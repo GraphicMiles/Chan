@@ -11,9 +11,9 @@ import {
   updateDoc,
   getDoc,
 } from 'firebase/firestore'
-import { db } from '../lib/firebase.js'
-import { useAuth } from './useAuth.jsx'
-import { parseJsonResponse } from '../lib/api.js'
+import { db } from '../../../shared/lib/firebase.js'
+import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
+import { parseJsonResponse } from '../../../shared/lib/api.js'
 
 export function useRoom(roomId, inviteCode = null) {
   const { user } = useAuth()

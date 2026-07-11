@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { signInWithRedirect, getRedirectResult } from 'firebase/auth'
-import { useAuth } from '../hooks/useAuth.jsx'
-import { auth, googleProvider } from '../lib/firebase.js'
+import { signInWithRedirect } from 'firebase/auth'
+import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
+import { auth, googleProvider } from '../../../shared/lib/firebase.js'
+import { Button, Input, Card } from '../../../shared/ui/index.js'
+import styles from './AuthPage.module.css'
 
-export default function Auth() {
+export default function AuthPage() {
   const { login, register, loginWithGoogle, user } = useAuth()
   const navigate = useNavigate()
   const [mode, setMode] = useState('login')
@@ -59,32 +61,70 @@ export default function Auth() {
   }
 
   return (
-    <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div className="card" style={{ width: '100%', maxWidth: 400 }}>
-        <h1 style={{ fontSize: '1.75rem', marginBottom: '1.25rem' }}>Chan</h1>
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-          <button className={`btn ${mode === 'login' ? '' : 'secondary'}`} onClick={() => setMode('login')} type="button">Sign in</button>
-          <button className={`btn ${mode === 'register' ? '' : 'secondary'}`} onClick={() => setMode('register')} type="button">Create account</button>
+    <div className={styles.page}>
+      <Card className={styles.card}>
+        <h1 className={styles.title}>Welcome to Chan</h1>
+        <p className={styles.subtitle}>Watch together, chat, and share your screen.</p>
+
+        <div className={styles.tabs}>
+          <Button
+            variant={mode === 'login' ? 'primary' : 'secondary'}
+            onClick={() => setMode('login')}
+            type="button"
+            fullWidth
+          >
+            Sign in
+          </Button>
+          <Button
+            variant={mode === 'register' ? 'primary' : 'secondary'}
+            onClick={() => setMode('register')}
+            type="button"
+            fullWidth
+          >
+            Create account
+          </Button>
         </div>
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+
+        <form onSubmit={submit} className={styles.form}>
           {mode === 'register' && (
-            <input className="input" placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
+            <Input
+              placeholder="Display name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              required
+            />
           )}
-          <input className="input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <input className="input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          <button className="btn" type="submit" disabled={working}>
-            {working ? 'Please wait...' : (mode === 'login' ? 'Sign in' : 'Create account')}
-          </button>
+          <Input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <Input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <Button type="submit" disabled={working} fullWidth>
+            {working ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
+          </Button>
         </form>
-        <div style={{ textAlign: 'center', margin: '1rem 0' }}>or</div>
-        <button className="btn secondary" onClick={handleGoogle} type="button" style={{ width: '100%' }} disabled={working}>
-          {working ? 'Please wait...' : 'Continue with Google'}
-        </button>
-        {error && <p style={{ color: 'var(--ember)', marginTop: '1rem' }}>{error}</p>}
-        <p style={{ marginTop: '1rem', textAlign: 'center', color: 'var(--fog)', fontSize: '0.85rem' }}>
+
+        <div className={styles.divider}>or</div>
+
+        <Button variant="secondary" onClick={handleGoogle} type="button" fullWidth disabled={working}>
+          Continue with Google
+        </Button>
+
+        {error && <p className={styles.error}>{error}</p>}
+
+        <p className={styles.footer}>
           <Link to="/">Back home</Link>
         </p>
-      </div>
+      </Card>
     </div>
   )
 }

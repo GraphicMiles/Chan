@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore'
-import { db } from '../lib/firebase.js'
-import { useAuth } from './useAuth.jsx'
+import { db } from '../../../shared/lib/firebase.js'
+import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 
 const SYNC_THRESHOLD = 1.5
 

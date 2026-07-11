@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { createRoom, connectToLivekit, publishScreenShare, publishCameraShare, isDisplayMediaSupported, getHostVideoTrack } from '../lib/livekit.js'
-import { parseJsonResponse } from '../lib/api.js'
+import { createRoom, connectToLivekit, publishScreenShare, publishCameraShare, isDisplayMediaSupported, getHostVideoTrack } from '../services/livekit.js'
+import { parseJsonResponse } from '../../../shared/lib/api.js'
 
 export default function ScreenShare({ roomId, isHost, user }) {
   const videoRef = useRef(null)

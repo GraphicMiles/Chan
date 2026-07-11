@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore'
-import { db } from '../lib/firebase.js'
-import { useAuth } from '../hooks/useAuth.jsx'
-import { extractVideoId, searchVideos, getThumbnail } from '../lib/youtube.js'
-import { parseJsonResponse } from '../lib/api.js'
+import { db } from '../../../shared/lib/firebase.js'
+import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
+import { extractVideoId, searchVideos, getThumbnail } from '../../../shared/lib/youtube.js'
+import { parseJsonResponse } from '../../../shared/lib/api.js'
+import { Button, Input, Card, Spinner } from '../../../shared/ui/index.js'
+import styles from './CreateRoomPage.module.css'
 
 function makeInviteCode() {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
 }
 
-export default function CreateRoom() {
+export default function CreateRoomPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
@@ -81,7 +83,6 @@ export default function CreateRoom() {
         updatedBy: user.uid,
       })
 
-      // Add the host as a participant via the server function so security rules stay strict
       const joinRes = await fetch('/api/joinRoom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -95,7 +96,7 @@ export default function CreateRoom() {
       if (!joinRes.ok) throw new Error(joinData.error || 'Could not add host to room')
 
       navigate(`/room/${roomId}`)
-  } catch (err) {
+    } catch (err) {
       console.error('Create room error:', err)
       setError(err.message || 'Could not create room. Please try again.')
       setCreating(false)
@@ -103,57 +104,84 @@ export default function CreateRoom() {
   }
 
   return (
-    <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div className="card" style={{ width: '100%', maxWidth: 540 }}>
-        <h1 style={{ fontSize: '1.5rem', marginBottom: '1.25rem' }}>Start a Room</h1>
-        <form onSubmit={create} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <input className="input" placeholder="Room title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+    <div className={styles.page}>
+      <Card className={styles.card}>
+        <h1 className={styles.title}>Start a Room</h1>
+        <p className={styles.subtitle}>Pick a YouTube video and invite others to watch with you.</p>
 
-          <input className="input" placeholder="Paste YouTube URL" value={url} onChange={(e) => onUrlChange(e.target.value)} />
+        <form onSubmit={create} className={styles.form}>
+          <Input
+            placeholder="Room title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input className="input" placeholder="Or search YouTube" value={search} onChange={(e) => setSearch(e.target.value)} />
-            <button className="btn secondary" type="button" onClick={onSearch}>Search</button>
+          <Input
+            placeholder="Paste YouTube URL"
+            value={url}
+            onChange={(e) => onUrlChange(e.target.value)}
+          />
+
+          <div className={styles.row}>
+            <Input
+              placeholder="Or search YouTube"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <Button variant="secondary" type="button" onClick={onSearch} className={styles.searchButton}>
+              Search
+            </Button>
           </div>
 
           {results.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.5rem' }}>
+            <div className={styles.results}>
               {results.map((item) => (
-                <button key={item.id.videoId} type="button" className="card" style={{ padding: '0.5rem', textAlign: 'left', cursor: 'pointer' }} onClick={() => selectVideo(item.id.videoId)}>
-                  <img src={getThumbnail(item.id.videoId)} alt="" style={{ width: '100%', borderRadius: '0.25rem' }} />
-                  <p style={{ fontSize: '0.75rem', marginTop: '0.4rem', color: 'var(--paper)', lineHeight: 1.2 }}>{item.snippet.title}</p>
+                <button key={item.id.videoId} type="button" className={styles.result} onClick={() => selectVideo(item.id.videoId)}>
+                  <img src={getThumbnail(item.id.videoId)} alt="" className={styles.resultThumb} />
+                  <p className={styles.resultTitle}>{item.snippet.title}</p>
                 </button>
               ))}
             </div>
           )}
 
           {videoId && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(124,137,247,0.12)', padding: '0.5rem 0.75rem', borderRadius: '0.5rem' }}>
-              <img src={getThumbnail(videoId)} alt="" style={{ width: 80, borderRadius: '0.25rem' }} />
-              <span className="mono">Selected: {videoId}</span>
+            <div className={styles.selected}>
+              <img src={getThumbnail(videoId)} alt="" className={styles.selectedThumb} />
+              <span className={styles.selectedText}>Selected: {videoId}</span>
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <label style={{ flex: 1, color: 'var(--fog)', fontSize: '0.9rem' }}>
-              Capacity
-              <input className="input" type="number" min={1} max={12} value={capacity} onChange={(e) => setCapacity(e.target.value)} style={{ marginTop: '0.25rem' }} />
+          <div className={styles.settings}>
+            <label className={styles.setting}>
+              <span className={styles.note}>Capacity</span>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+              />
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--fog)', fontSize: '0.9rem' }}>
+            <label className={styles.checkbox}>
               <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
               Private room
             </label>
           </div>
 
-          {isPrivate && <p className="mono" style={{ color: 'var(--fog)' }}>An invite code will be generated automatically.</p>}
+          {isPrivate && <p className={styles.note}>An invite code will be generated automatically.</p>}
 
-          <button className="btn" type="submit" disabled={creating}>
-            {creating ? 'Creating room...' : 'Create room'}
-          </button>
+          <Button type="submit" disabled={creating}>
+            {creating ? <Spinner size={18} /> : 'Create room'}
+          </Button>
         </form>
-        {error && <p style={{ color: 'var(--ember)', marginTop: '1rem', padding: '0.75rem', background: 'rgba(255,107,71,0.12)', borderRadius: '0.5rem' }}>{error}</p>}
-        <p style={{ marginTop: '1rem' }}><Link to="/">Cancel</Link></p>
-      </div>
+
+        {error && <p className={styles.error}>{error}</p>}
+
+        <p className={styles.footer}>
+          <Link to="/">Cancel</Link>
+        </p>
+      </Card>
     </div>
   )
 }

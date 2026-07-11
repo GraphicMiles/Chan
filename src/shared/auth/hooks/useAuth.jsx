@@ -10,7 +10,7 @@ import {
   updateProfile,
 } from 'firebase/auth'
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'
-import { auth, db, googleProvider } from '../lib/firebase.js'
+import { auth, db, googleProvider } from '../../lib/firebase.js'
 
 const AuthContext = createContext(null)
 
