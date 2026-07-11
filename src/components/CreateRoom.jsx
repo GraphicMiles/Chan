@@ -80,14 +80,21 @@ export default function CreateRoom() {
         updatedBy: user.uid,
       })
 
-      await setDoc(doc(db, 'rooms', roomId, 'participants', user.uid), {
+    // Add the host as a participant via the server function so security rules stay strict
+    const joinRes = await fetch('/api/joinRoom', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        roomId,
+        uid: user.uid,
         displayName: user.displayName || user.email?.split('@')[0] || 'Host',
-        role: 'host',
-        joinedAt: serverTimestamp(),
-      })
+      }),
+    })
+    const joinData = await joinRes.json()
+    if (!joinRes.ok) throw new Error(joinData.error || 'Could not add host to room')
 
-      navigate(`/room/${roomId}`)
-    } catch (err) {
+    navigate(`/room/${roomId}`)
+  } catch (err) {
       console.error('Create room error:', err)
       setError(err.message || 'Could not create room. Please try again.')
       setCreating(false)

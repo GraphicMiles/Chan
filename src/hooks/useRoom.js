@@ -8,11 +8,8 @@ import {
   orderBy,
   addDoc,
   serverTimestamp,
-  deleteDoc,
   updateDoc,
   getDoc,
-  runTransaction,
-  increment,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase.js'
 import { useAuth } from './useAuth.jsx'
@@ -49,15 +46,13 @@ export function useRoom(roomId, inviteCode = null) {
   const leave = useCallback(async () => {
     if (!user || !roomId) return
     try {
-      const roomRef = doc(db, 'rooms', roomId)
-      const participantRef = doc(db, 'rooms', roomId, 'participants', user.uid)
-      await runTransaction(db, async (t) => {
-        const snap = await t.get(participantRef)
-        if (snap.exists()) {
-          t.delete(participantRef)
-          t.update(roomRef, { participantCount: increment(-1) })
-        }
+      const res = await fetch('/api/leaveRoom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId, uid: user.uid }),
       })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not leave room')
       setJoined(false)
     } catch (err) {
       console.error(err)
