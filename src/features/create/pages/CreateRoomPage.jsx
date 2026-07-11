@@ -5,7 +5,7 @@ import { db } from '../../../shared/lib/firebase.js'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import { extractVideoId, searchVideos, getThumbnail } from '../../../shared/lib/youtube.js'
 import { parseJsonResponse } from '../../../shared/lib/api.js'
-import { Button, Input, Card, Spinner } from '../../../shared/ui/index.js'
+import { Button, Input, Card, useToast } from '../../../shared/ui/index.js'
 import styles from './CreateRoomPage.module.css'
 
 function makeInviteCode() {
@@ -15,6 +15,7 @@ function makeInviteCode() {
 export default function CreateRoomPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
   const [capacity, setCapacity] = useState(12)
@@ -24,6 +25,7 @@ export default function CreateRoomPage() {
   const [videoId, setVideoId] = useState('')
   const [error, setError] = useState(null)
   const [creating, setCreating] = useState(false)
+  const [searching, setSearching] = useState(false)
 
   if (!user) return <Link to="/auth">Sign in to create a room</Link>
 
@@ -40,8 +42,16 @@ export default function CreateRoomPage() {
   const onSearch = async (e) => {
     e.preventDefault()
     if (!search.trim()) return
-    const items = await searchVideos(search)
-    setResults(items)
+    setSearching(true)
+    try {
+      const items = await searchVideos(search)
+      setResults(items)
+      if (!items.length) toast('No videos found', { variant: 'warning' })
+    } catch (err) {
+      toast(err.message || 'Search failed', { variant: 'error' })
+    } finally {
+      setSearching(false)
+    }
   }
 
   const selectVideo = (id) => {
@@ -69,6 +79,7 @@ export default function CreateRoomPage() {
         isPrivate,
         inviteCode,
         coHosts: [],
+        locked: false,
         capacity: Math.min(Math.max(Number(capacity) || 12, 1), 12),
         status: 'live',
         participantCount: 1,
@@ -91,15 +102,18 @@ export default function CreateRoomPage() {
           roomId,
           uid: user.uid,
           displayName: user.displayName || 'Host',
+          inviteCode: inviteCode || undefined,
         }),
       })
       const joinData = await parseJsonResponse(joinRes)
       if (!joinRes.ok) throw new Error(joinData.error || 'Could not add host to room')
 
-      navigate(`/room/${roomId}`)
+      toast('Room created', { variant: 'success' })
+      navigate(`/room/${roomId}${inviteCode ? `?invite=${inviteCode}` : ''}`)
     } catch (err) {
       console.error('Create room error:', err)
       setError(err.message || 'Could not create room. Please try again.')
+      toast(err.message || 'Could not create room', { variant: 'error' })
       setCreating(false)
     }
   }
@@ -116,6 +130,7 @@ export default function CreateRoomPage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
+            maxLength={80}
           />
 
           <Input
@@ -130,7 +145,13 @@ export default function CreateRoomPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <Button variant="secondary" type="button" onClick={onSearch} className={styles.searchButton}>
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={onSearch}
+              className={styles.searchButton}
+              loading={searching}
+            >
               Search
             </Button>
           </div>
@@ -138,7 +159,12 @@ export default function CreateRoomPage() {
           {results.length > 0 && (
             <div className={styles.results}>
               {results.map((item) => (
-                <button key={item.id.videoId} type="button" className={styles.result} onClick={() => selectVideo(item.id.videoId)}>
+                <button
+                  key={item.id.videoId}
+                  type="button"
+                  className={styles.result}
+                  onClick={() => selectVideo(item.id.videoId)}
+                >
                   <img src={getThumbnail(item.id.videoId)} alt="" className={styles.resultThumb} />
                   <p className={styles.resultTitle}>{item.snippet.title}</p>
                 </button>
@@ -165,15 +191,19 @@ export default function CreateRoomPage() {
               />
             </label>
             <label className={styles.checkbox}>
-              <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+              />
               Private room
             </label>
           </div>
 
           {isPrivate && <p className={styles.note}>An invite code will be generated automatically.</p>}
 
-          <Button type="submit" disabled={creating}>
-            {creating ? <Spinner size={18} /> : 'Create room'}
+          <Button type="submit" loading={creating} fullWidth>
+            Create room
           </Button>
         </form>
 

@@ -19,7 +19,12 @@ export default async function handler(req, res) {
     let targetRoomId = roomId
 
     if (!targetRoomId && inviteCode) {
-      const snap = await db.collection('rooms').where('inviteCode', '==', inviteCode.toUpperCase()).where('status', '==', 'live').limit(1).get()
+      const snap = await db
+        .collection('rooms')
+        .where('inviteCode', '==', String(inviteCode).toUpperCase())
+        .where('status', '==', 'live')
+        .limit(1)
+        .get()
       if (snap.empty) return sendResponse(res, 404, { error: 'Room not found or invite code invalid' }, headers)
       targetRoomId = snap.docs[0].id
     }
@@ -40,12 +45,29 @@ export default async function handler(req, res) {
       const participantSnap = await t.get(participantRef)
       if (participantSnap.exists) return
 
-      const participantsSnap = await roomRef.collection('participants').get()
-      if (participantsSnap.size >= room.capacity) throw new Error('Room is full')
+      // Host can always rejoin; locked blocks new non-host joins.
+      if (room.locked === true && room.hostId !== uid) {
+        throw new Error('Room is locked — the host is not accepting new joins')
+      }
+
+      // Host always allowed; others need invite code for private rooms.
+      if (room.isPrivate === true && room.hostId !== uid) {
+        const code = String(inviteCode || '').toUpperCase()
+        if (!code || code !== String(room.inviteCode || '').toUpperCase()) {
+          throw new Error('Private room — invite code required')
+        }
+      }
+
+      // Capacity check inside transaction (reads all participant docs).
+      const participantsSnap = await t.get(roomRef.collection('participants'))
+      if (participantsSnap.size >= (room.capacity || 12)) {
+        throw new Error('Room is full — ask the host to raise capacity')
+      }
 
       t.set(participantRef, {
         displayName,
         role: room.hostId === uid ? 'host' : 'viewer',
+        muted: false,
         joinedAt: FieldValue.serverTimestamp(),
       })
       t.update(roomRef, { participantCount: participantsSnap.size + 1 })
@@ -54,6 +76,8 @@ export default async function handler(req, res) {
     return sendResponse(res, 200, { roomId: targetRoomId }, headers)
   } catch (err) {
     console.error('joinRoom error', err)
-    return sendResponse(res, 500, { error: err.message || 'Internal error' }, headers)
+    const msg = err.message || 'Internal error'
+    const status = /full|locked|Private|ended|not found|invite/i.test(msg) ? 400 : 500
+    return sendResponse(res, status, { error: msg }, headers)
   }
 }

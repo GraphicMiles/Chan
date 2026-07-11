@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import { useRoom } from '../hooks/useRoom.js'
@@ -10,7 +10,7 @@ import ParticipantList from '../components/ParticipantList.jsx'
 import { SyncPulse } from '../../../shared/components/SyncPulse.jsx'
 import { extractVideoId } from '../../../shared/lib/youtube.js'
 import { isDisplayMediaSupported } from '../services/livekit.js'
-import { Button, Input, Card, IconButton } from '../../../shared/ui/index.js'
+import { Button, Input, Card, IconButton, Modal, useToast } from '../../../shared/ui/index.js'
 import { Layout } from '../../../shared/layout/index.js'
 import ShareRoom from '../components/ShareRoom.jsx'
 import styles from './RoomPage.module.css'
@@ -21,33 +21,173 @@ export default function RoomPage() {
   const inviteCode = searchParams.get('invite')
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [showChat, setShowChat] = useState(true)
+  const { toast } = useToast()
+
+  const [showChat, setShowChat] = useState(() => (typeof window !== 'undefined' ? window.innerWidth > 768 : true))
   const [newVideoUrl, setNewVideoUrl] = useState('')
   const [showVideoInput, setShowVideoInput] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [endConfirmOpen, setEndConfirmOpen] = useState(false)
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const [shareBanner, setShareBanner] = useState('')
+  const [busy, setBusy] = useState(false)
   const playerRef = useRef(null)
-  const { room, participants, messages, error, joined, activityType, endRoom, sendMessage, updateRoom, typing, setTyping, kickParticipant, promoteParticipant, muteParticipant } = useRoom(roomId, inviteCode)
+  const prevActivity = useRef(null)
+
+  const {
+    room,
+    participants,
+    messages,
+    error,
+    joined,
+    activityType,
+    endRoom,
+    leave,
+    sendMessage,
+    updateRoom,
+    typing,
+    setTyping,
+    kickParticipant,
+    promoteParticipant,
+    muteParticipant,
+  } = useRoom(roomId, inviteCode)
+
   const { isHost, writePlayerState, canControl } = usePlayerSync(roomId, room, playerRef)
 
-  if (!user) return <div className={styles.loading}><Link to="/auth">Sign in to join</Link></div>
-  if (error) return <div className={styles.error}>{error}</div>
+  useEffect(() => {
+    if (!activityType) return
+    if (prevActivity.current && prevActivity.current !== activityType) {
+      if (activityType === 'screenshare') {
+        const hostName = room?.hostName || 'Host'
+        setShareBanner(`${hostName} is sharing their screen`)
+        const t = window.setTimeout(() => setShareBanner(''), 3500)
+        return () => window.clearTimeout(t)
+      }
+    }
+    prevActivity.current = activityType
+  }, [activityType, room?.hostName])
+
+  // Esc closes mobile chat
+  useEffect(() => {
+    if (!showChat) return
+    const onKey = (e) => {
+      if (e.key === 'Escape' && window.innerWidth <= 768) setShowChat(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showChat])
+
+  if (!user) {
+    return (
+      <div className={styles.loading}>
+        <Link to="/auth">Sign in to join</Link>
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className={styles.error}>
+        <p>{error}</p>
+        <Button as={Link} to="/" variant="secondary">Back home</Button>
+      </div>
+    )
+  }
   if (!room) return <div className={styles.loading}>Loading room…</div>
   if (!joined) return <div className={styles.joining}>Joining room…</div>
 
   const isYoutube = activityType === 'youtube'
+  const canShareScreen = isDisplayMediaSupported()
 
   const switchActivity = async (type) => {
-    await updateRoom({ activityType: type })
+    if (type === 'screenshare' && !canShareScreen) {
+      toast('Screen share needs a desktop browser. On mobile, only watching is supported.', { variant: 'warning' })
+      return
+    }
+    try {
+      setBusy(true)
+      await updateRoom({ activityType: type })
+    } catch (err) {
+      toast(err.message || 'Could not switch mode', { variant: 'error' })
+    } finally {
+      setBusy(false)
+    }
   }
 
   const changeVideo = async (e) => {
     e.preventDefault()
     const id = extractVideoId(newVideoUrl)
-    if (!id) return alert('Invalid YouTube URL')
-    await updateRoom({ videoId: id, activityType: 'youtube' })
-    await writePlayerState({ videoId: id, isPlaying: false, currentTime: 0 })
-    setNewVideoUrl('')
-    setShowVideoInput(false)
+    if (!id) {
+      toast('Paste a valid YouTube URL', { variant: 'error' })
+      return
+    }
+    try {
+      setBusy(true)
+      await updateRoom({ videoId: id, activityType: 'youtube' })
+      await writePlayerState({ videoId: id, isPlaying: false, currentTime: 0 })
+      setNewVideoUrl('')
+      setShowVideoInput(false)
+      toast('Video updated', { variant: 'success' })
+    } catch (err) {
+      toast(err.message || 'Could not update video', { variant: 'error' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveTitle = async () => {
+    const next = titleDraft.trim()
+    if (!next || next === room.title) {
+      setEditingTitle(false)
+      return
+    }
+    try {
+      await updateRoom({ title: next })
+      toast('Title updated', { variant: 'success' })
+      setEditingTitle(false)
+    } catch (err) {
+      toast(err.message || 'Could not update title', { variant: 'error' })
+    }
+  }
+
+  const toggleLock = async () => {
+    try {
+      await updateRoom({ locked: !room.locked })
+      toast(room.locked ? 'Room unlocked' : 'Room locked — new joins blocked', { variant: 'success' })
+    } catch (err) {
+      toast(err.message || 'Could not update lock', { variant: 'error' })
+    }
+  }
+
+  const confirmEnd = async () => {
+    try {
+      setBusy(true)
+      await endRoom()
+    } catch (err) {
+      toast(err.message || 'Could not end room', { variant: 'error' })
+      setBusy(false)
+    }
+  }
+
+  const confirmLeave = async () => {
+    try {
+      setBusy(true)
+      await leave()
+      navigate('/')
+    } catch (err) {
+      toast(err.message || 'Could not leave', { variant: 'error' })
+      setBusy(false)
+    }
+  }
+
+  const requestLeave = () => {
+    if (isHost && activityType === 'screenshare') {
+      setLeaveConfirmOpen(true)
+      return
+    }
+    confirmLeave()
   }
 
   const onPlayerReady = (player) => {
@@ -61,21 +201,41 @@ export default function RoomPage() {
   const header = (
     <header className={styles.header}>
       <div className={styles.roomTitle}>
-        <Link to="/" style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text-primary)', fontSize: '1.25rem', textDecoration: 'none' }}>
+        <Link to="/" className={styles.brand}>
           Chan
         </Link>
         <SyncPulse active size={18} />
-        <h1 className={styles.titleText}>{room.title}</h1>
+        {editingTitle && isHost ? (
+          <form
+            className={styles.titleEdit}
+            onSubmit={(e) => {
+              e.preventDefault()
+              saveTitle()
+            }}
+          >
+            <Input
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              maxLength={80}
+              autoFocus
+            />
+            <Button type="submit" size="sm">Save</Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setEditingTitle(false)}>Cancel</Button>
+          </form>
+        ) : (
+          <h1 className={styles.titleText}>{room.title}</h1>
+        )}
+        {room.locked && <span className={styles.lockBadge}>Locked</span>}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className={styles.headerActions}>
         <Button variant="secondary" size="sm" onClick={() => setShareOpen(true)}>Share</Button>
-        <IconButton onClick={() => setShowChat((s) => !s)} active={showChat}>
+        <IconButton onClick={() => setShowChat((s) => !s)} active={showChat} aria-label="Toggle chat">
           {showChat ? '💬' : '🗨️'}
         </IconButton>
         {isHost ? (
-          <Button variant="danger" size="sm" onClick={endRoom}>End room</Button>
+          <Button variant="danger" size="sm" onClick={() => setEndConfirmOpen(true)}>End room</Button>
         ) : (
-          <Button variant="danger" size="sm" onClick={() => navigate('/')}>Leave</Button>
+          <Button variant="danger" size="sm" onClick={requestLeave}>Leave</Button>
         )}
       </div>
     </header>
@@ -87,71 +247,170 @@ export default function RoomPage() {
         <div className={styles.stage}>
           <div className={styles.playerWrap}>
             {isYoutube ? (
-              <VideoPlayer videoId={room.videoId} isHost={isHost} onReady={onPlayerReady} onPlayerEvent={onPlayerEvent} />
+              <VideoPlayer
+                videoId={room.videoId}
+                isHost={canControl}
+                onReady={onPlayerReady}
+                onPlayerEvent={onPlayerEvent}
+              />
             ) : (
               <ScreenShare roomId={roomId} isHost={isHost} user={user} />
             )}
+            {shareBanner && <div className={styles.shareBanner}>{shareBanner}</div>}
           </div>
 
           {canControl && (
-            <Card>
+            <Card className={styles.controlsCard}>
               <div className={styles.controls}>
-                <Button variant="secondary" size="sm" onClick={() => setShowVideoInput((s) => !s)}>Change video</Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowVideoInput((s) => !s)}>
+                  Change video
+                </Button>
                 {isYoutube ? (
-                  <Button variant="secondary" size="sm" onClick={() => switchActivity('screenshare')}>
-                    {isDisplayMediaSupported() ? 'Share screen' : 'Share camera'}
-                  </Button>
+                  canShareScreen ? (
+                    <Button variant="secondary" size="sm" loading={busy} onClick={() => switchActivity('screenshare')}>
+                      Share screen
+                    </Button>
+                  ) : (
+                    <span className={styles.screenNote}>Screen share needs a desktop browser</span>
+                  )
                 ) : (
-                  <Button variant="secondary" size="sm" onClick={() => switchActivity('youtube')}>
-                    {isDisplayMediaSupported() ? 'Stop screen share' : 'Stop camera share'}
+                  <Button variant="secondary" size="sm" loading={busy} onClick={() => switchActivity('youtube')}>
+                    Stop screen share
                   </Button>
+                )}
+                {isHost && (
+                  <>
+                    <Button variant="secondary" size="sm" onClick={toggleLock}>
+                      {room.locked ? 'Unlock room' : 'Lock room'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setTitleDraft(room.title || '')
+                        setEditingTitle(true)
+                      }}
+                    >
+                      Edit title
+                    </Button>
+                  </>
                 )}
               </div>
               {showVideoInput && (
                 <form onSubmit={changeVideo} className={styles.videoForm}>
-                  <Input placeholder="Paste new YouTube URL" value={newVideoUrl} onChange={(e) => setNewVideoUrl(e.target.value)} />
-                  <Button type="submit">Update</Button>
+                  <Input
+                    placeholder="Paste new YouTube URL"
+                    value={newVideoUrl}
+                    onChange={(e) => setNewVideoUrl(e.target.value)}
+                  />
+                  <Button type="submit" loading={busy}>Update</Button>
                 </form>
               )}
             </Card>
           )}
 
-          <div className={styles.grid}>
-            <ParticipantList
-              participants={participants}
-              hostId={room.hostId}
-              coHosts={room.coHosts}
-              currentUserId={user?.uid}
-              isHost={isHost}
-              onKick={kickParticipant}
-              onPromote={promoteParticipant}
-              onMute={muteParticipant}
-            />
-            <Card className={styles.infoCard}>
-              <h3 style={{ fontSize: '1rem', margin: 0 }}>Room info</h3>
-              <p className="mono">Capacity: {participants.length}/{room.capacity}</p>
-              <p className="mono">Mode: {isYoutube ? 'YouTube' : 'Screen share'}</p>
-              {room.isPrivate && <p className="mono">Invite: {room.inviteCode}</p>}
-            </Card>
+          <div className={styles.metaBar}>
+            <button
+              type="button"
+              className={styles.metaToggle}
+              onClick={() => setDetailsOpen((s) => !s)}
+              aria-expanded={detailsOpen}
+            >
+              <span>
+                {participants.length}/{room.capacity} watching · {isYoutube ? 'YouTube' : 'Screen share'}
+              </span>
+              <span className={styles.metaChevron}>{detailsOpen ? '▾' : '▸'}</span>
+            </button>
+            {detailsOpen && (
+              <div className={styles.details}>
+                <ParticipantList
+                  participants={participants}
+                  hostId={room.hostId}
+                  coHosts={room.coHosts}
+                  currentUserId={user?.uid}
+                  isHost={isHost}
+                  onKick={async (uid) => {
+                    try {
+                      await kickParticipant(uid)
+                      toast('Participant removed', { variant: 'success' })
+                    } catch (err) {
+                      toast(err.message || 'Kick failed', { variant: 'error' })
+                    }
+                  }}
+                  onPromote={async (uid, role) => {
+                    try {
+                      await promoteParticipant(uid, role)
+                      toast(role === 'co-host' ? 'Promoted to co-host' : 'Demoted to viewer', { variant: 'success' })
+                    } catch (err) {
+                      toast(err.message || 'Update failed', { variant: 'error' })
+                    }
+                  }}
+                  onMute={async (uid, muted) => {
+                    try {
+                      await muteParticipant(uid, muted)
+                      toast(muted ? 'Muted' : 'Unmuted', { variant: 'success' })
+                    } catch (err) {
+                      toast(err.message || 'Mute failed', { variant: 'error' })
+                    }
+                  }}
+                />
+                <Card className={styles.infoCard}>
+                  <h3 className={styles.infoTitle}>Room info</h3>
+                  <p className="mono">Host: {room.hostName}</p>
+                  <p className="mono">Capacity: {participants.length}/{room.capacity}</p>
+                  <p className="mono">Mode: {isYoutube ? 'YouTube' : 'Screen share'}</p>
+                  {room.isPrivate && <p className="mono">Invite: {room.inviteCode}</p>}
+                  {room.locked && <p className="mono">Joins locked</p>}
+                </Card>
+              </div>
+            )}
           </div>
         </div>
 
         {showChat && (
           <>
             <div className={styles.overlay} onClick={() => setShowChat(false)} />
-            <aside className={`${styles.sidebar} ${showChat ? styles.open : ''}`}>
+            <aside className={`${styles.sidebar} ${showChat ? styles.open : ''}`} role="dialog" aria-label="Chat">
               <div className={styles.sidebarHeader}>
                 <h3 className={styles.sidebarTitle}>Chat</h3>
-                <IconButton onClick={() => setShowChat(false)}>✕</IconButton>
+                <IconButton onClick={() => setShowChat(false)} aria-label="Close chat">✕</IconButton>
               </div>
               <div className={styles.sidebarContent}>
-                <Chat messages={messages} sendMessage={sendMessage} user={user} roomId={roomId} typing={typing} setTyping={setTyping} />
+                <Chat
+                  messages={messages}
+                  sendMessage={sendMessage}
+                  user={user}
+                  roomId={roomId}
+                  typing={typing}
+                  setTyping={setTyping}
+                />
               </div>
             </aside>
           </>
         )}
       </div>
+
       <ShareRoom room={room} roomId={roomId} open={shareOpen} onClose={() => setShareOpen(false)} />
+
+      <Modal open={endConfirmOpen} title="End this room?" onClose={() => setEndConfirmOpen(false)}>
+        <p className={styles.confirmText}>
+          This ends the room for everyone. Viewers will be disconnected and the room will be marked ended.
+        </p>
+        <div className={styles.confirmActions}>
+          <Button variant="secondary" onClick={() => setEndConfirmOpen(false)}>Cancel</Button>
+          <Button variant="danger" loading={busy} onClick={confirmEnd}>End room</Button>
+        </div>
+      </Modal>
+
+      <Modal open={leaveConfirmOpen} title="Leave while sharing?" onClose={() => setLeaveConfirmOpen(false)}>
+        <p className={styles.confirmText}>
+          You are currently sharing your screen. Leaving will stop the share for everyone.
+        </p>
+        <div className={styles.confirmActions}>
+          <Button variant="secondary" onClick={() => setLeaveConfirmOpen(false)}>Stay</Button>
+          <Button variant="danger" loading={busy} onClick={confirmLeave}>Leave room</Button>
+        </div>
+      </Modal>
     </Layout>
   )
 }

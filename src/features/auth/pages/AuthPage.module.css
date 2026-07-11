@@ -68,7 +68,10 @@
   color: var(--danger);
   border-radius: var(--radius-md);
   font-size: 0.9rem;
+  white-space: pre-wrap;
+  line-height: 1.45;
 }
+
 
 .footer {
   margin-top: 1rem;

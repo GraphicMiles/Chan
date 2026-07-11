@@ -23,7 +23,7 @@ export default function RoomCard({ room }) {
       </div>
       <div className={styles.footer}>
         <span className={styles.viewers}>
-          <Avatar name={room.hostName} size={20} />
+          <Avatar name={room.hostName} uid={room.hostId} size={20} />
           {room.participantCount}/{room.capacity || 12} watching
         </span>
       </div>

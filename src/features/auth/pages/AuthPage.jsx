@@ -9,6 +9,7 @@ export default function AuthPage() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   if (user) {
     navigate('/')
@@ -17,12 +18,13 @@ export default function AuthPage() {
 
   const submit = async (e) => {
     e.preventDefault()
+    setError('')
     setLoading(true)
     try {
       await signInAnonymously(name.trim() || 'Viewer')
       navigate('/')
     } catch (err) {
-      alert(err.message || 'Could not join anonymously')
+      setError(err.message || 'Could not join anonymously')
       setLoading(false)
     }
   }
@@ -39,11 +41,17 @@ export default function AuthPage() {
             onChange={(e) => setName(e.target.value)}
             required
             maxLength={30}
+            autoComplete="nickname"
           />
-          <Button type="submit" disabled={loading} fullWidth>
-            {loading ? 'Joining…' : 'Continue anonymously'}
+          <Button type="submit" loading={loading} fullWidth>
+            Continue anonymously
           </Button>
         </form>
+        {error && (
+          <div className={styles.error} role="alert">
+            {error}
+          </div>
+        )}
       </Card>
     </div>
   )
