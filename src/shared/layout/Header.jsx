@@ -14,7 +14,7 @@ export function Header({ user, actions, className }) {
         {user && (
           <div className={styles.user}>
             <Avatar name={user.displayName || user.email} size={28} />
-            <span className={styles.userName}>{user.displayName || user.email}</span>
+            <span className={styles.userName}>{user.displayName || 'Anonymous'}</span>
           </div>
         )}
         {actions}

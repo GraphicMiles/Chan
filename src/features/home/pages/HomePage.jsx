@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../../../shared/lib/firebase.js'
@@ -14,6 +14,8 @@ export default function HomePage() {
   const [rooms, setRooms] = useState([])
   const [inviteCode, setInviteCode] = useState('')
   const [roomsLoading, setRoomsLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState('newest')
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'rooms'), (snap) => {
@@ -21,12 +23,26 @@ export default function HomePage() {
         snap.docs
           .map((d) => ({ id: d.id, ...d.data() }))
           .filter((r) => r.status === 'live' && !r.isPrivate)
-          .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
       )
       setRoomsLoading(false)
     })
     return unsub
   }, [])
+
+  const filteredRooms = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    let list = rooms
+    if (term) {
+      list = rooms.filter((r) =>
+        r.title?.toLowerCase().includes(term) ||
+        r.hostName?.toLowerCase().includes(term)
+      )
+    }
+    return [...list].sort((a, b) => {
+      if (sortBy === 'popular') return (b.participantCount || 0) - (a.participantCount || 0)
+      return (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)
+    })
+  }, [rooms, search, sortBy])
 
   const joinByInvite = async (e) => {
     e.preventDefault()
@@ -42,7 +58,7 @@ export default function HomePage() {
       body: JSON.stringify({
         inviteCode: code,
         uid: user.uid,
-        displayName: user.displayName || user.email?.split('@')[0] || 'Viewer',
+        displayName: user.displayName || 'Viewer',
       }),
     })
     const data = await parseJsonResponse(res)
@@ -56,10 +72,10 @@ export default function HomePage() {
   const headerActions = user ? (
     <>
       <Button as={Link} to="/create">Start a Room</Button>
-      <Button variant="secondary" onClick={logout}>Sign out</Button>
+      <Button variant="secondary" onClick={logout}>New identity</Button>
     </>
   ) : (
-    <Button as={Link} to="/auth">Sign in</Button>
+    <Button as={Link} to="/auth">Join</Button>
   )
 
   return (
@@ -77,23 +93,46 @@ export default function HomePage() {
         </form>
       </div>
 
+      <div className={styles.controls}>
+        <Input
+          placeholder="Search rooms or hosts…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className={styles.search}
+        />
+        <div className={styles.sort}>
+          <button
+            className={`${styles.sortButton} ${sortBy === 'newest' ? styles.sortButtonActive : ''}`}
+            onClick={() => setSortBy('newest')}
+          >
+            Newest
+          </button>
+          <button
+            className={`${styles.sortButton} ${sortBy === 'popular' ? styles.sortButtonActive : ''}`}
+            onClick={() => setSortBy('popular')}
+          >
+            Popular
+          </button>
+        </div>
+      </div>
+
       {loading || roomsLoading ? (
         <div className={styles.loading}><Spinner /> Loading…</div>
-      ) : rooms.length === 0 ? (
+      ) : filteredRooms.length === 0 ? (
         <EmptyState
-          title="No live rooms right now"
-          description="Start one and invite people to watch together."
+          title={search ? 'No rooms match your search' : 'No live rooms right now'}
+          description={search ? 'Try a different term or start your own.' : 'Start one and invite people to watch together.'}
           action={
             user ? (
               <Button as={Link} to="/create">Start a Room</Button>
             ) : (
-              <Button as={Link} to="/auth">Sign in to start</Button>
+              <Button as={Link} to="/auth">Join to start</Button>
             )
           }
         />
       ) : (
         <div className={styles.grid}>
-          {rooms.map((room) => <RoomCard key={room.id} room={room} />)}
+          {filteredRooms.map((room) => <RoomCard key={room.id} room={room} />)}
         </div>
       )}
     </Layout>

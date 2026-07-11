@@ -62,12 +62,13 @@ export default function CreateRoomPage() {
       const inviteCode = isPrivate ? makeInviteCode() : ''
       await setDoc(doc(db, 'rooms', roomId), {
         hostId: user.uid,
-        hostName: user.displayName || user.email?.split('@')[0] || 'Host',
+        hostName: user.displayName || 'Host',
         title: title.trim(),
         activityType: 'youtube',
         videoId,
         isPrivate,
         inviteCode,
+        coHosts: [],
         capacity: Math.min(Math.max(Number(capacity) || 12, 1), 12),
         status: 'live',
         participantCount: 1,
@@ -89,7 +90,7 @@ export default function CreateRoomPage() {
         body: JSON.stringify({
           roomId,
           uid: user.uid,
-          displayName: user.displayName || user.email?.split('@')[0] || 'Host',
+          displayName: user.displayName || 'Host',
         }),
       })
       const joinData = await parseJsonResponse(joinRes)

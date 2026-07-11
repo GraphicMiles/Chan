@@ -12,6 +12,7 @@ import { extractVideoId } from '../../../shared/lib/youtube.js'
 import { isDisplayMediaSupported } from '../services/livekit.js'
 import { Button, Input, Card, IconButton } from '../../../shared/ui/index.js'
 import { Layout } from '../../../shared/layout/index.js'
+import ShareRoom from '../components/ShareRoom.jsx'
 import styles from './RoomPage.module.css'
 
 export default function RoomPage() {
@@ -23,9 +24,10 @@ export default function RoomPage() {
   const [showChat, setShowChat] = useState(true)
   const [newVideoUrl, setNewVideoUrl] = useState('')
   const [showVideoInput, setShowVideoInput] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const playerRef = useRef(null)
-  const { room, participants, messages, error, joined, activityType, endRoom, sendMessage, updateRoom, typing, setTyping } = useRoom(roomId, inviteCode)
-  const { isHost, writePlayerState } = usePlayerSync(roomId, room, playerRef)
+  const { room, participants, messages, error, joined, activityType, endRoom, sendMessage, updateRoom, typing, setTyping, kickParticipant, promoteParticipant, muteParticipant } = useRoom(roomId, inviteCode)
+  const { isHost, writePlayerState, canControl } = usePlayerSync(roomId, room, playerRef)
 
   if (!user) return <div className={styles.loading}><Link to="/auth">Sign in to join</Link></div>
   if (error) return <div className={styles.error}>{error}</div>
@@ -53,14 +55,7 @@ export default function RoomPage() {
   }
 
   const onPlayerEvent = (patch) => {
-    if (isHost) writePlayerState(patch)
-  }
-
-  const copyInvite = () => {
-    if (!room.inviteCode) return
-    const url = `${window.location.origin}/room/${roomId}?invite=${room.inviteCode}`
-    navigator.clipboard.writeText(url)
-    alert('Invite link copied')
+    if (canControl) writePlayerState(patch)
   }
 
   const header = (
@@ -73,9 +68,7 @@ export default function RoomPage() {
         <h1 className={styles.titleText}>{room.title}</h1>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        {isHost && room.isPrivate && (
-          <Button variant="secondary" size="sm" onClick={copyInvite}>Copy invite</Button>
-        )}
+        <Button variant="secondary" size="sm" onClick={() => setShareOpen(true)}>Share</Button>
         <IconButton onClick={() => setShowChat((s) => !s)} active={showChat}>
           {showChat ? '💬' : '🗨️'}
         </IconButton>
@@ -100,7 +93,7 @@ export default function RoomPage() {
             )}
           </div>
 
-          {isHost && (
+          {canControl && (
             <Card>
               <div className={styles.controls}>
                 <Button variant="secondary" size="sm" onClick={() => setShowVideoInput((s) => !s)}>Change video</Button>
@@ -124,7 +117,16 @@ export default function RoomPage() {
           )}
 
           <div className={styles.grid}>
-            <ParticipantList participants={participants} hostId={room.hostId} />
+            <ParticipantList
+              participants={participants}
+              hostId={room.hostId}
+              coHosts={room.coHosts}
+              currentUserId={user?.uid}
+              isHost={isHost}
+              onKick={kickParticipant}
+              onPromote={promoteParticipant}
+              onMute={muteParticipant}
+            />
             <Card className={styles.infoCard}>
               <h3 style={{ fontSize: '1rem', margin: 0 }}>Room info</h3>
               <p className="mono">Capacity: {participants.length}/{room.capacity}</p>
@@ -149,6 +151,7 @@ export default function RoomPage() {
           </>
         )}
       </div>
+      <ShareRoom room={room} roomId={roomId} open={shareOpen} onClose={() => setShareOpen(false)} />
     </Layout>
   )
 }

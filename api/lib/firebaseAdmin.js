@@ -1,4 +1,6 @@
 import { Firestore, FieldValue, Timestamp } from '@google-cloud/firestore'
+import { initializeApp, getApps, cert } from 'firebase-admin/app'
+import { getAuth } from 'firebase-admin/auth'
 
 function getCredentials() {
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID
@@ -9,8 +11,6 @@ function getCredentials() {
     throw new Error('Firebase Admin credentials are missing. Check FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, and FIREBASE_ADMIN_PRIVATE_KEY.')
   }
 
-  // Users sometimes paste the whole service-account JSON into this env var.
-  // Detect that and extract the correct fields.
   if (privateKey.trim().startsWith('{')) {
     try {
       const json = JSON.parse(privateKey)
@@ -21,13 +21,13 @@ function getCredentials() {
     }
   }
 
-  // Vercel stores multiline keys with literal \n characters, so convert them to real newlines.
   privateKey = privateKey.replace(/\\n/g, '\n')
 
   return { projectId, clientEmail, privateKey }
 }
 
 let dbInstance = null
+let authInstance = null
 
 export function getDb() {
   if (!dbInstance) {
@@ -38,6 +38,30 @@ export function getDb() {
     })
   }
   return dbInstance
+}
+
+export function getAuthClient() {
+  if (!authInstance) {
+    const apps = getApps()
+    if (apps.length === 0) {
+      const { projectId, clientEmail, privateKey } = getCredentials()
+      initializeApp({
+        projectId,
+        credential: cert({
+          projectId,
+          clientEmail,
+          privateKey,
+        }),
+      })
+    }
+    authInstance = getAuth()
+  }
+  return authInstance
+}
+
+export async function verifyIdToken(token) {
+  const auth = getAuthClient()
+  return auth.verifyIdToken(token)
 }
 
 export { FieldValue, Timestamp }

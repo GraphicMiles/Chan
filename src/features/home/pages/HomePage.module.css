@@ -12,6 +12,44 @@
   margin: 0;
 }
 
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.search {
+  width: 200px;
+}
+
+.sort {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.sortButton {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sortButton:hover {
+  background: var(--bg-surface-raised);
+  color: var(--text-primary);
+}
+
+.sortButtonActive {
+  background: var(--accent-muted);
+  border-color: var(--accent-muted);
+  color: var(--accent);
+}
+
 .inviteForm {
   display: flex;
   gap: 0.5rem;
@@ -31,4 +69,7 @@
 .loading {
   color: var(--text-secondary);
   padding: 2rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
