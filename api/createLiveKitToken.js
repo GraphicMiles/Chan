@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken'
-import { db } from './lib/firebaseAdmin.js'
+import { getDb } from './lib/firebaseAdmin.js'
 
 const headers = {
   'Content-Type': 'application/json',
@@ -9,10 +9,11 @@ const headers = {
 }
 
 export default async function handler(req, res) {
-  if (req.method === 'OPTIONS') return res.status(200).set(headers).end()
-  if (req.method !== 'POST') return res.status(405).set(headers).json({ error: 'Method not allowed' })
-
   try {
+    if (req.method === 'OPTIONS') return res.status(200).set(headers).end()
+    if (req.method !== 'POST') return res.status(405).set(headers).json({ error: 'Method not allowed' })
+
+    const db = getDb()
     const { roomId, uid, role } = req.body || {}
     if (!roomId || !uid || !role) {
       return res.status(400).set(headers).json({ error: 'Missing roomId, uid, or role' })

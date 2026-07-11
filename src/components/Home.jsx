@@ -25,7 +25,11 @@ export default function Home() {
   const joinByInvite = async (e) => {
     e.preventDefault()
     if (!inviteCode.trim()) return
-      const code = inviteCode.trim().toUpperCase()
+    if (!user) {
+      alert('Sign in to join a room')
+      return
+    }
+    const code = inviteCode.trim().toUpperCase()
     const res = await fetch('/api/joinRoom', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -1,5 +1,5 @@
 import admin from 'firebase-admin'
-import { db } from './lib/firebaseAdmin.js'
+import { getDb } from './lib/firebaseAdmin.js'
 
 const headers = {
   'Content-Type': 'application/json',
@@ -11,20 +11,21 @@ const headers = {
 const STALE_MINUTES = 15
 
 export default async function handler(req, res) {
-  if (req.method === 'OPTIONS') return res.status(200).set(headers).end()
-  if (req.method !== 'POST' && req.method !== 'GET') {
-    return res.status(405).set(headers).json({ error: 'Method not allowed' })
-  }
-
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const provided = req.headers['x-cron-secret']
-    if (provided !== cronSecret) {
-      return res.status(401).set(headers).json({ error: 'Unauthorized' })
-    }
-  }
-
   try {
+    if (req.method === 'OPTIONS') return res.status(200).set(headers).end()
+    if (req.method !== 'POST' && req.method !== 'GET') {
+      return res.status(405).set(headers).json({ error: 'Method not allowed' })
+    }
+
+    const cronSecret = process.env.CRON_SECRET
+    if (cronSecret) {
+      const provided = req.headers['x-cron-secret']
+      if (provided !== cronSecret) {
+        return res.status(401).set(headers).json({ error: 'Unauthorized' })
+      }
+    }
+
+    const db = getDb()
     const cutoff = admin.firestore.Timestamp.fromDate(
       new Date(Date.now() - STALE_MINUTES * 60 * 1000)
     )
