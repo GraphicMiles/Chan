@@ -1,4 +1,4 @@
-import { AccessToken } from 'livekit-server-sdk'
+import jwt from 'jsonwebtoken'
 import { db } from './lib/firebaseAdmin.js'
 
 const headers = {
@@ -34,17 +34,24 @@ export default async function handler(req, res) {
       return res.status(500).set(headers).json({ error: 'LiveKit credentials not configured' })
     }
 
-    const at = new AccessToken(apiKey, apiSecret, { identity: uid })
-    at.addGrant({
-      roomJoin: true,
-      room: roomId,
-      canPublish: isHost,
-      canSubscribe: true,
-      canPublishData: false,
-    })
-    at.ttl = '10m'
+    const token = jwt.sign(
+      {
+        video: {
+          roomJoin: true,
+          room: roomId,
+          canPublish: isHost,
+          canSubscribe: true,
+          canPublishData: false,
+        },
+      },
+      apiSecret,
+      {
+        issuer: apiKey,
+        subject: uid,
+        expiresIn: '10m',
+      }
+    )
 
-    const token = await at.toJwt()
     return res.status(200).set(headers).json({ token })
   } catch (err) {
     console.error('createLiveKitToken error', err)
