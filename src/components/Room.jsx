@@ -9,6 +9,7 @@ import Chat from './Chat.jsx'
 import ParticipantList from './ParticipantList.jsx'
 import { SyncPulse } from './SyncPulse.jsx'
 import { extractVideoId } from '../lib/youtube.js'
+import { isDisplayMediaSupported } from '../lib/livekit.js'
 
 export default function Room() {
   const { roomId } = useParams()
@@ -95,9 +96,13 @@ export default function Room() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <button className="btn secondary" onClick={() => setShowVideoInput((s) => !s)}>Change video</button>
                 {isYoutube ? (
-                  <button className="btn secondary" onClick={() => switchActivity('screenshare')}>Share screen</button>
+                  <button className="btn secondary" onClick={() => switchActivity('screenshare')}>
+                    {isDisplayMediaSupported() ? 'Share screen' : 'Share camera'}
+                  </button>
                 ) : (
-                  <button className="btn secondary" onClick={() => switchActivity('youtube')}>Stop screen share</button>
+                  <button className="btn secondary" onClick={() => switchActivity('youtube')}>
+                    {isDisplayMediaSupported() ? 'Stop screen share' : 'Stop camera share'}
+                  </button>
                 )}
               </div>
               {showVideoInput && (

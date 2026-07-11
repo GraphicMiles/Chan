@@ -2,6 +2,10 @@ import { Room } from 'livekit-client'
 
 export const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL
 
+export function isDisplayMediaSupported() {
+  return typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getDisplayMedia === 'function'
+}
+
 export function createRoom() {
   return new Room({
     adaptiveStream: true,
@@ -16,8 +20,23 @@ export async function connectToLivekit(room, token, url = LIVEKIT_URL) {
 }
 
 export async function publishScreenShare(room) {
+  if (!isDisplayMediaSupported()) {
+    throw new Error('Screen sharing is not supported on this device. Use a desktop browser.')
+  }
   const stream = await navigator.mediaDevices.getDisplayMedia({
     video: { displaySurface: 'monitor' },
+    audio: true,
+  })
+  await room.localParticipant.publishTrack(stream.getVideoTracks()[0])
+  return stream
+}
+
+export async function publishCameraShare(room) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error('Camera is not available on this device.')
+  }
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: true,
     audio: true,
   })
   await room.localParticipant.publishTrack(stream.getVideoTracks()[0])
