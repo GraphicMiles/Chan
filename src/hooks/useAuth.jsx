@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  getRedirectResult,
   signOut,
   sendEmailVerification,
   updateProfile,
@@ -18,18 +19,30 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    getRedirectResult(auth).then(async (result) => {
+      if (result?.user) {
+        await ensureDisplayName(result.user, result.user.displayName)
+      }
+    }).catch((err) => {
+      console.error('Redirect sign-in error:', err)
+    })
+
     return onAuthStateChanged(auth, async (u) => {
       if (u) {
-        const ref = doc(db, 'users', u.uid)
-        const snap = await getDoc(ref)
-        if (!snap.exists()) {
-          await setDoc(ref, {
-            displayName: u.displayName || u.email?.split('@')[0] || 'Viewer',
-            email: u.email,
-            emailVerified: u.emailVerified,
-            tier: 'free',
-            createdAt: serverTimestamp(),
-          })
+        try {
+          const ref = doc(db, 'users', u.uid)
+          const snap = await getDoc(ref)
+          if (!snap.exists()) {
+            await setDoc(ref, {
+              displayName: u.displayName || u.email?.split('@')[0] || 'Viewer',
+              email: u.email,
+              emailVerified: u.emailVerified,
+              tier: 'free',
+              createdAt: serverTimestamp(),
+            })
+          }
+        } catch (err) {
+          console.error('Error syncing user doc:', err)
         }
         setUser(u)
       } else {
