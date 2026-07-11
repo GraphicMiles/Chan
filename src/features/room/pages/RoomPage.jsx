@@ -24,7 +24,7 @@ export default function RoomPage() {
   const [newVideoUrl, setNewVideoUrl] = useState('')
   const [showVideoInput, setShowVideoInput] = useState(false)
   const playerRef = useRef(null)
-  const { room, participants, messages, error, joined, activityType, endRoom, sendMessage, updateRoom } = useRoom(roomId, inviteCode)
+  const { room, participants, messages, error, joined, activityType, endRoom, sendMessage, updateRoom, typing, setTyping } = useRoom(roomId, inviteCode)
   const { isHost, writePlayerState } = usePlayerSync(roomId, room, playerRef)
 
   if (!user) return <div className={styles.loading}><Link to="/auth">Sign in to join</Link></div>
@@ -136,7 +136,7 @@ export default function RoomPage() {
 
         {showChat && (
           <div className={styles.sidebar}>
-            <Chat messages={messages} sendMessage={sendMessage} />
+            <Chat messages={messages} sendMessage={sendMessage} user={user} roomId={roomId} typing={typing} setTyping={setTyping} />
           </div>
         )}
       </div>
