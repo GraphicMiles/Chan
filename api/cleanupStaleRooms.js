@@ -5,7 +5,7 @@ const headers = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, x-cron-secret',
 }
 
 const STALE_MINUTES = 15
@@ -14,6 +14,14 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).set(headers).end()
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).set(headers).json({ error: 'Method not allowed' })
+  }
+
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret) {
+    const provided = req.headers['x-cron-secret']
+    if (provided !== cronSecret) {
+      return res.status(401).set(headers).json({ error: 'Unauthorized' })
+    }
   }
 
   try {
