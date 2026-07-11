@@ -4,6 +4,7 @@ import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { extractVideoId, searchVideos, getThumbnail } from '../lib/youtube.js'
+import { parseJsonResponse } from '../lib/api.js'
 
 function makeInviteCode() {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
@@ -90,7 +91,7 @@ export default function CreateRoom() {
         displayName: user.displayName || user.email?.split('@')[0] || 'Host',
       }),
     })
-    const joinData = await joinRes.json()
+    const joinData = await parseJsonResponse(joinRes)
     if (!joinRes.ok) throw new Error(joinData.error || 'Could not add host to room')
 
     navigate(`/room/${roomId}`)

@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../lib/firebase.js'
 import { useAuth } from './useAuth.jsx'
+import { parseJsonResponse } from '../lib/api.js'
 
 export function useRoom(roomId, inviteCode = null) {
   const { user } = useAuth()
@@ -35,7 +36,7 @@ export function useRoom(roomId, inviteCode = null) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const data = await res.json()
+      const data = await parseJsonResponse(res)
       if (!res.ok) throw new Error(data.error || 'Could not join room')
       setJoined(true)
     } catch (err) {
@@ -51,7 +52,7 @@ export function useRoom(roomId, inviteCode = null) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId, uid: user.uid }),
       })
-      const data = await res.json()
+      const data = await parseJsonResponse(res)
       if (!res.ok) throw new Error(data.error || 'Could not leave room')
       setJoined(false)
     } catch (err) {
@@ -67,7 +68,7 @@ export function useRoom(roomId, inviteCode = null) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId, uid: user.uid }),
       })
-      const data = await res.json()
+      const data = await parseJsonResponse(res)
       if (!res.ok) throw new Error(data.error || 'Could not end room')
       navigate('/')
     } catch (err) {
