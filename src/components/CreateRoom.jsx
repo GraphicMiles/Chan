@@ -20,6 +20,7 @@ export default function CreateRoom() {
   const [results, setResults] = useState([])
   const [videoId, setVideoId] = useState('')
   const [error, setError] = useState(null)
+  const [creating, setCreating] = useState(false)
 
   if (!user) return <Link to="/auth">Sign in to create a room</Link>
 
@@ -49,41 +50,48 @@ export default function CreateRoom() {
   const create = async (e) => {
     e.preventDefault()
     setError(null)
-    if (!title.trim()) return setError('Give the room a title')
-    if (!videoId) return setError('Pick a YouTube video')
+    setCreating(true)
+    try {
+      if (!title.trim()) throw new Error('Give the room a title')
+      if (!videoId) throw new Error('Pick a YouTube video')
 
-    const roomId = doc(collection(db, 'rooms')).id
-    const inviteCode = isPrivate ? makeInviteCode() : ''
-    await setDoc(doc(db, 'rooms', roomId), {
-      hostId: user.uid,
-      hostName: user.displayName || user.email?.split('@')[0] || 'Host',
-      title: title.trim(),
-      activityType: 'youtube',
-      videoId,
-      isPrivate,
-      inviteCode,
-      capacity: Math.min(Math.max(Number(capacity) || 12, 1), 12),
-      status: 'live',
-      participantCount: 1,
-      createdAt: serverTimestamp(),
-      lastHeartbeat: serverTimestamp(),
-    })
+      const roomId = doc(collection(db, 'rooms')).id
+      const inviteCode = isPrivate ? makeInviteCode() : ''
+      await setDoc(doc(db, 'rooms', roomId), {
+        hostId: user.uid,
+        hostName: user.displayName || user.email?.split('@')[0] || 'Host',
+        title: title.trim(),
+        activityType: 'youtube',
+        videoId,
+        isPrivate,
+        inviteCode,
+        capacity: Math.min(Math.max(Number(capacity) || 12, 1), 12),
+        status: 'live',
+        participantCount: 1,
+        createdAt: serverTimestamp(),
+        lastHeartbeat: serverTimestamp(),
+      })
 
-    await setDoc(doc(db, 'rooms', roomId, 'playerState', 'current'), {
-      videoId,
-      isPlaying: false,
-      currentTime: 0,
-      updatedAt: serverTimestamp(),
-      updatedBy: user.uid,
-    })
+      await setDoc(doc(db, 'rooms', roomId, 'playerState', 'current'), {
+        videoId,
+        isPlaying: false,
+        currentTime: 0,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid,
+      })
 
-    await setDoc(doc(db, 'rooms', roomId, 'participants', user.uid), {
-      displayName: user.displayName || user.email?.split('@')[0] || 'Host',
-      role: 'host',
-      joinedAt: serverTimestamp(),
-    })
+      await setDoc(doc(db, 'rooms', roomId, 'participants', user.uid), {
+        displayName: user.displayName || user.email?.split('@')[0] || 'Host',
+        role: 'host',
+        joinedAt: serverTimestamp(),
+      })
 
-    navigate(`/room/${roomId}`)
+      navigate(`/room/${roomId}`)
+    } catch (err) {
+      console.error('Create room error:', err)
+      setError(err.message || 'Could not create room. Please try again.')
+      setCreating(false)
+    }
   }
 
   return (
@@ -131,9 +139,11 @@ export default function CreateRoom() {
 
           {isPrivate && <p className="mono" style={{ color: 'var(--fog)' }}>An invite code will be generated automatically.</p>}
 
-          <button className="btn" type="submit">Create room</button>
+          <button className="btn" type="submit" disabled={creating}>
+            {creating ? 'Creating room...' : 'Create room'}
+          </button>
         </form>
-        {error && <p style={{ color: 'var(--ember)', marginTop: '1rem' }}>{error}</p>}
+        {error && <p style={{ color: 'var(--ember)', marginTop: '1rem', padding: '0.75rem', background: 'rgba(255,107,71,0.12)', borderRadius: '0.5rem' }}>{error}</p>}
         <p style={{ marginTop: '1rem' }}><Link to="/">Cancel</Link></p>
       </div>
     </div>
