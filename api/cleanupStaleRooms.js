@@ -1,4 +1,4 @@
-import admin from 'firebase-admin'
+import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { getDb } from './lib/firebaseAdmin.js'
 
 const headers = {
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     }
 
     const db = getDb()
-    const cutoff = admin.firestore.Timestamp.fromDate(
+    const cutoff = Timestamp.fromDate(
       new Date(Date.now() - STALE_MINUTES * 60 * 1000)
     )
     const snap = await db
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     const batch = db.batch()
     let count = 0
     snap.docs.forEach((d) => {
-      batch.update(d.ref, { status: 'ended', activityType: 'idle', endedAt: admin.firestore.FieldValue.serverTimestamp() })
+      batch.update(d.ref, { status: 'ended', activityType: 'idle', endedAt: FieldValue.serverTimestamp() })
       count++
     })
     await batch.commit()

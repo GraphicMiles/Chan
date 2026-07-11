@@ -1,4 +1,4 @@
-import admin from 'firebase-admin'
+import { FieldValue } from 'firebase-admin/firestore'
 import { getDb } from './lib/firebaseAdmin.js'
 
 const headers = {
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
       if (!participantSnap.exists) return
 
       t.delete(participantRef)
-      t.update(roomRef, { participantCount: admin.firestore.FieldValue.increment(-1) })
+      t.update(roomRef, { participantCount: FieldValue.increment(-1) })
     })
 
     return res.status(200).set(headers).json({ success: true })

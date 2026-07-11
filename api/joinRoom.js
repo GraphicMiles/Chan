@@ -1,4 +1,4 @@
-import admin from 'firebase-admin'
+import { FieldValue } from 'firebase-admin/firestore'
 import { getDb } from './lib/firebaseAdmin.js'
 
 const headers = {
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
       t.set(participantRef, {
         displayName,
         role: room.hostId === uid ? 'host' : 'viewer',
-        joinedAt: admin.firestore.FieldValue.serverTimestamp(),
+        joinedAt: FieldValue.serverTimestamp(),
       })
       t.update(roomRef, { participantCount: participantsSnap.size + 1 })
     })

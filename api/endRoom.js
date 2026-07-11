@@ -1,4 +1,4 @@
-import admin from 'firebase-admin'
+import { FieldValue } from 'firebase-admin/firestore'
 import { getDb } from './lib/firebaseAdmin.js'
 
 const headers = {
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     await roomRef.update({
       status: 'ended',
       activityType: 'idle',
-      endedAt: admin.firestore.FieldValue.serverTimestamp(),
+      endedAt: FieldValue.serverTimestamp(),
     })
 
     return res.status(200).set(headers).json({ success: true })
