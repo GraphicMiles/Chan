@@ -1,5 +1,4 @@
-import { FieldValue, Timestamp } from 'firebase-admin/firestore'
-import { getDb } from './lib/firebaseAdmin.js'
+import { getDb, FieldValue, Timestamp } from './lib/firebaseAdmin.js'
 
 const headers = {
   'Content-Type': 'application/json',

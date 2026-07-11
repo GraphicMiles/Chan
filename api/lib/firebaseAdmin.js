@@ -1,5 +1,4 @@
-import { initializeApp, cert, getApps } from 'firebase-admin/app'
-import { getFirestore } from 'firebase-admin/firestore'
+import { Firestore, FieldValue, Timestamp } from '@google-cloud/firestore'
 
 function getCredentials() {
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID
@@ -28,12 +27,17 @@ function getCredentials() {
   return { projectId, clientEmail, privateKey }
 }
 
-function initApp() {
-  const existing = getApps()
-  if (existing.length > 0) return existing[0]
-  return initializeApp({ credential: cert(getCredentials()) })
-}
+let dbInstance = null
 
 export function getDb() {
-  return getFirestore(initApp())
+  if (!dbInstance) {
+    const { projectId, clientEmail, privateKey } = getCredentials()
+    dbInstance = new Firestore({
+      projectId,
+      credentials: { client_email: clientEmail, private_key: privateKey },
+    })
+  }
+  return dbInstance
 }
+
+export { FieldValue, Timestamp }
