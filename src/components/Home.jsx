@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../lib/firebase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { parseJsonResponse } from '../lib/api.js'
 import RoomCard from './RoomCard.jsx'
 
 export default function Home() {
@@ -39,7 +40,7 @@ export default function Home() {
         displayName: user.displayName || user.email?.split('@')[0] || 'Viewer',
       }),
     })
-    const data = await res.json()
+    const data = await parseJsonResponse(res)
     if (res.ok && data.roomId) {
       window.location.href = `/room/${data.roomId}`
     } else {

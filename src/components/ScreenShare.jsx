@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createRoom, connectToLivekit, publishScreenShare, getHostVideoTrack } from '../lib/livekit.js'
+import { parseJsonResponse } from '../lib/api.js'
 
 export default function ScreenShare({ roomId, isHost, user }) {
   const videoRef = useRef(null)
@@ -18,7 +19,7 @@ export default function ScreenShare({ roomId, isHost, user }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ roomId, uid: user.uid, role: isHost ? 'host' : 'viewer' }),
         })
-        const data = await res.json()
+        const data = await parseJsonResponse(res)
         if (!res.ok) throw new Error(data.error || 'Could not get LiveKit token')
 
         const lkRoom = createRoom()
