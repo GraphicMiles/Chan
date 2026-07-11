@@ -135,9 +135,18 @@ export default function RoomPage() {
         </div>
 
         {showChat && (
-          <div className={styles.sidebar}>
-            <Chat messages={messages} sendMessage={sendMessage} user={user} roomId={roomId} typing={typing} setTyping={setTyping} />
-          </div>
+          <>
+            <div className={styles.overlay} onClick={() => setShowChat(false)} />
+            <aside className={`${styles.sidebar} ${showChat ? styles.open : ''}`}>
+              <div className={styles.sidebarHeader}>
+                <h3 className={styles.sidebarTitle}>Chat</h3>
+                <IconButton onClick={() => setShowChat(false)}>✕</IconButton>
+              </div>
+              <div className={styles.sidebarContent}>
+                <Chat messages={messages} sendMessage={sendMessage} user={user} roomId={roomId} typing={typing} setTyping={setTyping} />
+              </div>
+            </aside>
+          </>
         )}
       </div>
     </Layout>
