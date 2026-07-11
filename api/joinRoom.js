@@ -1,4 +1,5 @@
 import { getDb, FieldValue } from './lib/firebaseAdmin.js'
+import { sendResponse } from './lib/response.js'
 
 const headers = {
   'Content-Type': 'application/json',
@@ -9,8 +10,8 @@ const headers = {
 
 export default async function handler(req, res) {
   try {
-    if (req.method === 'OPTIONS') return res.status(200).set(headers).end()
-    if (req.method !== 'POST') return res.status(405).set(headers).json({ error: 'Method not allowed' })
+    if (req.method === 'OPTIONS') return sendResponse(res, 200, undefined, headers)
+    if (req.method !== 'POST') return sendResponse(res, 405, { error: 'Method not allowed' }, headers)
 
     const db = getDb()
     const { roomId, uid, displayName, inviteCode } = req.body || {}
@@ -19,12 +20,12 @@ export default async function handler(req, res) {
 
     if (!targetRoomId && inviteCode) {
       const snap = await db.collection('rooms').where('inviteCode', '==', inviteCode.toUpperCase()).where('status', '==', 'live').limit(1).get()
-      if (snap.empty) return res.status(404).set(headers).json({ error: 'Room not found or invite code invalid' })
+      if (snap.empty) return sendResponse(res, 404, { error: 'Room not found or invite code invalid' }, headers)
       targetRoomId = snap.docs[0].id
     }
 
     if (!targetRoomId || !uid || !displayName) {
-      return res.status(400).set(headers).json({ error: 'Missing roomId, uid, or displayName' })
+      return sendResponse(res, 400, { error: 'Missing roomId, uid, or displayName' }, headers)
     }
 
     const roomRef = db.collection('rooms').doc(targetRoomId)
@@ -50,9 +51,9 @@ export default async function handler(req, res) {
       t.update(roomRef, { participantCount: participantsSnap.size + 1 })
     })
 
-    return res.status(200).set(headers).json({ roomId: targetRoomId })
+    return sendResponse(res, 200, { roomId: targetRoomId }, headers)
   } catch (err) {
     console.error('joinRoom error', err)
-    return res.status(500).set(headers).json({ error: err.message || 'Internal error' })
+    return sendResponse(res, 500, { error: err.message || 'Internal error' }, headers)
   }
 }
