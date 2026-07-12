@@ -107,6 +107,7 @@ export default function HomePage() {
 
   const headerActions = user ? (
     <>
+      <Button as={Link} to="/media" variant="secondary">Media</Button>
       <Button as={Link} to="/create">Start a Room</Button>
       <Button variant="secondary" onClick={logout}>New identity</Button>
     </>

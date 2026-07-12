@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore'
 import { db } from '../../../shared/lib/firebase.js'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
@@ -15,14 +15,17 @@ function makeInviteCode() {
 export default function CreateRoomPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const presetVideo = searchParams.get('video') || ''
+  const presetTitle = searchParams.get('title') || ''
   const { toast } = useToast()
-  const [title, setTitle] = useState('')
-  const [url, setUrl] = useState('')
+  const [title, setTitle] = useState(presetTitle)
+  const [url, setUrl] = useState(presetVideo ? `https://youtube.com/watch?v=${presetVideo}` : '')
   const [capacity, setCapacity] = useState(12)
   const [isPrivate, setIsPrivate] = useState(false)
   const [search, setSearch] = useState('')
   const [results, setResults] = useState([])
-  const [videoId, setVideoId] = useState('')
+  const [videoId, setVideoId] = useState(presetVideo)
   const [error, setError] = useState(null)
   const [creating, setCreating] = useState(false)
   const [searching, setSearching] = useState(false)
