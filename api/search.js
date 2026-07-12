@@ -1,27 +1,37 @@
-// api/search.js — YouTube + Aggregator Search
+import { sendResponse } from './lib/response.js';
+
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    return sendResponse(res, 200, {}, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+  }
   
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    return sendResponse(res, 405, { error: 'Method not allowed' });
+  }
 
   const { query, source = 'youtube' } = req.body || {};
   
-  if (!query) return res.status(400).json({ error: 'Query required' });
+  if (!query) {
+    return sendResponse(res, 400, { error: 'Query required' });
+  }
 
   try {
     const results = [];
 
     if (source === 'youtube') {
-      const apiKey = process.env.VITE_YOUTUBE_API_KEY;
+      const apiKey = process.env.VITE_YOUTUBE_API_KEY || process.env.YOUTUBE_API_KEY;
+      
       if (!apiKey) {
-        return res.status(500).json({ error: 'YouTube API key not configured' });
+        return sendResponse(res, 500, { error: 'YouTube API key not configured' });
       }
 
       const ytRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=12&key=${apiKey}`
+        `https://www.googleapis.com/youtube/v3/search?` +
+        `part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=12&key=${apiKey}`
       );
       
       const ytData = await ytRes.json();
@@ -37,7 +47,7 @@ export default async function handler(req, res) {
       })));
     }
 
-    return res.status(200).json({
+    return sendResponse(res, 200, {
       success: true,
       query,
       count: results.length,
@@ -46,6 +56,6 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('Search error:', err);
-    return res.status(500).json({ error: err.message });
+    return sendResponse(res, 500, { error: err.message });
   }
 }
