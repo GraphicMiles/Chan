@@ -23,6 +23,16 @@ export const SITE_CONFIGS = {
     link: 'a[href], .downloadlink a, .movie-link, a[href*="/download/"], a[href*=".mp4"]',
     meta: '.movieinfo, .meta, small, .year, .info',
   },
+  o2tv: {
+    label: 'O2TV Series',
+    items: 'a[href$=".mp4"], a[href$=".mkv"], a[href$=".avi"], a[href$=".mov"]',
+    title: 'title, h1',
+    image: 'img[src], .poster img',
+    link: 'a[href$=".mp4"], a[href$=".mkv"], a[href$=".avi"], a[href$=".mov"]',
+    meta: '.info, .meta',
+    // O2TV has direct file listings
+    isDirectListing: true,
+  },
   custom: {
     label: 'Custom URL',
     items: 'article, .post, .item, .card, .movie, .video, [class*="movie"], [class*="video"], [class*="post"], main, .content',
