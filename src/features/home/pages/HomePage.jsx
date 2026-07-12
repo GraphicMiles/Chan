@@ -82,10 +82,11 @@ export default function HomePage() {
     const code = inviteCode.trim().toUpperCase()
     setJoining(true)
     try {
-      const res = await fetch('/api/joinRoom', {
+      const res = await fetch('/api/room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'join',
           inviteCode: code,
           uid: user.uid,
           displayName: user.displayName || 'Viewer',

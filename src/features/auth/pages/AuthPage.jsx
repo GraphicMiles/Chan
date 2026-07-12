@@ -1,19 +1,29 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import { Button, Input, Card } from '../../../shared/ui/index.js'
 import styles from './AuthPage.module.css'
 
 export default function AuthPage() {
-  const { user, signInAnonymously } = useAuth()
+  const { user, loading: authLoading, signInAnonymously } = useAuth()
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  if (user) {
-    navigate('/')
-    return null
+  // Never navigate during render — React 18 StrictMode / concurrent safe
+  useEffect(() => {
+    if (!authLoading && user) navigate('/', { replace: true })
+  }, [user, authLoading, navigate])
+
+  if (authLoading || user) {
+    return (
+      <div className={styles.page}>
+        <Card className={styles.card}>
+          <p className={styles.subtitle}>Loading…</p>
+        </Card>
+      </div>
+    )
   }
 
   const submit = async (e) => {
@@ -22,7 +32,7 @@ export default function AuthPage() {
     setLoading(true)
     try {
       await signInAnonymously(name.trim() || 'Viewer')
-      navigate('/')
+      navigate('/', { replace: true })
     } catch (err) {
       setError(err.message || 'Could not join anonymously')
       setLoading(false)

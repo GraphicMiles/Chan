@@ -95,10 +95,11 @@ export default function CreateRoomPage() {
         updatedBy: user.uid,
       })
 
-      const joinRes = await fetch('/api/joinRoom', {
+      const joinRes = await fetch('/api/room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'join',
           roomId,
           uid: user.uid,
           displayName: user.displayName || 'Host',
