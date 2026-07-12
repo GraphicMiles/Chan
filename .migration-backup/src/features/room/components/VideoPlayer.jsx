@@ -30,13 +30,15 @@ export default function VideoPlayer({ videoId, videoUrl, videoType = 'youtube', 
     video.addEventListener('pause', handlePause)
     video.addEventListener('timeupdate', handleTimeUpdate)
     
-    // Notify parent that player is ready
+    // Notify parent that player is ready with a YouTube-shaped interface
     onReady?.({ 
       playVideo: () => video.play(),
       pauseVideo: () => video.pause(),
       seekTo: (time) => { video.currentTime = time },
       getCurrentTime: () => video.currentTime,
-      getDuration: () => video.duration
+      getDuration: () => video.duration,
+      // Shim: mirrors YouTube's player state enum (1 = playing, 2 = paused)
+      getPlayerState: () => video.paused ? 2 : 1,
     })
 
     return () => {

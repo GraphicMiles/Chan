@@ -55,7 +55,7 @@ export function ScraperPage() {
   const createRoomWithVideo = (videoUrl, title) => {
     const encodedUrl = encodeURIComponent(videoUrl)
     const encodedTitle = encodeURIComponent(title || 'Watch Party')
-    navigate(`/create-room?videoUrl=${encodedUrl}&title=${encodedTitle}&type=direct`)
+    navigate(`/create?videoUrl=${encodedUrl}&title=${encodedTitle}&type=direct`)
   }
 
   const isVideoLink = (url) => {

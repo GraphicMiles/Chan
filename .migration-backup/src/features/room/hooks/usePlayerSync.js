@@ -18,6 +18,7 @@ export function usePlayerSync(roomId, room, playerRef) {
     const ref = doc(db, 'rooms', roomId, 'playerState', 'current')
     await setDoc(ref, {
       videoId: room.videoId || '',
+      videoUrl: room.videoUrl || null,
       isPlaying: false,
       currentTime: 0,
       updatedAt: serverTimestamp(),
@@ -28,7 +29,7 @@ export function usePlayerSync(roomId, room, playerRef) {
 
   // Controller heartbeat every 5s
   useEffect(() => {
-    if (!canControl || !room?.videoId) return
+    if (!canControl || (!room?.videoId && !room?.videoUrl)) return
 
     const interval = setInterval(() => {
       const player = playerRef.current
@@ -37,14 +38,14 @@ export function usePlayerSync(roomId, room, playerRef) {
       if (state === undefined) return
       const isPlaying = state === 1
       writePlayerState({
-        videoId: room.videoId,
+        ...(room.videoId ? { videoId: room.videoId } : { videoUrl: room.videoUrl }),
         isPlaying,
         currentTime: player.getCurrentTime?.() || 0,
       })
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [canControl, room?.videoId, playerRef, writePlayerState])
+  }, [canControl, room?.videoId, room?.videoUrl, playerRef, writePlayerState])
 
   // Viewer reconciliation
   useEffect(() => {
