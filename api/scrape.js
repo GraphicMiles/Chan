@@ -1,54 +1,56 @@
-// api/scrape.js — Deployable Vercel Serverless Function
+import { sendResponse } from './lib/response.js';
 import * as cheerio from 'cheerio';
 
 export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // Use preflight from http.js if you want, or manual CORS:
+  if (req.method === 'OPTIONS') {
+    return sendResponse(res, 200, {}, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+  }
   
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    return sendResponse(res, 405, { error: 'Method not allowed' });
+  }
 
   const { url, site } = req.body || {};
   
-  if (!url) return res.status(400).json({ error: 'URL required' });
+  if (!url) {
+    return sendResponse(res, 400, { error: 'URL required' });
+  }
 
   try {
-    // Fetch with browser headers
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.0.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
       }
     });
 
     if (!response.ok) {
-      return res.status(500).json({ error: `HTTP ${response.status}` });
+      return sendResponse(res, 500, { error: `HTTP ${response.status}` });
     }
 
     const html = await response.text();
     const $ = cheerio.load(html);
     const results = [];
 
-    // Site-specific selectors
     const configs = {
       nkiri: {
         items: 'article.post-item, .movie-item, .post',
         title: 'h2 a, .entry-title a, h3 a',
         image: 'img',
         link: 'a',
-        meta: '.posted-on, .meta, .cat-links'
+        meta: '.posted-on, .meta'
       },
       netnaija: {
         items: '.file-thumb, .video-thumb, .result-item',
         title: 'a',
         image: 'img',
         link: 'a',
-        meta: '.meta, .file-info'
+        meta: '.meta'
       },
       fzmovies: {
         items: '.mainbox, .moviebox, .content',
@@ -66,7 +68,7 @@ export default async function handler(req, res) {
       }
     };
 
-    const config = configs[site] || configs.nkiri; // default to nkiri style
+    const config = configs[site] || configs.nkiri;
 
     $(config.items).each((i, el) => {
       const $el = $(el);
@@ -86,7 +88,7 @@ export default async function handler(req, res) {
       }
     });
 
-    return res.status(200).json({
+    return sendResponse(res, 200, {
       success: true,
       count: results.length,
       url: url,
@@ -95,7 +97,7 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('Scrape error:', err);
-    return res.status(500).json({ error: err.message });
+    return sendResponse(res, 500, { error: err.message });
   }
 }
 
