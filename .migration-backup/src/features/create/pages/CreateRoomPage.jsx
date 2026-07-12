@@ -79,12 +79,12 @@ export default function CreateRoomPage() {
   }
 
   const selectVideo = (item) => {
-    if (item.id?.videoId) {
-      // YouTube result
-      setVideoId(item.id.videoId)
+    if (item.source === 'youtube' && item.id) {
+      // YouTube result — id is the videoId string returned by useScraper
+      setVideoId(item.id)
       setVideoUrl('')
       setVideoType('youtube')
-      setUrl(`https://youtube.com/watch?v=${item.id.videoId}`)
+      setUrl(item.url || `https://youtube.com/watch?v=${item.id}`)
     } else if (item.link && item.link.match(/\.(mp4|mkv|avi|mov|webm)$/i)) {
       // Direct video from scraper
       setVideoUrl(item.link)
@@ -129,6 +129,7 @@ export default function CreateRoomPage() {
       } else if (videoType === 'direct' && videoUrl) {
         roomData.videoUrl = videoUrl
         roomData.videoType = 'direct'
+        roomData.activityType = 'direct'
       }
 
       await setDoc(doc(db, 'rooms', roomId), roomData)
@@ -145,9 +146,10 @@ export default function CreateRoomPage() {
       
       await setDoc(doc(db, 'rooms', roomId, 'playerState', 'current'), playerState)
 
+      const joinToken = await user.getIdToken()
       const joinRes = await fetch('/api/room', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${joinToken}` },
         body: JSON.stringify({
           action: 'join',
           roomId,
@@ -265,7 +267,7 @@ export default function CreateRoomPage() {
             <div className={styles.results}>
               {results.map((item, idx) => (
                 <button
-                  key={item.id?.videoId || idx}
+                  key={item.id || item.link || idx}
                   type="button"
                   className={styles.result}
                   onClick={() => selectVideo(item)}
@@ -278,7 +280,7 @@ export default function CreateRoomPage() {
                       onError={(e) => e.target.style.display = 'none'}
                     />
                   )}
-                  <p className={styles.resultTitle}>{item.title || item.snippet?.title}</p>
+                  <p className={styles.resultTitle}>{item.title}</p>
                   <span className={styles.resultSource}>{item.source || 'youtube'}</span>
                 </button>
               ))}

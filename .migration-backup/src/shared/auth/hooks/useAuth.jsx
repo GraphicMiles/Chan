@@ -9,6 +9,7 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [, forceUpdate] = useState(0)
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
@@ -63,6 +64,9 @@ export function AuthProvider({ children }) {
       { displayName: name },
       { merge: true }
     )
+    // updateProfile mutates the Firebase user object in place but doesn't fire
+    // onAuthStateChanged, so React won't re-render. Force it explicitly.
+    forceUpdate(n => n + 1)
   }
 
   const logout = () => signOut(auth)

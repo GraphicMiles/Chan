@@ -97,8 +97,11 @@ export default function RoomPage() {
   if (!room) return <div className={styles.loading}>Loading room…</div>
   if (!joined) return <div className={styles.joining}>Joining room…</div>
 
-  const isYoutube = activityType === 'youtube'
-  const isDirectVideo = room?.videoType === 'direct' || room?.videoUrl
+  // isDirectVideo is derived from the room doc's videoType (source of truth).
+  // isYoutube must exclude direct-video rooms — both had activityType 'youtube'
+  // in older data, so checking videoType is the only reliable way to distinguish.
+  const isDirectVideo = room?.videoType === 'direct'
+  const isYoutube = !isDirectVideo && (activityType === 'youtube' || activityType === 'direct')
   const canShareScreen = isDisplayMediaSupported()
 
   const switchActivity = async (type) => {
@@ -139,7 +142,7 @@ export default function RoomPage() {
           videoId: null, 
           videoUrl: newVideoUrl,
           videoType: 'direct',
-          activityType: 'youtube' 
+          activityType: 'direct' 
         })
         await writePlayerState({ videoId: null, videoUrl: newVideoUrl, isPlaying: false, currentTime: 0 })
       } else {
@@ -272,7 +275,7 @@ export default function RoomPage() {
                 videoId={room.videoId}
                 videoUrl={room.videoUrl}
                 videoType={room.videoType || 'youtube'}
-                isHost={canControl}
+                canControl={canControl}
                 onReady={onPlayerReady}
                 onPlayerEvent={onPlayerEvent}
               />
@@ -297,7 +300,7 @@ export default function RoomPage() {
                     <span className={styles.screenNote}>Screen share needs a desktop browser</span>
                   )
                 ) : (
-                  <Button variant="secondary" size="sm" loading={busy} onClick={() => switchActivity('youtube')}>
+                  <Button variant="secondary" size="sm" loading={busy} onClick={() => switchActivity(room?.videoType === 'direct' ? 'direct' : 'youtube')}>
                     Stop screen share
                   </Button>
                 )}
@@ -352,6 +355,7 @@ export default function RoomPage() {
                   coHosts={room.coHosts}
                   currentUserId={user?.uid}
                   isHost={isHost}
+                  canControl={canControl}
                   onKick={async (uid) => {
                     try {
                       await kickParticipant(uid)

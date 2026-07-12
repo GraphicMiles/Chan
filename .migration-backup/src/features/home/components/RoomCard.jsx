@@ -5,11 +5,24 @@ import { SyncPulse } from '../../../shared/components/SyncPulse.jsx'
 import styles from './RoomCard.module.css'
 
 export default function RoomCard({ room }) {
-  const thumb = getThumbnail(room.videoId || 'dQw4w9WgXcQ')
+  const isDirectVideo = room.videoType === 'direct' || (!room.videoId && room.videoUrl)
+  const thumb = isDirectVideo ? null : getThumbnail(room.videoId)
   return (
     <Card interactive clickable as={Link} to={`/room/${room.id}`} className={styles.link}>
       <div className={styles.thumbWrap}>
-        <img src={thumb} alt="" className={styles.thumb} />
+        {thumb ? (
+          <img src={thumb} alt="" className={styles.thumb} />
+        ) : (
+          <div className={styles.thumb} style={{
+            background: 'var(--surface-2, #1e1e2e)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '2.5rem',
+          }}>
+            🎬
+          </div>
+        )}
         <div className={styles.badge}>
           <Badge variant="live">
             <SyncPulse active size={14} />

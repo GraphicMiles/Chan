@@ -6,8 +6,23 @@
  *
  * Replaces: joinRoom, leaveRoom, endRoom
  */
-import { getDb, FieldValue } from './lib/firebaseAdmin.js'
+import { getDb, FieldValue, verifyIdToken } from './lib/firebaseAdmin.js'
 import { preflight, ok, fail, statusForError } from './lib/http.js'
+
+async function requireUser(req, expectedUid) {
+  const token = req.headers.authorization?.split('Bearer ')[1]
+  if (!token) throw Object.assign(new Error('Missing token'), { status: 401 })
+  let decoded
+  try {
+    decoded = await verifyIdToken(token)
+  } catch {
+    throw Object.assign(new Error('Invalid or expired token'), { status: 401 })
+  }
+  if (expectedUid && decoded.uid !== expectedUid) {
+    throw Object.assign(new Error('Token uid does not match request uid'), { status: 403 })
+  }
+  return decoded
+}
 
 async function joinRoom(db, body) {
   const { roomId, uid, displayName, inviteCode } = body || {}
@@ -123,6 +138,8 @@ export default async function handler(req, res) {
     const body = req.body || {}
     const action = String(body.action || '').toLowerCase()
     if (!action) return fail(res, 400, 'Missing action (join | leave | end)')
+
+    await requireUser(req, body.uid)
 
     const db = getDb()
     let result

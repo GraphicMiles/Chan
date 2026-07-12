@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore'
 import { db } from '../../../shared/lib/firebase.js'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import { parseJsonResponse } from '../../../shared/lib/api.js'
@@ -21,6 +21,7 @@ export default function HomePage() {
   const [sortBy, setSortBy] = useState('newest')
   const [joining, setJoining] = useState(false)
   const [lastRoom, setLastRoom] = useState(null)
+  const [continueRoom, setContinueRoom] = useState(null)
 
   useEffect(() => {
     setLastRoom(getLastRoom())
@@ -70,10 +71,29 @@ export default function HomePage() {
     })
   }, [rooms, search, sortBy])
 
-  const continueRoom = useMemo(() => {
-    if (!lastRoom?.roomId) return null
-    return rooms.find((r) => r.id === lastRoom.roomId) || null
-  }, [rooms, lastRoom])
+  // Resolve the "continue watching" room. Public rooms are in the local list;
+  // private rooms require a direct Firestore fetch since they're excluded from
+  // the public query.
+  useEffect(() => {
+    if (!lastRoom?.roomId || !user) {
+      setContinueRoom(null)
+      return
+    }
+    const found = rooms.find((r) => r.id === lastRoom.roomId)
+    if (found) {
+      setContinueRoom(found)
+      return
+    }
+    getDoc(doc(db, 'rooms', lastRoom.roomId))
+      .then((snap) => {
+        if (snap.exists() && snap.data().status === 'live') {
+          setContinueRoom({ id: snap.id, ...snap.data() })
+        } else {
+          setContinueRoom(null)
+        }
+      })
+      .catch(() => setContinueRoom(null))
+  }, [rooms, lastRoom, user])
 
   const joinByInvite = async (e) => {
     e.preventDefault()
@@ -86,9 +106,10 @@ export default function HomePage() {
     const code = inviteCode.trim().toUpperCase()
     setJoining(true)
     try {
+      const token = await user.getIdToken()
       const res = await fetch('/api/room', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           action: 'join',
           inviteCode: code,

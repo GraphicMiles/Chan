@@ -8,6 +8,7 @@ export default function ParticipantList({
   coHosts = [],
   currentUserId,
   isHost,
+  canControl, // true for host + co-hosts; used for mute which the API allows for both
   onKick,
   onPromote,
   onMute,
@@ -25,7 +26,8 @@ export default function ParticipantList({
         {participants.map((p) => {
           const role = getRole(p)
           const isSelf = p.id === currentUserId
-          const canManage = isHost && !isSelf
+          const canManage = isHost && !isSelf   // kick + promote: host only
+          const canMute = canControl && !isSelf  // mute: host + co-hosts
 
           return (
             <div key={p.id} className={styles.participant}>
@@ -44,23 +46,31 @@ export default function ParticipantList({
                   {p.muted && <span className={styles.mutedTag}> · muted</span>}
                 </span>
               </div>
-              {canManage && (
+              {(canManage || canMute) && (
                 <div className={styles.actions}>
-                  {role === 'viewer' ? (
-                    <button className={styles.action} onClick={() => onPromote(p.id, 'co-host')}>
-                      Promote
-                    </button>
-                  ) : (
-                    <button className={styles.action} onClick={() => onPromote(p.id, 'viewer')}>
-                      Demote
+                  {canManage && (
+                    <>
+                      {role === 'viewer' ? (
+                        <button className={styles.action} onClick={() => onPromote(p.id, 'co-host')}>
+                          Promote
+                        </button>
+                      ) : (
+                        <button className={styles.action} onClick={() => onPromote(p.id, 'viewer')}>
+                          Demote
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {canMute && (
+                    <button className={styles.action} onClick={() => onMute(p.id, !p.muted)}>
+                      {p.muted ? 'Unmute' : 'Mute'}
                     </button>
                   )}
-                  <button className={styles.action} onClick={() => onMute(p.id, !p.muted)}>
-                    {p.muted ? 'Unmute' : 'Mute'}
-                  </button>
-                  <button className={`${styles.action} ${styles.danger}`} onClick={() => onKick(p.id)}>
-                    Kick
-                  </button>
+                  {canManage && (
+                    <button className={`${styles.action} ${styles.danger}`} onClick={() => onKick(p.id)}>
+                      Kick
+                    </button>
+                  )}
                 </div>
               )}
             </div>

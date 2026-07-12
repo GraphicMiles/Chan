@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import YouTube from 'react-youtube'
 
-export default function VideoPlayer({ videoId, videoUrl, videoType = 'youtube', isHost, onReady, onPlayerEvent }) {
+export default function VideoPlayer({ videoId, videoUrl, videoType = 'youtube', canControl, onReady, onPlayerEvent }) {
   const playerRef = useRef(null)
   const videoRef = useRef(null)
 
@@ -76,7 +76,7 @@ export default function VideoPlayer({ videoId, videoUrl, videoType = 'youtube', 
         <video
           ref={videoRef}
           src={videoUrl}
-          controls={isHost}
+          controls={canControl}
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           crossOrigin="anonymous"
           playsInline
@@ -106,10 +106,10 @@ export default function VideoPlayer({ videoId, videoUrl, videoType = 'youtube', 
             height: '100%',
             playerVars: {
               autoplay: 0,
-              controls: isHost ? 1 : 0,
+              controls: canControl ? 1 : 0,
               rel: 0,
               modestbranding: 1,
-              disablekb: isHost ? 0 : 1,
+              disablekb: canControl ? 0 : 1,
             },
           }}
           onReady={handleYouTubeReady}

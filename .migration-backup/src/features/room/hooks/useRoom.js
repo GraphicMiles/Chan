@@ -46,6 +46,7 @@ export function useRoom(roomId, inviteCode = null) {
     if (!user || !roomId || joinInFlight.current) return
     joinInFlight.current = true
     try {
+      const token = await user.getIdToken()
       const body = {
         action: 'join',
         roomId,
@@ -55,7 +56,7 @@ export function useRoom(roomId, inviteCode = null) {
       if (inviteCode) body.inviteCode = inviteCode
       const res = await fetch('/api/room', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       })
       const data = await parseJsonResponse(res)
@@ -74,9 +75,10 @@ export function useRoom(roomId, inviteCode = null) {
     if (!user || !roomId) return
     intentionalLeave.current = true
     try {
+      const token = await user.getIdToken()
       const res = await fetch('/api/room', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ action: 'leave', roomId, uid: user.uid }),
       })
       const data = await parseJsonResponse(res)
@@ -91,9 +93,10 @@ export function useRoom(roomId, inviteCode = null) {
     if (!user || !roomId) return
     intentionalLeave.current = true
     try {
+      const token = await user.getIdToken()
       const res = await fetch('/api/room', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ action: 'end', roomId, uid: user.uid }),
       })
       const data = await parseJsonResponse(res)
@@ -264,6 +267,10 @@ export function useRoom(roomId, inviteCode = null) {
     intentionalLeave.current = false
     wasParticipant.current = false
     let cancelled = false
+    let leaveToken = null
+
+    // Cache a token now for the keepalive leave fired on cleanup (can't await in cleanup)
+    user.getIdToken().then(t => { leaveToken = t }).catch(() => {})
 
     const check = async () => {
       try {
@@ -287,7 +294,10 @@ export function useRoom(roomId, inviteCode = null) {
       intentionalLeave.current = true
       fetch('/api/room', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(leaveToken ? { Authorization: `Bearer ${leaveToken}` } : {}),
+        },
         body: JSON.stringify({ action: 'leave', roomId, uid: user.uid }),
         keepalive: true,
       }).catch(() => {})

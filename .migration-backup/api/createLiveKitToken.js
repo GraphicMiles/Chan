@@ -41,7 +41,7 @@ export default async function handler(req, res) {
       {
         issuer: apiKey,
         subject: uid,
-        expiresIn: '10m',
+        expiresIn: '4h',
       }
     )
 

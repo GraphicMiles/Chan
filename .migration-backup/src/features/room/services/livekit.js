@@ -28,6 +28,8 @@ export async function publishScreenShare(room) {
     audio: true,
   })
   await room.localParticipant.publishTrack(stream.getVideoTracks()[0])
+  const screenAudio = stream.getAudioTracks()
+  if (screenAudio.length > 0) await room.localParticipant.publishTrack(screenAudio[0])
   return stream
 }
 
@@ -40,6 +42,8 @@ export async function publishCameraShare(room) {
     audio: true,
   })
   await room.localParticipant.publishTrack(stream.getVideoTracks()[0])
+  const camAudio = stream.getAudioTracks()
+  if (camAudio.length > 0) await room.localParticipant.publishTrack(camAudio[0])
   return stream
 }
 

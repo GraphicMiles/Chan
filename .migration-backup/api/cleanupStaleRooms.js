@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   try {
     // Allow GET for simple cron pings as well as POST
     if (req.method === 'OPTIONS') {
-      return sendResponse(res, 200, undefined, JSON_HEADERS)
+      return sendResponse(res, 200, { ok: true }, JSON_HEADERS)
     }
     if (req.method !== 'POST' && req.method !== 'GET') {
       return fail(res, 405, 'Method not allowed')
