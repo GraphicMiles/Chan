@@ -21,27 +21,95 @@ const BOT_PHRASES = [
   'security check',
 ]
 
-const MEDIA_EXT_RE = /\.(mp4|m3u8|webm|ogg|mov|mkv)(\?|#|$)/i
+const MEDIA_EXT_RE = /\.(mp4|m3u8|webm|ogg|mov|mkv|avi|flv)(\?|#|$)/i
+
+// Check if URL is a direct video file
+function isDirectVideoFile(url) {
+  if (!url) return false
+  try {
+    const u = new URL(url)
+    return MEDIA_EXT_RE.test(u.pathname)
+  } catch {
+    return MEDIA_EXT_RE.test(url)
+  }
+}
+
+// Generate site-specific headers to avoid 403s
+function getHeadersForUrl(targetUrl) {
+  try {
+    const url = new URL(targetUrl)
+    const referer = `${url.protocol}//${url.hostname}/`
+    
+    // Site-specific headers
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'DNT': '1',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Cache-Control': 'max-age=0',
+    }
+    
+    // Add Referer for sites that require it
+    if (url.hostname.includes('o2tv.org')) {
+      headers['Referer'] = 'http://d6.o2tv.org/'
+      headers['Origin'] = 'http://d6.o2tv.org'
+    } else if (url.hostname.includes('thenetnaija.ng')) {
+      headers['Referer'] = 'https://thenetnaija.ng/'
+    } else {
+      headers['Referer'] = referer
+    }
+    
+    return headers
+  } catch {
+    return {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': '*/*',
+    }
+  }
+}
 
 async function fetchHtml(targetUrl) {
+  // If it's a direct video file, don't try to fetch as HTML
+  if (isDirectVideoFile(targetUrl)) {
+    return { isDirectFile: true, url: targetUrl }
+  }
+  
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 9000)
+  const timeout = setTimeout(() => controller.abort(), 15000) // Increased timeout
 
   try {
+    const headers = getHeadersForUrl(targetUrl)
+    
     const res = await fetch(targetUrl, {
       signal: controller.signal,
       redirect: 'follow',
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept:
-          'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        Referer: 'https://www.google.com/',
-      },
+      headers,
     })
+    
     clearTimeout(timeout)
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+    
+    if (!res.ok) {
+      // If we got a 403, try with different headers
+      if (res.status === 403) {
+        throw new Error(`HTTP 403: Access denied (hotlink protection). Try a different URL or copy the link address manually.`)
+      }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+    }
+    
+    const contentType = res.headers.get('content-type') || ''
+    
+    // If response is a video file, return as direct
+    if (contentType.includes('video/') || contentType.includes('application/octet-stream')) {
+      return { isDirectFile: true, url: targetUrl, contentType }
+    }
+    
     const html = await res.text()
 
     const lower = html.toLowerCase()
@@ -55,7 +123,7 @@ async function fetchHtml(targetUrl) {
         if (lower.includes(p)) throw new Error('Site blocked automated access (bot challenge)')
       }
     }
-    return html
+    return { html, isDirectFile: false }
   } catch (e) {
     clearTimeout(timeout)
     if (e.name === 'AbortError') throw new Error('Site took too long to respond (timeout)')
@@ -113,15 +181,33 @@ function extractMediaFromHtml(html, pageUrl, siteKey) {
     })
   })
 
-  // 3) Regex scan of raw HTML for media URLs (quoted)
-  const re = /https?:\/\/[^\s"'<>]+\.(?:mp4|m3u8|webm|ogg|mov|mkv)(?:\?[^\s"'<>]*)?/gi
+  // 3) Look for download buttons with data attributes
+  $('[data-download], [data-url], [data-file], .download-btn, #download-btn, .dl-link').each((_, el) => {
+    const dataUrl = $(el).attr('data-download') || $(el).attr('data-url') || $(el).attr('data-file')
+    if (dataUrl && MEDIA_EXT_RE.test(dataUrl)) {
+      const abs = resolveUrl(dataUrl, pageUrl)
+      pushUnique(out, seen, {
+        title: `${pageTitle} (download)`,
+        image: $('meta[property="og:image"]').attr('content') || null,
+        link: abs,
+        url: abs,
+        meta: 'download button',
+        source: siteKey,
+        isDirect: true,
+      })
+    }
+  })
+
+  // 4) Regex scan of raw HTML for media URLs (quoted)
+  const re = /https?:\/\/[^\s"'<>]+\.(?:mp4|m3u8|webm|ogg|mov|mkv|avi|flv)(?:\?[^\s"'<>]*)?/gi
   const matches = html.match(re) || []
-  for (const m of matches.slice(0, 20)) {
+  for (const m of matches.slice(0, 30)) {
+    const cleanUrl = m.replace(/&amp;/g, '&')
     pushUnique(out, seen, {
       title: `${pageTitle} (found on page)`,
       image: $('meta[property="og:image"]').attr('content') || null,
-      link: m,
-      url: m,
+      link: cleanUrl,
+      url: cleanUrl,
       meta: 'found in page',
       source: siteKey,
       isDirect: true,
@@ -208,8 +294,53 @@ export default async function handler(req, res) {
       return fail(res, 400, 'Only http(s) URLs are allowed')
     }
 
-    const html = await fetchHtml(targetUrl)
+    // Check if this is a direct video URL first
+    if (isDirectVideoFile(targetUrl)) {
+      const title = decodeURIComponent(parsed.pathname.split('/').pop() || 'Video')
+      return ok(res, {
+        count: 1,
+        directCount: 1,
+        results: [{
+          title: title.replace(/\.(mp4|m3u8|mkv|avi|mov)$/i, ''),
+          image: null,
+          link: targetUrl,
+          url: targetUrl,
+          meta: 'direct file',
+          source: 'direct',
+          isDirect: true,
+          playableInRoom: true,
+        }],
+        url: targetUrl,
+        site: 'direct',
+        hint: undefined,
+      })
+    }
+
+    const fetchResult = await fetchHtml(targetUrl)
+    
+    // If fetch returned a direct file detection
+    if (fetchResult.isDirectFile) {
+      const title = decodeURIComponent(parsed.pathname.split('/').pop() || 'Video')
+      return ok(res, {
+        count: 1,
+        directCount: 1,
+        results: [{
+          title: title.replace(/\.(mp4|m3u8|mkv|avi|mov)$/i, ''),
+          image: null,
+          link: fetchResult.url,
+          url: fetchResult.url,
+          meta: 'direct file',
+          source: 'direct',
+          isDirect: true,
+          playableInRoom: true,
+        }],
+        url: targetUrl,
+        site: 'direct',
+      })
+    }
+    
     const siteKey = site || 'custom'
+    const html = fetchResult.html
 
     // Prefer real media files found on the page
     const media = extractMediaFromHtml(html, targetUrl, siteKey)
@@ -242,6 +373,7 @@ export default async function handler(req, res) {
             : undefined,
     })
   } catch (e) {
+    console.error('Scrape error:', e)
     return fail(res, 500, e.message || 'Scrape failed')
   }
-}
+      }
