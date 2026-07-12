@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../shared/auth/hooks/useAuth.jsx'
 import { useScraper } from '../../hooks/useScraper.js'
 import { Button, Input, Card, Badge, EmptyState, Skeleton } from '../../shared/ui/index.js'
@@ -17,6 +18,7 @@ const MANUAL_SITES = [
 ]
 
 export function ScraperPage() {
+  const navigate = useNavigate()
   const { user, logout } = useAuth()
   const { scrape, search, results, lastQuery, loading, error, clear } = useScraper()
 
@@ -48,6 +50,18 @@ export function ScraperPage() {
   const switchMode = (next) => {
     setMode(next)
     clear()
+  }
+
+  const createRoomWithVideo = (videoUrl, title) => {
+    const encodedUrl = encodeURIComponent(videoUrl)
+    const encodedTitle = encodeURIComponent(title || 'Watch Party')
+    navigate(`/create-room?videoUrl=${encodedUrl}&title=${encodedTitle}&type=direct`)
+  }
+
+  const isVideoLink = (url) => {
+    if (!url) return false
+    const videoExts = ['.mp4', '.mkv', '.avi', '.mov', '.webm']
+    return videoExts.some(ext => url.toLowerCase().includes(ext))
   }
 
   return (
@@ -178,49 +192,75 @@ export function ScraperPage() {
 
       {!loading && !error && results.length > 0 && (
         <div className={styles.grid}>
-          {results.map((r, idx) => (
-            <Card key={idx} className={styles.card}>
-              {r.image || r.thumbnail ? (
-                <img
-                  className={styles.thumb}
-                  src={r.image || r.thumbnail}
-                  alt={r.title}
-                  loading="lazy"
-                />
-              ) : (
-                <div className={styles.thumb} style={{ background: 'var(--surface-2)' }} />
-              )}
-              <div className={styles.cardTitle} title={r.title}>
-                {r.title}
-              </div>
-              <div className={styles.cardMeta}>
-                {r.meta || r.channel || r.source}
-              </div>
-              <div className={styles.cardActions}>
-                <Button
-                  as="a"
-                  href={r.link || r.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  size="sm"
-                >
-                  Open
-                </Button>
-                {r.link && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => navigator.clipboard.writeText(r.link)}
-                  >
-                    Copy link
-                  </Button>
+          {results.map((r, idx) => {
+            const videoLink = isVideoLink(r.link) ? r.link : null
+            
+            return (
+              <Card key={idx} className={styles.card}>
+                {r.image || r.thumbnail ? (
+                  <img
+                    className={styles.thumb}
+                    src={r.image || r.thumbnail}
+                    alt={r.title}
+                    loading="lazy"
+                    onError={(e) => {
+                      e.target.style.display = 'none'
+                      e.target.parentElement.style.background = 'var(--surface-2)'
+                    }}
+                  />
+                ) : (
+                  <div className={styles.thumb} style={{ 
+                    background: 'var(--surface-2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--text-secondary)',
+                    fontSize: '14px'
+                  }}>
+                    No image
+                  </div>
                 )}
-              </div>
-              <Badge variant="secondary" style={{ position: 'absolute', top: 8, right: 8 }}>
-                {r.source}
-              </Badge>
-            </Card>
-          ))}
+                <div className={styles.cardTitle} title={r.title}>
+                  {r.title}
+                </div>
+                <div className={styles.cardMeta}>
+                  {r.meta || r.channel || r.source}
+                </div>
+                <div className={styles.cardActions}>
+                  <Button
+                    as="a"
+                    href={r.link || r.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    size="sm"
+                  >
+                    Open
+                  </Button>
+                  {r.link && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => navigator.clipboard.writeText(r.link)}
+                    >
+                      Copy
+                    </Button>
+                  )}
+                  {videoLink && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => createRoomWithVideo(videoLink, r.title)}
+                    >
+                      Watch in Room
+                    </Button>
+                  )}
+                </div>
+                <Badge variant="secondary" style={{ position: 'absolute', top: 8, right: 8 }}>
+                  {r.source}
+                </Badge>
+              </Card>
+            )
+          })}
         </div>
       )}
     </Layout>
