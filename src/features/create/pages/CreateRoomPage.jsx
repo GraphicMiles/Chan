@@ -1,332 +1,444 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { toast } from 'react-toastify'
-import styles from './CreateRoomPage.module.scss'
-import { useAuth } from '../../auth/AuthContext'
-import { createRoom, joinRoom } from '../../../api/rooms'
-import { extractVideoId, buildYouTubeEmbedUrl, isDirectVideoUrl, normalizeDirectUrl } from '../../../shared/lib/youtube.js'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
+import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore'
+import { db } from '../../../shared/lib/firebase.js'
+import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
+import {
+  extractVideoId,
+  getThumbnail,
+  isDirectVideoUrl,
+  normalizeDirectUrl,
+  checkEmbeddable,
+  searchYouTube,
+  hasYouTubeApiKey,
+} from '../../../shared/lib/youtube.js'
 import { useScraper } from '../../../hooks/useScraper.js'
-import { ScraperResultCard } from '../../scraper/components/ScraperResultCard.jsx'
+import { parseJsonResponse } from '../../../shared/lib/api.js'
+import { Button, Input, Card, useToast } from '../../../shared/ui/index.js'
+import styles from './CreateRoomPage.module.css'
 
-const MAX_TITLE = 120
-const MAX_DESC = 500
+function makeInviteCode() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase()
+}
 
 export default function CreateRoomPage() {
-  const { user, isAuthenticated } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  
-  const [title, setTitle] = useState('')
-  const [description, setDesc] = useState('')
-  const [isPublic, setIsPublic] = useState(true)
-  const [videoType, setVideoType] = useState('youtube')
-  const [videoId, setVideoId] = useState('')
-  const [videoUrl, setVideoUrl] = useState('')
-  const [url, setUrl] = useState('')
-  const [embedWarning, setEmbedWarning] = useState(null)
+  const { toast } = useToast()
+  const { scrape, results, loading: scraperLoading, error: scraperError, clear } = useScraper()
+
+  const presetVideo = searchParams.get('video') || ''
+  const presetVideoUrl = searchParams.get('videoUrl') || ''
+  const presetTitle = searchParams.get('title') || ''
+  const presetType = searchParams.get('type') || 'youtube'
+
+  const [title, setTitle] = useState(presetTitle)
+  const [url, setUrl] = useState(
+    presetVideo ? `https://youtube.com/watch?v=${presetVideo}` : presetVideoUrl
+  )
+  const [capacity, setCapacity] = useState(12)
+  const [isPrivate, setIsPrivate] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchMode, setSearchMode] = useState(
+    presetType === 'direct' || presetVideoUrl ? 'scraper' : 'youtube'
+  )
+  const [scraperSite, setScraperSite] = useState('netnaija')
+  const [videoId, setVideoId] = useState(presetVideo)
+  const [videoUrl, setVideoUrl] = useState(presetVideoUrl)
+  const [videoType, setVideoType] = useState(presetType === 'direct' ? 'direct' : 'youtube')
+  const [error, setError] = useState(null)
   const [creating, setCreating] = useState(false)
-  const [selectedResult, setSelectedResult] = useState(null)
-  const [mode, setMode] = useState('youtube')
-  const fileInputRef = useRef(null)
-  
-  const { results, loading, error, clear, scrape } = useScraper()
+  const [embedWarning, setEmbedWarning] = useState(null)
+  const [ytResults, setYtResults] = useState([])
+  const [ytLoading, setYtLoading] = useState(false)
 
-  // Load from URL params (e.g., from scraper redirect)
   useEffect(() => {
-    const videoUrlParam = searchParams.get('videoUrl')
-    const titleParam = searchParams.get('title')
-    const typeParam = searchParams.get('type')
-    
-    if (videoUrlParam) {
-      const decodedUrl = decodeURIComponent(videoUrlParam)
-      setVideoUrl(decodedUrl)
-      setUrl(decodedUrl)
-      
-      if (typeParam === 'direct' || isDirectVideoUrl(decodedUrl)) {
-        setMode('direct')
-        setVideoType('direct')
-        setVideoId('')
-      }
-      
-      if (titleParam) {
-        setTitle(decodeURIComponent(titleParam))
-      }
+    if (presetVideoUrl && isDirectVideoUrl(presetVideoUrl)) {
+      setVideoUrl(normalizeDirectUrl(presetVideoUrl))
+      setVideoType('direct')
+      setVideoId('')
     }
-  }, [searchParams])
+  }, [presetVideoUrl])
 
-  const onTitleChange = (v) => setTitle(v.slice(0, MAX_TITLE))
-  const onDescChange = (v) => setDesc(v.slice(0, MAX_DESC))
+  if (!user) return <Link to="/auth">Sign in to create a room</Link>
 
   const onUrlChange = (value) => {
     setUrl(value)
     setEmbedWarning(null)
-    clear()
-    setSelectedResult(null)
-    
     const id = extractVideoId(value)
     if (id) {
       setVideoId(id)
       setVideoUrl('')
       setVideoType('youtube')
-      setMode('youtube')
+      clear()
+      setYtResults([])
+      checkEmbeddable(id).then((r) => {
+        if (!r.embeddable) setEmbedWarning(r.reason)
+        else if (r.title && !title) setTitle(r.title)
+      })
       return
     }
-    
-    // Check for direct video URL
     if (isDirectVideoUrl(value)) {
-      const normalized = normalizeDirectUrl(value.trim())
-      setVideoUrl(normalized)
+      setVideoUrl(normalizeDirectUrl(value.trim()))
       setVideoId('')
       setVideoType('direct')
-      setMode('direct')
-      toast.success('Direct video URL detected')
+      clear()
+      setYtResults([])
+    }
+  }
+
+  const onYtSearch = async (e) => {
+    e?.preventDefault?.()
+    if (!searchQuery.trim()) return
+    if (!hasYouTubeApiKey()) {
+      toast('Add VITE_YOUTUBE_API_KEY for YouTube search, or paste a video URL', {
+        variant: 'warning',
+      })
       return
     }
-    
-    // Reset if empty
-    if (!value.trim()) {
-      setVideoId('')
+    setYtLoading(true)
+    setError(null)
+    try {
+      const items = await searchYouTube(searchQuery.trim(), 12)
+      setYtResults(
+        items.map((it) => ({
+          id: it.id,
+          title: it.title,
+          thumbnail: it.thumbnail,
+          channel: it.channelTitle,
+          source: 'youtube',
+          url: `https://www.youtube.com/watch?v=${it.id}`,
+          embeddable: true,
+        }))
+      )
+      if (!items.length) toast('No YouTube results', { variant: 'warning' })
+    } catch (err) {
+      toast(err.message || 'YouTube search failed', { variant: 'error' })
+      setYtResults([])
+    } finally {
+      setYtLoading(false)
+    }
+  }
+
+  const onScrape = async (e) => {
+    e?.preventDefault?.()
+    if (!url.trim()) {
+      toast('Paste a page URL first', { variant: 'warning' })
+      return
+    }
+    if (isDirectVideoUrl(url)) {
+      onUrlChange(url)
+      toast('Direct video link selected', { variant: 'success' })
+      return
+    }
+    await scrape({ url: url.trim(), site: scraperSite })
+  }
+
+  const selectVideo = (item) => {
+    setError(null)
+    setEmbedWarning(null)
+
+    if (item.source === 'youtube' && item.id) {
+      setVideoId(item.id)
       setVideoUrl('')
       setVideoType('youtube')
-    }
-  }
-
-  const handleScrape = async () => {
-    if (!url.trim()) {
-      toast.error('Please enter a URL')
-      return
-    }
-    
-    // If it's a direct URL, no need to scrape
-    if (isDirectVideoUrl(url)) {
-      const normalized = normalizeDirectUrl(url.trim())
-      setVideoUrl(normalized)
-      setVideoType('direct')
-      setMode('direct')
-      toast.success('Direct video URL ready to play')
-      return
-    }
-    
-    try {
-      await scrape({ url })
-    } catch (e) {
-      toast.error(e.message || 'Failed to extract links')
-    }
-  }
-
-  const handleResultSelect = (result) => {
-    setSelectedResult(result)
-    
-    if (result.isDirect && result.url) {
-      setVideoUrl(result.url)
-      setVideoType('direct')
-      setVideoId('')
-      setMode('direct')
-      if (result.title && !title) {
-        setTitle(result.title)
-      }
-    } else if (result.link) {
-      // For non-direct results, we might need to scrape further
-      setUrl(result.link)
-      toast.info('This is a page link. You may need to open it and extract the video.')
-    }
-  }
-
-  const handleCreate = async () => {
-    if (!title.trim()) {
-      toast.error('Please enter a room title')
-      return
-    }
-    
-    let finalVideoUrl = ''
-    
-    if (mode === 'youtube' && videoId) {
-      finalVideoUrl = buildYouTubeEmbedUrl(videoId)
-    } else if (mode === 'direct' && videoUrl) {
-      finalVideoUrl = videoUrl
-    } else if (mode === 'upload' && fileInputRef.current?.files?.[0]) {
-      toast.error('File upload not yet implemented')
-      return
-    } else {
-      toast.error('Please provide a valid video source')
-      return
-    }
-    
-    if (!finalVideoUrl) {
-      toast.error('Please provide a video URL')
-      return
-    }
-    
-    setCreating(true)
-    
-    try {
-      const room = await createRoom({
-        title: title.trim(),
-        description: description.trim(),
-        isPublic,
-        videoUrl: finalVideoUrl,
-        videoType: mode,
+      setUrl(item.url || `https://youtube.com/watch?v=${item.id}`)
+      if (item.title) setTitle((t) => t || item.title)
+      setYtResults([])
+      clear()
+      checkEmbeddable(item.id).then((r) => {
+        if (!r.embeddable) setEmbedWarning(r.reason)
       })
-      
-      toast.success('Room created!')
-      navigate(`/room/${room.id}`)
-    } catch (e) {
-      toast.error(e.message || 'Failed to create room')
-    } finally {
+      return
+    }
+
+    const candidate = item.link || item.url || ''
+    if (item.isDirect || isDirectVideoUrl(candidate)) {
+      setVideoUrl(normalizeDirectUrl(candidate))
+      setVideoId('')
+      setVideoType('direct')
+      setUrl(candidate)
+      if (item.title) setTitle((t) => t || item.title)
+      clear()
+      toast('Direct video link selected', { variant: 'success' })
+      return
+    }
+
+    toast(
+      'That’s a webpage link, not a playable file. Open it or paste a direct .mp4/.m3u8 URL.',
+      { variant: 'warning', duration: 6000 }
+    )
+  }
+
+  const create = async (e) => {
+    e.preventDefault()
+    setError(null)
+    setCreating(true)
+    try {
+      if (!title.trim()) throw new Error('Give the room a title')
+      if (!videoId && !videoUrl) {
+        throw new Error('Pick a YouTube video or paste a direct video file link (.mp4 / .m3u8)')
+      }
+
+      if (videoType === 'youtube' && videoId) {
+        const check = await checkEmbeddable(videoId)
+        if (!check.embeddable) {
+          throw new Error(
+            check.reason ||
+              'This YouTube video cannot be embedded in Chan. Choose a different video.'
+          )
+        }
+      }
+
+      const roomId = doc(collection(db, 'rooms')).id
+      const inviteCode = isPrivate ? makeInviteCode() : ''
+
+      const roomData = {
+        hostId: user.uid,
+        hostName: user.displayName || 'Host',
+        title: title.trim(),
+        activityType: videoType === 'direct' ? 'direct' : 'youtube',
+        isPrivate,
+        inviteCode,
+        coHosts: [],
+        locked: false,
+        capacity: Math.min(Math.max(Number(capacity) || 12, 1), 12),
+        participantCount: 0,
+        status: 'live',
+        createdAt: serverTimestamp(),
+        lastHeartbeat: serverTimestamp(),
+      }
+
+      if (videoType === 'youtube' && videoId) {
+        roomData.videoId = videoId
+        roomData.videoType = 'youtube'
+      } else if (videoType === 'direct' && videoUrl) {
+        roomData.videoUrl = videoUrl
+        roomData.videoType = 'direct'
+        roomData.activityType = 'direct'
+      }
+
+      await setDoc(doc(db, 'rooms', roomId), roomData)
+
+      const playerState = {
+        isPlaying: false,
+        currentTime: 0,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid,
+      }
+      if (videoId) playerState.videoId = videoId
+      if (videoUrl) playerState.videoUrl = videoUrl
+
+      await setDoc(doc(db, 'rooms', roomId, 'playerState', 'current'), playerState)
+
+      const joinToken = await user.getIdToken()
+      const joinRes = await fetch('/api/room', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${joinToken}`,
+        },
+        body: JSON.stringify({
+          action: 'join',
+          roomId,
+          uid: user.uid,
+          displayName: user.displayName || 'Host',
+          inviteCode: inviteCode || undefined,
+        }),
+      })
+      const joinData = await parseJsonResponse(joinRes)
+      if (!joinRes.ok) throw new Error(joinData.error || 'Could not add host to room')
+
+      toast('Room created', { variant: 'success' })
+      navigate(`/room/${roomId}${inviteCode ? `?invite=${inviteCode}` : ''}`)
+    } catch (err) {
+      console.error('Create room error:', err)
+      setError(err.message || 'Could not create room. Please try again.')
+      toast(err.message || 'Could not create room', { variant: 'error' })
       setCreating(false)
     }
   }
 
-  const canCreate = useMemo(() => {
-    if (!title.trim()) return false
-    if (mode === 'youtube' && !videoId) return false
-    if (mode === 'direct' && !videoUrl) return false
-    return true
-  }, [title, mode, videoId, videoUrl])
+  const listResults = searchMode === 'youtube' ? ytResults : results
 
   return (
     <div className={styles.page}>
-      <div className={styles.card}>
-        <h1>Create a Watch Room</h1>
-        
-        <div className={styles.tabs}>
-          <button
-            className={mode === 'youtube' ? styles.active : ''}
-            onClick={() => setMode('youtube')}
-          >
-            YouTube
-          </button>
-          <button
-            className={mode === 'direct' ? styles.active : ''}
-            onClick={() => setMode('direct')}
-          >
-            Direct URL / Scrape
-          </button>
-        </div>
+      <Card className={styles.card}>
+        <h1 className={styles.title}>Start a Room</h1>
+        <p className={styles.subtitle}>
+          Pick an embeddable YouTube video, or a direct video file URL (.mp4 / .m3u8).
+        </p>
 
-        <div className={styles.field}>
-          <label>Room Title</label>
-          <input
+        <form onSubmit={create} className={styles.form}>
+          <Input
+            placeholder="Room title"
             value={title}
-            onChange={(e) => onTitleChange(e.target.value)}
-            placeholder="e.g., Movie Night - Westworld S04E01"
-            maxLength={MAX_TITLE}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            maxLength={80}
           />
-          <span className={styles.hint}>{title.length}/{MAX_TITLE}</span>
-        </div>
 
-        <div className={styles.field}>
-          <label>Description (optional)</label>
-          <textarea
-            value={description}
-            onChange={(e) => onDescChange(e.target.value)}
-            placeholder="What's this about?"
-            maxLength={MAX_DESC}
-            rows={3}
-          />
-          <span className={styles.hint}>{description.length}/{MAX_DESC}</span>
-        </div>
-
-        <div className={styles.field}>
-          <label>Visibility</label>
-          <div className={styles.toggleRow}>
+          <div className={styles.tabs}>
             <button
-              className={isPublic ? styles.active : ''}
-              onClick={() => setIsPublic(true)}
+              type="button"
+              className={searchMode === 'youtube' ? styles.tabActive : styles.tab}
+              onClick={() => {
+                setSearchMode('youtube')
+                clear()
+              }}
             >
-              Public
+              YouTube
             </button>
             <button
-              className={!isPublic ? styles.active : ''}
-              onClick={() => setIsPublic(false)}
+              type="button"
+              className={searchMode === 'scraper' ? styles.tabActive : styles.tab}
+              onClick={() => {
+                setSearchMode('scraper')
+                setYtResults([])
+              }}
             >
-              Private
+              Direct / Scraper
             </button>
           </div>
-        </div>
 
-        {mode === 'youtube' && (
-          <div className={styles.field}>
-            <label>YouTube URL</label>
-            <input
-              value={url}
-              onChange={(e) => onUrlChange(e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=..."
-            />
-            {embedWarning && (
-              <div className={styles.warning}>{embedWarning}</div>
-            )}
-            {videoId && !embedWarning && (
-              <div className={styles.preview}>
-                <span className={styles.success}>YouTube video detected</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {mode === 'direct' && (
-          <>
-            <div className={styles.field}>
-              <label>Page URL or direct .mp4 link</label>
-              <input
+          {searchMode === 'youtube' ? (
+            <>
+              <Input
+                placeholder="Paste YouTube URL"
                 value={url}
                 onChange={(e) => onUrlChange(e.target.value)}
-                placeholder="https://site.com/movie or http://cdn.com/file.mp4"
               />
-              <div className={styles.scrapeRow}>
-                <button
-                  onClick={handleScrape}
-                  disabled={loading || !url.trim()}
-                  className={styles.scrapeBtn}
+              <div className={styles.row}>
+                <Input
+                  placeholder="Or search YouTube"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={onYtSearch}
+                  className={styles.searchButton}
+                  loading={ytLoading}
                 >
-                  {loading ? 'Extracting...' : 'Extract links from page'}
-                </button>
-                {isDirectVideoUrl(url) && (
-                  <span className={styles.directBadge}>Direct video detected</span>
-                )}
+                  Search
+                </Button>
               </div>
+            </>
+          ) : (
+            <>
+              <p className={styles.note}>
+                Prefer a direct .mp4/.m3u8 URL. Scraping often only finds webpage links.
+              </p>
+              <select
+                className={styles.select}
+                value={scraperSite}
+                onChange={(e) => setScraperSite(e.target.value)}
+              >
+                <option value="netnaija">NetNaija</option>
+                <option value="nkiri">Nkiri</option>
+                <option value="fzmovies">FZMovies</option>
+                <option value="custom">Other Site</option>
+              </select>
+              <Input
+                placeholder="Page URL or direct .mp4 link"
+                value={url}
+                onChange={(e) => onUrlChange(e.target.value)}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onScrape}
+                loading={scraperLoading}
+                fullWidth
+              >
+                Extract links
+              </Button>
+            </>
+          )}
+
+          {listResults.length > 0 && (
+            <div className={styles.results}>
+              {listResults.map((item, idx) => {
+                const playable =
+                  (item.source === 'youtube' && item.id) ||
+                  item.isDirect ||
+                  isDirectVideoUrl(item.link || item.url)
+                return (
+                  <button
+                    key={item.id || item.link || idx}
+                    type="button"
+                    className={`${styles.result} ${!playable ? styles.resultMuted : ''}`}
+                    onClick={() => selectVideo(item)}
+                  >
+                    {(item.thumbnail || item.image) && (
+                      <img
+                        src={item.thumbnail || item.image}
+                        alt=""
+                        className={styles.resultThumb}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none'
+                        }}
+                      />
+                    )}
+                    <p className={styles.resultTitle}>{item.title}</p>
+                    <span className={styles.resultSource}>
+                      {item.source || 'link'}
+                      {playable ? ' · playable' : ' · page only'}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
+          )}
 
-            {error && (
-              <div className={styles.error}>
-                {error}
-              </div>
-            )}
+          {(videoId || videoUrl) && (
+            <div className={styles.selected}>
+              {videoType === 'youtube' && videoId && (
+                <img src={getThumbnail(videoId)} alt="" className={styles.selectedThumb} />
+              )}
+              <span className={styles.selectedText}>
+                {videoType === 'youtube' ? `YouTube: ${videoId}` : 'Direct video link selected'}
+              </span>
+            </div>
+          )}
 
-            {results.length > 0 && (
-              <div className={styles.results}>
-                <h3>Found {results.length} result(s)</h3>
-                <div className={styles.resultList}>
-                  {results.map((r, idx) => (
-                    <ScraperResultCard
-                      key={idx}
-                      result={r}
-                      selected={selectedResult === r}
-                      onClick={() => handleResultSelect(r)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+          {embedWarning && <p className={styles.warning}>{embedWarning}</p>}
 
-            {videoUrl && videoType === 'direct' && (
-              <div className={styles.preview}>
-                <span className={styles.success}>Ready to play: {videoUrl.slice(0, 60)}...</span>
-              </div>
-            )}
-          </>
-        )}
+          <div className={styles.settings}>
+            <label className={styles.setting}>
+              <span className={styles.note}>Capacity</span>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+              />
+            </label>
+            <label className={styles.checkbox}>
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+              />
+              Private room
+            </label>
+          </div>
 
-        <div className={styles.actions}>
-          <button
-            className={styles.primary}
-            onClick={handleCreate}
-            disabled={!canCreate || creating}
-          >
-            {creating ? 'Creating...' : 'Create Room'}
-          </button>
-        </div>
-      </div>
+          <Button type="submit" loading={creating} fullWidth disabled={!videoId && !videoUrl}>
+            Create room
+          </Button>
+        </form>
+
+        {error && <p className={styles.error}>{error}</p>}
+        {scraperError && <p className={styles.error}>{scraperError}</p>}
+
+        <p className={styles.footer}>
+          <Link to="/">Cancel</Link>
+        </p>
+      </Card>
     </div>
   )
-        }
+}
