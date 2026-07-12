@@ -1,6 +1,11 @@
-// Vercel Node.js functions use the native http.ServerResponse.
-// res.status().set().json() is NOT supported; res.writeHead/end is standard.
-export function sendResponse(res, status, body, headers) {
-  res.writeHead(status, headers)
-  res.end(body === undefined ? '' : JSON.stringify(body))
+export function sendResponse(res, status, body, headers = {}) {
+  const json = JSON.stringify(body)
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    ...headers,
+  })
+  res.end(json)
 }
