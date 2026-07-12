@@ -20,7 +20,7 @@ export function ScraperPage() {
   const { user, logout } = useAuth()
   const { scrape, search, results, lastQuery, loading, error, clear } = useScraper()
 
-  const [mode, setMode] = useState('movies') // 'movies' | 'youtube'
+  const [mode, setMode] = useState('movies')
   const [movieQuery, setMovieQuery] = useState('')
   const [movieSite, setMovieSite] = useState('omdb')
   const [manualUrl, setManualUrl] = useState('')
@@ -159,38 +159,66 @@ export function ScraperPage() {
       )}
 
       {!loading && !error && results.length === 0 && lastQuery && (
-        <EmptyState
-          title="No results"
-          description="Nothing matched that search. Try a different title, or double-check the pasted URL and site selectors."
-        />
+        <div className={styles.empty}>
+          <EmptyState
+            title="No results"
+            description="Try a different query or check the URL."
+          />
+        </div>
       )}
 
-      {!loading && results.length > 0 && (
+      {!loading && !error && results.length === 0 && !lastQuery && (
+        <div className={styles.empty}>
+          <EmptyState
+            title="Ready"
+            description="Search for movies or YouTube videos above."
+          />
+        </div>
+      )}
+
+      {!loading && !error && results.length > 0 && (
         <div className={styles.grid}>
-          {results.map((item, i) => (
-            <Card key={item.link || item.id || i} className={styles.resultCard}>
-              {item.image || item.thumbnail ? (
-                <img className={styles.thumb} src={item.image || item.thumbnail} alt="" loading="lazy" />
+          {results.map((r, idx) => (
+            <Card key={idx} className={styles.card}>
+              {r.image || r.thumbnail ? (
+                <img
+                  className={styles.thumb}
+                  src={r.image || r.thumbnail}
+                  alt={r.title}
+                  loading="lazy"
+                />
               ) : (
-                <div className={styles.thumbPlaceholder} aria-hidden="true" />
+                <div className={styles.thumb} style={{ background: 'var(--surface-2)' }} />
               )}
-              <div className={styles.resultBody}>
-                <h4 className={styles.resultTitle}>{item.title}</h4>
-                {(item.meta || item.channel) && (
-                  <p className={styles.resultMeta}>{item.meta || item.channel}</p>
-                )}
-                <Badge variant="muted">{item.source}</Badge>
+              <div className={styles.cardTitle} title={r.title}>
+                {r.title}
               </div>
-              {(item.link || item.url) && (
-                <a
-                  className={styles.resultAction}
-                  href={item.link || item.url}
+              <div className={styles.cardMeta}>
+                {r.meta || r.channel || r.source}
+              </div>
+              <div className={styles.cardActions}>
+                <Button
+                  as="a"
+                  href={r.link || r.url}
                   target="_blank"
                   rel="noreferrer"
+                  size="sm"
                 >
                   Open
-                </a>
-              )}
+                </Button>
+                {r.link && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => navigator.clipboard.writeText(r.link)}
+                  >
+                    Copy link
+                  </Button>
+                )}
+              </div>
+              <Badge variant="secondary" style={{ position: 'absolute', top: 8, right: 8 }}>
+                {r.source}
+              </Badge>
             </Card>
           ))}
         </div>
