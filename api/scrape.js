@@ -18,7 +18,18 @@ async function fetchHtml(url) {
     if (!response.ok) {
       throw new Error(`Site responded with HTTP ${response.status}`);
     }
-    return await response.text();
+    const html = await response.text();
+    // Bot-protection services (Cloudflare/AWS WAF, etc.) often return a 2xx
+    // "challenge" page instead of a normal error — surface that clearly
+    // instead of silently returning zero results.
+    const lower = html.toLowerCase();
+    const looksBlocked =
+      html.trim().length < 200 ||
+      /gokuprops|awswafcookiedomainlist|cf-chl|captcha|checking your browser|are you a human|unusual traffic|access denied|attention required/.test(lower);
+    if (looksBlocked) {
+      throw new Error('This site blocked the request as automated traffic (bot-protection challenge) — it cannot be scraped from a server.');
+    }
+    return html;
   } finally {
     clearTimeout(timer);
   }

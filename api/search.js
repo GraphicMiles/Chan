@@ -12,7 +12,38 @@ export default async function handler(req, res) {
   try {
     const results = [];
 
-    if (source === 'youtube') {
+    if (source === 'omdb') {
+      const apiKey = process.env.OMDB_API_KEY;
+
+      if (!apiKey) {
+        return fail(res, 500, 'OMDb API key not configured');
+      }
+
+      const omdbRes = await fetch(
+        `https://www.omdbapi.com/?apikey=${apiKey}&s=${encodeURIComponent(query)}`
+      );
+
+      if (!omdbRes.ok) {
+        throw new Error(`OMDb API responded with HTTP ${omdbRes.status}`);
+      }
+
+      const omdbData = await omdbRes.json();
+
+      if (omdbData.Response === 'False') {
+        // Not an error -- just no matches (or a malformed query).
+        return ok(res, { success: true, query, count: 0, results: [] });
+      }
+
+      results.push(
+        ...(omdbData.Search || []).map((item) => ({
+          title: `${item.Title} (${item.Year})`,
+          image: item.Poster !== 'N/A' ? item.Poster : null,
+          link: `https://www.imdb.com/title/${item.imdbID}/`,
+          meta: item.Type,
+          source: 'imdb',
+        }))
+      );
+    } else if (source === 'youtube') {
       const apiKey = process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;
 
       if (!apiKey) {

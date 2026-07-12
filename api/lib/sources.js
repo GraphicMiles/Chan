@@ -9,15 +9,9 @@
 // Selectors are best-effort. Real-world sites change markup often; if a site returns
 // 0 results, the selectors below likely need updating for that site's current HTML.
 export const SITE_CONFIGS = {
-  imdb: {
-    label: 'IMDb',
-    buildSearchUrl: (query) => `https://www.imdb.com/find/?q=${encodeURIComponent(query)}&s=tt`,
-    items: '.ipc-metadata-list-summary-item, .find-result-item, .lister-item, li.find-title-result',
-    title: '.ipc-metadata-list-summary-item__t, .ipc-title__text, .lister-item-header a, a.ipc-metadata-list-summary-item__t',
-    image: 'img',
-    link: 'a',
-    meta: '.ipc-metadata-list-summary-item__li, .lister-item-year, .find-result-item .result_text',
-  },
+  // Note: IMDb search is handled by api/search.js via the official OMDb API
+  // (http://www.omdbapi.com/), not by scraping IMDb's site -- IMDb sits behind
+  // AWS WAF bot-protection that blocks non-browser requests outright.
   nkiri: {
     label: 'Nkiri',
     items: 'article.post-item, .movie-item, .post, article',

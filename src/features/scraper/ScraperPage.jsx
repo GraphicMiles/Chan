@@ -6,7 +6,7 @@ import { Header, Layout } from '../../shared/layout/index.js'
 import styles from './ScraperPage.module.css'
 
 const SEARCHABLE_SITES = [
-  { value: 'imdb', label: 'IMDb' },
+  { value: 'omdb', label: 'IMDb (via OMDb)' },
 ]
 
 const MANUAL_SITES = [
@@ -22,7 +22,7 @@ export function ScraperPage() {
 
   const [mode, setMode] = useState('movies') // 'movies' | 'youtube'
   const [movieQuery, setMovieQuery] = useState('')
-  const [movieSite, setMovieSite] = useState('imdb')
+  const [movieSite, setMovieSite] = useState('omdb')
   const [manualUrl, setManualUrl] = useState('')
   const [ytQuery, setYtQuery] = useState('')
 
@@ -32,7 +32,7 @@ export function ScraperPage() {
     e.preventDefault()
     if (isSearchableSite) {
       if (!movieQuery.trim()) return
-      scrape({ query: movieQuery.trim(), site: movieSite })
+      search(movieQuery.trim(), movieSite)
     } else {
       if (!manualUrl.trim()) return
       scrape({ url: manualUrl.trim(), site: movieSite })
