@@ -1,302 +1,289 @@
-import { useState } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../shared/auth/hooks/useAuth.jsx'
+import { toast } from 'react-toastify'
+import styles from './ScraperPage.module.scss'
 import { useScraper } from '../../hooks/useScraper.js'
-import { isDirectVideoUrl } from '../../shared/lib/youtube.js'
-import { Button, Input, Card, Badge, EmptyState, Skeleton, useToast } from '../../shared/ui/index.js'
-import { Header, Layout } from '../../shared/layout/index.js'
-import styles from './ScraperPage.module.css'
+import { isDirectVideoUrl, normalizeDirectUrl } from '../../shared/lib/youtube.js'
 
-const SEARCHABLE_SITES = [{ value: 'omdb', label: 'IMDb (via OMDb)' }]
-
-const MANUAL_SITES = [
-  { value: 'nkiri', label: 'Nkiri' },
-  { value: 'netnaija', label: 'NetNaija' },
-  { value: 'fzmovies', label: 'FZMovies' },
-  { value: 'custom', label: 'Other (custom page)' },
+const SITES = [
+  { key: 'nkiri', label: 'Nkiri' },
+  { key: 'netnaija', label: 'NetNaija' },
+  { key: 'fzmovies', label: 'FZMovies' },
+  { key: 'o2tv', label: 'O2TV Series' },
+  { key: 'custom', label: 'Custom URL' },
 ]
 
-export function ScraperPage() {
+export default function ScraperPage() {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
-  const { toast } = useToast()
-  const { scrape, search, results, lastQuery, loading, error, clear } = useScraper()
+  const { results, loading, error, clear, scrape } = useScraper()
+  const [url, setUrl] = useState('')
+  const [query, setQuery] = useState('')
+  const [site, setSite] = useState('custom')
+  const [showDirectOnly, setShowDirectOnly] = useState(false)
 
-  const [mode, setMode] = useState('movies')
-  const [movieQuery, setMovieQuery] = useState('')
-  const [movieSite, setMovieSite] = useState('omdb')
-  const [manualUrl, setManualUrl] = useState('')
-  const [ytQuery, setYtQuery] = useState('')
-
-  const isSearchableSite = SEARCHABLE_SITES.some((s) => s.value === movieSite)
-
-  const runMovieLookup = (e) => {
-    e.preventDefault()
-    if (isSearchableSite) {
-      if (!movieQuery.trim()) return
-      search(movieQuery.trim(), movieSite)
-    } else {
-      if (!manualUrl.trim()) return
-      scrape({ url: manualUrl.trim(), site: movieSite })
+  const handleUrlChange = useCallback((e) => {
+    const value = e.target.value
+    setUrl(value)
+    
+    // Auto-detect direct URLs
+    if (value && isDirectVideoUrl(value)) {
+      toast.info('Direct video URL detected!', { autoClose: 2000 })
     }
-  }
+  }, [])
 
-  const runYoutubeSearch = (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault()
-    if (!ytQuery.trim()) return
-    search(ytQuery.trim(), 'youtube')
-  }
-
-  const switchMode = (next) => {
-    setMode(next)
-    clear()
-  }
-
-  const startYoutubeRoom = (item) => {
-    if (!item?.id) return
-    if (item.embeddable === false) {
-      toast(
-        'This video often cannot embed in Chan (Vevo/label). Open on YouTube or pick another.',
-        { variant: 'warning', duration: 6000 }
-      )
-    }
-    const q = new URLSearchParams({
-      video: item.id,
-      title: item.title || 'Watch Party',
-      type: 'youtube',
-    })
-    navigate(`/create?${q.toString()}`)
-  }
-
-  const startDirectRoom = (videoUrl, title) => {
-    if (!isDirectVideoUrl(videoUrl)) {
-      toast('That is not a direct video file URL (.mp4 / .m3u8).', { variant: 'error' })
+    
+    const trimmedUrl = url.trim()
+    
+    if (!trimmedUrl && !query.trim()) {
+      toast.error('Please enter a URL or search query')
       return
     }
-    const q = new URLSearchParams({
-      videoUrl,
-      title: title || 'Watch Party',
-      type: 'direct',
-    })
-    navigate(`/create?${q.toString()}`)
-  }
+
+    // If it's a direct video URL, redirect immediately to create room
+    if (isDirectVideoUrl(trimmedUrl)) {
+      const normalized = normalizeDirectUrl(trimmedUrl)
+      const title = normalized.split('/').pop()?.replace(/\.(mp4|m3u8|mkv|avi|mov|webm|ogg|flv)$/i, '') || 'Video'
+      navigate(
+        `/create?videoUrl=${encodeURIComponent(normalized)}&title=${encodeURIComponent(title)}&type=direct`
+      )
+      return
+    }
+
+    await scrape({ url: trimmedUrl, query: query.trim() || undefined, site })
+  }, [url, query, site, scrape, navigate])
+
+  const handleResultClick = useCallback((result) => {
+    const resultUrl = result.url || result.link
+    
+    if (!resultUrl) {
+      toast.error('No URL available for this result')
+      return
+    }
+
+    // If it's a direct video or detected as playable
+    if (result.isDirect || isDirectVideoUrl(resultUrl)) {
+      navigate(
+        `/create?videoUrl=${encodeURIComponent(resultUrl)}&title=${encodeURIComponent(
+          result.title || 'Video'
+        )}&type=direct`
+      )
+    } else {
+      // For page links, set as new URL to scrape deeper
+      setUrl(resultUrl)
+      clear()
+      toast.info('Loaded page URL. Click Extract to find videos.')
+    }
+  }, [navigate, clear])
+
+  const handlePlayDirect = useCallback((result) => {
+    const resultUrl = result.url || result.link
+    if (resultUrl) {
+      navigate(
+        `/create?videoUrl=${encodeURIComponent(resultUrl)}&title=${encodeURIComponent(
+          result.title || 'Video'
+        )}&type=direct`
+      )
+    }
+  }, [navigate])
+
+  const filteredResults = useMemo(() => {
+    if (!showDirectOnly) return results
+    return results.filter((r) => r.isDirect || isDirectVideoUrl(r.url || r.link))
+  }, [results, showDirectOnly])
+
+  const directCount = useMemo(() => {
+    return results.filter((r) => r.isDirect || isDirectVideoUrl(r.url || r.link)).length
+  }, [results])
+
+  const isDirectInput = isDirectVideoUrl(url)
 
   return (
-    <Layout
-      header={
-        <Header
-          user={user}
-          actions={
-            user && (
-              <Button variant="ghost" size="sm" onClick={logout}>
-                Sign out
-              </Button>
-            )
-          }
-        />
-      }
-      wide
-    >
-      <div className={styles.intro}>
-        <h1 className={styles.title}>Discover</h1>
+    <div className={styles.page}>
+      <div className={styles.container}>
+        <h1>Video Scraper</h1>
         <p className={styles.subtitle}>
-          Search on demand. YouTube results prefer embeddable videos. Movie-site scrape finds links on a page you paste —
-          only direct media files can play in a room.
+          Extract video links from movie/series sites or paste a direct .mp4/.m3u8 link
         </p>
-      </div>
 
-      <div className={styles.tabs}>
-        <button
-          type="button"
-          className={mode === 'movies' ? styles.tabActive : styles.tab}
-          onClick={() => switchMode('movies')}
-        >
-          Movies &amp; shows
-        </button>
-        <button
-          type="button"
-          className={mode === 'youtube' ? styles.tabActive : styles.tab}
-          onClick={() => switchMode('youtube')}
-        >
-          YouTube
-        </button>
-      </div>
-
-      {mode === 'movies' ? (
-        <Card className={styles.panel}>
-          <form className={styles.form} onSubmit={runMovieLookup}>
-            <select
-              className={styles.select}
-              value={movieSite}
-              onChange={(e) => setMovieSite(e.target.value)}
-            >
-              <optgroup label="Search by title">
-                {SEARCHABLE_SITES.map((s) => (
-                  <option key={s.value} value={s.value}>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.row}>
+            <div className={styles.field}>
+              <label htmlFor="site">Site</label>
+              <select id="site" value={site} onChange={(e) => setSite(e.target.value)}>
+                {SITES.map((s) => (
+                  <option key={s.key} value={s.key}>
                     {s.label}
                   </option>
                 ))}
-              </optgroup>
-              <optgroup label="Paste a page URL">
-                {MANUAL_SITES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
+              </select>
+            </div>
+          </div>
 
-            {isSearchableSite ? (
-              <Input
-                className={styles.grow}
-                value={movieQuery}
-                onChange={(e) => setMovieQuery(e.target.value)}
-                placeholder='Search a title, e.g. "Superman 2025"'
-              />
-            ) : (
-              <Input
-                className={styles.grow}
-                value={manualUrl}
-                onChange={(e) => setManualUrl(e.target.value)}
-                placeholder="Paste the exact page URL to read"
-              />
-            )}
-
-            <Button type="submit" loading={loading}>
-              Search
-            </Button>
-            {results.length > 0 && (
-              <Button type="button" variant="secondary" onClick={clear}>
-                Clear
-              </Button>
-            )}
-          </form>
-          {!isSearchableSite && (
-            <p className={styles.hint}>
-              Open the site yourself, go to the title page, paste that URL. We extract on-page media URLs when present;
-              many sites only expose HTML download pages (Open/Copy only).
-            </p>
-          )}
-        </Card>
-      ) : (
-        <Card className={styles.panel}>
-          <form className={styles.form} onSubmit={runYoutubeSearch}>
-            <Input
-              className={styles.grow}
-              value={ytQuery}
-              onChange={(e) => setYtQuery(e.target.value)}
-              placeholder="Search YouTube videos..."
+          <div className={styles.field}>
+            <label htmlFor="url">
+              Page URL or Direct Video Link
+              {isDirectInput && <span className={styles.directIndicator}> - Direct Video Detected</span>}
+            </label>
+            <input
+              id="url"
+              type="url"
+              value={url}
+              onChange={handleUrlChange}
+              placeholder="https://example.com/movie-page or https://cdn.com/video.mp4"
+              className={isDirectInput ? styles.directInput : ''}
             />
-            <Button type="submit" loading={loading}>
-              Search
-            </Button>
-            {results.length > 0 && (
-              <Button type="button" variant="secondary" onClick={clear}>
-                Clear
-              </Button>
+            {isDirectInput && (
+              <div className={styles.directHint}>
+                This is a direct video link. Click "Extract Links" to create a room with it.
+              </div>
             )}
-          </form>
-        </Card>
-      )}
+          </div>
 
-      {error && (
-        <Card className={styles.errorCard}>
-          <strong>Search failed:</strong> {error}
-        </Card>
-      )}
+          <div className={styles.field}>
+            <label htmlFor="query">Search Query (optional - for supported sites)</label>
+            <input
+              id="query"
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="e.g., The Matrix 1999"
+            />
+          </div>
 
-      {loading && (
-        <div className={styles.grid}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className={styles.skeletonCard}>
-              <Skeleton height={120} rounded="md" />
-              <Skeleton height={16} style={{ marginTop: 12 }} />
-              <Skeleton height={12} width="60%" style={{ marginTop: 8 }} />
-            </Card>
-          ))}
-        </div>
-      )}
+          <div className={styles.actions}>
+            <button type="submit" disabled={loading || (!url.trim() && !query.trim())} className={styles.primary}>
+              {loading ? 'Extracting...' : isDirectInput ? 'Create Room with Video' : 'Extract Links'}
+            </button>
+            <button type="button" onClick={clear} disabled={loading || (results.length === 0 && !url && !query)}>
+              Clear
+            </button>
+          </div>
+        </form>
 
-      {!loading && !error && results.length === 0 && lastQuery && (
-        <div className={styles.empty}>
-          <EmptyState title="No results" description="Try a different query or check the URL." />
-        </div>
-      )}
+        {error && (
+          <div className={styles.error}>
+            <strong>Error:</strong> {error}
+          </div>
+        )}
 
-      {!loading && !error && results.length === 0 && !lastQuery && (
-        <div className={styles.empty}>
-          <EmptyState title="Ready" description="Search for movies or YouTube videos above." />
-        </div>
-      )}
-
-      {!loading && !error && results.length > 0 && (
-        <div className={styles.grid}>
-          {results.map((r, idx) => {
-            const href = r.link || r.url
-            const direct = r.isDirect || isDirectVideoUrl(href)
-            const isYt = r.source === 'youtube' && r.id
-            const embedBlocked = isYt && r.embeddable === false
-
-            return (
-              <Card key={r.id || href || idx} className={styles.card}>
-                {r.image || r.thumbnail ? (
-                  <img
-                    className={styles.thumb}
-                    src={r.image || r.thumbnail}
-                    alt=""
-                    loading="lazy"
-                    onError={(e) => {
-                      e.target.style.display = 'none'
-                    }}
-                  />
-                ) : (
-                  <div className={styles.thumbPlaceholder}>No image</div>
+        {results.length > 0 && (
+          <div className={styles.results}>
+            <div className={styles.resultsHeader}>
+              <h2>
+                Found {results.length} result{results.length !== 1 ? 's' : ''}
+                {directCount > 0 && (
+                  <span className={styles.directCount}> ({directCount} direct)</span>
                 )}
-                <div className={styles.cardTitle} title={r.title}>
-                  {r.title}
-                </div>
-                <div className={styles.cardMeta}>
-                  {r.meta || r.channel || r.source}
-                  {embedBlocked ? ' · may not embed' : ''}
-                  {direct ? ' · direct file' : ''}
-                </div>
-                <div className={styles.cardActions}>
-                  {href && (
-                    <Button as="a" href={href} target="_blank" rel="noreferrer" size="sm">
-                      Open
-                    </Button>
-                  )}
-                  {href && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(href)
-                        toast('Copied', { variant: 'success' })
-                      }}
-                    >
-                      Copy
-                    </Button>
-                  )}
-                  {isYt && (
-                    <Button size="sm" onClick={() => startYoutubeRoom(r)}>
-                      Start room
-                    </Button>
-                  )}
-                  {direct && !isYt && (
-                    <Button size="sm" onClick={() => startDirectRoom(href, r.title)}>
-                      Watch in room
-                    </Button>
-                  )}
-                </div>
-                <Badge variant="secondary" className={styles.badge}>
-                  {r.source}
-                </Badge>
-              </Card>
-            )
-          })}
-        </div>
-      )}
-    </Layout>
+              </h2>
+              <label className={styles.filter}>
+                <input
+                  type="checkbox"
+                  checked={showDirectOnly}
+                  onChange={(e) => setShowDirectOnly(e.target.checked)}
+                />
+                Show direct files only
+              </label>
+            </div>
+
+            {results.length > 0 && directCount === 0 && (
+              <div className={styles.hint}>
+                No direct video files found. These are page links - click one to open and extract further,
+                or try pasting a direct .mp4/.m3u8 link.
+              </div>
+            )}
+
+            <div className={styles.grid}>
+              {filteredResults.map((result, index) => {
+                const isPlayable = result.isDirect || isDirectVideoUrl(result.url || result.link)
+                
+                return (
+                  <div
+                    key={index}
+                    className={`${styles.card} ${isPlayable ? styles.playable : ''}`}
+                  >
+                    {result.image && (
+                      <div className={styles.thumbnail}>
+                        <img src={result.image} alt={result.title} loading="lazy" />
+                      </div>
+                    )}
+                    <div className={styles.content}>
+                      <h3>{result.title}</h3>
+                      <div className={styles.meta}>
+                        {result.quality && (
+                          <span className={styles.quality}>{result.quality}</span>
+                        )}
+                        {isPlayable ? (
+                          <span className={styles.badgeDirect}>Direct</span>
+                        ) : (
+                          <span className={styles.badgePage}>Page</span>
+                        )}
+                        {result.source && (
+                          <span className={styles.source}>{result.source}</span>
+                        )}
+                      </div>
+                      {result.meta && (
+                        <div className={styles.metaText}>{result.meta}</div>
+                      )}
+                      <div className={styles.urlPreview}>
+                        {(result.url || result.link || '').slice(0, 50)}...
+                      </div>
+                    </div>
+                    <div className={styles.cardActions}>
+                      {isPlayable ? (
+                        <button
+                          onClick={() => handlePlayDirect(result)}
+                          className={styles.playBtn}
+                        >
+                          Watch in Room
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleResultClick(result)}
+                            className={styles.openBtn}
+                          >
+                            Open Page
+                          </button>
+                          <a
+                            href={result.url || result.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.visitLink}
+                          >
+                            Visit ↗
+                          </a>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {results.length === 0 && !loading && !error && url && isDirectInput && (
+          <div className={styles.quickAction}>
+            <p>This URL is a direct video file and can be played immediately.</p>
+            <button
+              onClick={() =>
+                navigate(
+                  `/create?videoUrl=${encodeURIComponent(
+                    normalizeDirectUrl(url)
+                  )}&title=${encodeURIComponent(
+                    url.split('/').pop()?.replace(/\.(mp4|m3u8|mkv|avi|mov|webm|ogg|flv)$/i, '') || 'Video'
+                  )}&type=direct`
+                )
+              }
+              className={styles.primary}
+            >
+              Create Room Now
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   )
-}
+                }
