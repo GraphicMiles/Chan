@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { db } from '../../../shared/lib/firebase.js'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import { parseJsonResponse } from '../../../shared/lib/api.js'
@@ -31,14 +31,18 @@ export default function HomePage() {
       setRoomsLoading(false)
       return undefined
     }
+    // Firestore evaluates security rules against a query's *potential* result
+    // set, not just what it actually returns. Our rule only allows reading a
+    // room when status == "live" (and isPrivate != true, unless host/participant).
+    // A bare `collection(db, 'rooms')` listener could potentially match ended
+    // or private rooms too, so Firestore rejects the whole listener with
+    // permission-denied -- which is why public rooms never appeared here.
+    // Adding matching `where()` clauses lets the rule prove every possible
+    // result is readable.
     const unsub = onSnapshot(
-      collection(db, 'rooms'),
+      query(collection(db, 'rooms'), where('status', '==', 'live'), where('isPrivate', '==', false)),
       (snap) => {
-        setRooms(
-          snap.docs
-            .map((d) => ({ id: d.id, ...d.data() }))
-            .filter((r) => r.status === 'live' && !r.isPrivate)
-        )
+        setRooms(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
         setRoomsLoading(false)
       },
       (err) => {

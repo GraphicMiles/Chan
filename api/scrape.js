@@ -19,14 +19,18 @@ async function fetchHtml(url) {
       throw new Error(`Site responded with HTTP ${response.status}`);
     }
     const html = await response.text();
-    // Bot-protection services (Cloudflare/AWS WAF, etc.) often return a 2xx
-    // "challenge" page instead of a normal error — surface that clearly
-    // instead of silently returning zero results.
-    const lower = html.toLowerCase();
-    const looksBlocked =
-      html.trim().length < 200 ||
-      /gokuprops|awswafcookiedomainlist|cf-chl|captcha|checking your browser|are you a human|unusual traffic|access denied|attention required/.test(lower);
-    if (looksBlocked) {
+    // Bot-protection services (Cloudflare/AWS WAF, etc.) return a 2xx
+    // "challenge" page instead of a normal error. These are always small
+    // (a few KB at most) -- checking keywords only on short pages avoids
+    // false positives on long, legitimate pages that happen to mention
+    // "captcha" somewhere (e.g. in a footer notice).
+    const trimmed = html.trim();
+    const isShort = trimmed.length < 5000;
+    const lower = trimmed.toLowerCase();
+    const hasStrongWafSignal = /gokuprops|awswafcookiedomainlist|cf-chl-bypass|cf_chl_opt/.test(lower);
+    const hasWeakChallengeSignal =
+      isShort && /checking your browser|are you a human|unusual traffic|attention required|verify you are human/.test(lower);
+    if (trimmed.length < 200 || hasStrongWafSignal || hasWeakChallengeSignal) {
       throw new Error('This site blocked the request as automated traffic (bot-protection challenge) — it cannot be scraped from a server.');
     }
     return html;
