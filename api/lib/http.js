@@ -26,3 +26,13 @@ export function ok(res, body, status = 200) {
 export function fail(res, status, error) {
   sendResponse(res, status, { success: false, error })
 }
+
+export function statusForError(err) {
+  if (err && typeof err.status === 'number') return err.status
+  const message = String(err?.message || '')
+  if (/not found/i.test(message)) return 404
+  if (/unauthorized|invalid or expired token|missing token/i.test(message)) return 401
+  if (/only the host|cannot kick|cannot mute|cannot change your own role/i.test(message)) return 403
+  if (/missing|required|invalid|locked|full|invite code|ended/i.test(message)) return 400
+  return 500
+}
