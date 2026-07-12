@@ -70,7 +70,6 @@ export default function RoomPage() {
     prevActivity.current = activityType
   }, [activityType, room?.hostName])
 
-  // Esc closes mobile chat
   useEffect(() => {
     if (!showChat) return
     const onKey = (e) => {
@@ -99,6 +98,7 @@ export default function RoomPage() {
   if (!joined) return <div className={styles.joining}>Joining room…</div>
 
   const isYoutube = activityType === 'youtube'
+  const isDirectVideo = room?.videoType === 'direct' || room?.videoUrl
   const canShareScreen = isDisplayMediaSupported()
 
   const switchActivity = async (type) => {
@@ -119,14 +119,34 @@ export default function RoomPage() {
   const changeVideo = async (e) => {
     e.preventDefault()
     const id = extractVideoId(newVideoUrl)
-    if (!id) {
-      toast('Paste a valid YouTube URL', { variant: 'error' })
-      return
-    }
+    const isDirect = newVideoUrl.match(/\.(mp4|mkv|avi|mov|webm)$/i)
+    
     try {
       setBusy(true)
-      await updateRoom({ videoId: id, activityType: 'youtube' })
-      await writePlayerState({ videoId: id, isPlaying: false, currentTime: 0 })
+      
+      if (id) {
+        // YouTube video
+        await updateRoom({ 
+          videoId: id, 
+          videoUrl: null,
+          videoType: 'youtube',
+          activityType: 'youtube' 
+        })
+        await writePlayerState({ videoId: id, videoUrl: null, isPlaying: false, currentTime: 0 })
+      } else if (isDirect) {
+        // Direct video URL
+        await updateRoom({ 
+          videoId: null, 
+          videoUrl: newVideoUrl,
+          videoType: 'direct',
+          activityType: 'youtube' 
+        })
+        await writePlayerState({ videoId: null, videoUrl: newVideoUrl, isPlaying: false, currentTime: 0 })
+      } else {
+        toast('Paste a valid YouTube URL or direct video link (.mp4, .mkv, etc.)', { variant: 'error' })
+        return
+      }
+      
       setNewVideoUrl('')
       setShowVideoInput(false)
       toast('Video updated', { variant: 'success' })
@@ -226,6 +246,7 @@ export default function RoomPage() {
           <h1 className={styles.titleText}>{room.title}</h1>
         )}
         {room.locked && <span className={styles.lockBadge}>Locked</span>}
+        {isDirectVideo && <span className={styles.badge}>Direct</span>}
       </div>
       <div className={styles.headerActions}>
         <Button variant="secondary" size="sm" onClick={() => setShareOpen(true)}>Share</Button>
@@ -246,9 +267,11 @@ export default function RoomPage() {
       <div className={styles.main}>
         <div className={styles.stage}>
           <div className={styles.playerWrap}>
-            {isYoutube ? (
+            {isYoutube || isDirectVideo ? (
               <VideoPlayer
                 videoId={room.videoId}
+                videoUrl={room.videoUrl}
+                videoType={room.videoType || 'youtube'}
                 isHost={canControl}
                 onReady={onPlayerReady}
                 onPlayerEvent={onPlayerEvent}
@@ -265,7 +288,7 @@ export default function RoomPage() {
                 <Button variant="secondary" size="sm" onClick={() => setShowVideoInput((s) => !s)}>
                   Change video
                 </Button>
-                {isYoutube ? (
+                {(isYoutube || isDirectVideo) ? (
                   canShareScreen ? (
                     <Button variant="secondary" size="sm" loading={busy} onClick={() => switchActivity('screenshare')}>
                       Share screen
@@ -299,7 +322,7 @@ export default function RoomPage() {
               {showVideoInput && (
                 <form onSubmit={changeVideo} className={styles.videoForm}>
                   <Input
-                    placeholder="Paste new YouTube URL"
+                    placeholder="Paste YouTube URL or direct video link (.mp4, .mkv)"
                     value={newVideoUrl}
                     onChange={(e) => setNewVideoUrl(e.target.value)}
                   />
@@ -317,7 +340,7 @@ export default function RoomPage() {
               aria-expanded={detailsOpen}
             >
               <span>
-                {participants.length}/{room.capacity} watching · {isYoutube ? 'YouTube' : 'Screen share'}
+                {participants.length}/{room.capacity} watching · {isDirectVideo ? 'Direct Video' : isYoutube ? 'YouTube' : 'Screen share'}
               </span>
               <span className={styles.metaChevron}>{detailsOpen ? '▾' : '▸'}</span>
             </button>
@@ -358,7 +381,7 @@ export default function RoomPage() {
                   <h3 className={styles.infoTitle}>Room info</h3>
                   <p className="mono">Host: {room.hostName}</p>
                   <p className="mono">Capacity: {participants.length}/{room.capacity}</p>
-                  <p className="mono">Mode: {isYoutube ? 'YouTube' : 'Screen share'}</p>
+                  <p className="mono">Mode: {isDirectVideo ? 'Direct Video' : isYoutube ? 'YouTube' : 'Screen share'}</p>
                   {room.isPrivate && <p className="mono">Invite: {room.inviteCode}</p>}
                   {room.locked && <p className="mono">Joins locked</p>}
                 </Card>
@@ -413,4 +436,4 @@ export default function RoomPage() {
       </Modal>
     </Layout>
   )
-}
+        }
