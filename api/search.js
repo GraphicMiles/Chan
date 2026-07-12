@@ -30,19 +30,41 @@ async function searchYouTube(query, apiKey) {
   const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`)
   if (!res.ok) throw new Error(`YouTube error: ${res.status}`)
   const data = await res.json()
+  const ids = (data.items || []).map((it) => it.id?.videoId).filter(Boolean)
+  let statusById = {}
+  if (ids.length) {
+    const sRes = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=status,snippet&id=${ids.join(',')}&key=${apiKey}`
+    )
+    if (sRes.ok) {
+      const sData = await sRes.json()
+      for (const it of sData.items || []) {
+        statusById[it.id] = it
+      }
+    }
+  }
   const results =
-    data.items?.map((it) => ({
-      id: it.id.videoId,
-      title: it.snippet.title,
-      thumbnail:
-        it.snippet.thumbnails?.high?.url ||
-        it.snippet.thumbnails?.medium?.url ||
-        it.snippet.thumbnails?.default?.url,
-      channel: it.snippet.channelTitle,
-      published: it.snippet.publishedAt,
-      url: `https://www.youtube.com/watch?v=${it.id.videoId}`,
-      source: 'youtube',
-    })) || []
+    ids.map((id) => {
+      const searchItem = data.items.find((it) => it.id?.videoId === id)
+      const full = statusById[id]
+      const sn = full?.snippet || searchItem?.snippet || {}
+      return {
+        id,
+        title: sn.title || 'Untitled',
+        thumbnail:
+          sn.thumbnails?.high?.url ||
+          sn.thumbnails?.medium?.url ||
+          sn.thumbnails?.default?.url,
+        channel: sn.channelTitle,
+        published: sn.publishedAt,
+        url: `https://www.youtube.com/watch?v=${id}`,
+        link: `https://www.youtube.com/watch?v=${id}`,
+        source: 'youtube',
+        embeddable: full?.status?.embeddable !== false,
+      }
+    }) || []
+  // Prefer embeddable first
+  results.sort((a, b) => Number(b.embeddable) - Number(a.embeddable))
   return { results, count: results.length }
 }
 

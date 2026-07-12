@@ -2,13 +2,12 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../shared/auth/hooks/useAuth.jsx'
 import { useScraper } from '../../hooks/useScraper.js'
-import { Button, Input, Card, Badge, EmptyState, Skeleton } from '../../shared/ui/index.js'
+import { isDirectVideoUrl } from '../../shared/lib/youtube.js'
+import { Button, Input, Card, Badge, EmptyState, Skeleton, useToast } from '../../shared/ui/index.js'
 import { Header, Layout } from '../../shared/layout/index.js'
 import styles from './ScraperPage.module.css'
 
-const SEARCHABLE_SITES = [
-  { value: 'omdb', label: 'IMDb (via OMDb)' },
-]
+const SEARCHABLE_SITES = [{ value: 'omdb', label: 'IMDb (via OMDb)' }]
 
 const MANUAL_SITES = [
   { value: 'nkiri', label: 'Nkiri' },
@@ -20,6 +19,7 @@ const MANUAL_SITES = [
 export function ScraperPage() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { toast } = useToast()
   const { scrape, search, results, lastQuery, loading, error, clear } = useScraper()
 
   const [mode, setMode] = useState('movies')
@@ -44,7 +44,7 @@ export function ScraperPage() {
   const runYoutubeSearch = (e) => {
     e.preventDefault()
     if (!ytQuery.trim()) return
-    search(ytQuery.trim())
+    search(ytQuery.trim(), 'youtube')
   }
 
   const switchMode = (next) => {
@@ -52,24 +52,56 @@ export function ScraperPage() {
     clear()
   }
 
-  const createRoomWithVideo = (videoUrl, title) => {
-    const encodedUrl = encodeURIComponent(videoUrl)
-    const encodedTitle = encodeURIComponent(title || 'Watch Party')
-    navigate(`/create?videoUrl=${encodedUrl}&title=${encodedTitle}&type=direct`)
+  const startYoutubeRoom = (item) => {
+    if (!item?.id) return
+    if (item.embeddable === false) {
+      toast(
+        'This video often cannot embed in Chan (Vevo/label). Open on YouTube or pick another.',
+        { variant: 'warning', duration: 6000 }
+      )
+    }
+    const q = new URLSearchParams({
+      video: item.id,
+      title: item.title || 'Watch Party',
+      type: 'youtube',
+    })
+    navigate(`/create?${q.toString()}`)
   }
 
-  const isVideoLink = (url) => {
-    if (!url) return false
-    const videoExts = ['.mp4', '.mkv', '.avi', '.mov', '.webm']
-    return videoExts.some(ext => url.toLowerCase().includes(ext))
+  const startDirectRoom = (videoUrl, title) => {
+    if (!isDirectVideoUrl(videoUrl)) {
+      toast('That is not a direct video file URL (.mp4 / .m3u8).', { variant: 'error' })
+      return
+    }
+    const q = new URLSearchParams({
+      videoUrl,
+      title: title || 'Watch Party',
+      type: 'direct',
+    })
+    navigate(`/create?${q.toString()}`)
   }
 
   return (
-    <Layout header={<Header user={user} actions={user && <Button variant="ghost" size="sm" onClick={logout}>Sign out</Button>} />} wide>
+    <Layout
+      header={
+        <Header
+          user={user}
+          actions={
+            user && (
+              <Button variant="ghost" size="sm" onClick={logout}>
+                Sign out
+              </Button>
+            )
+          }
+        />
+      }
+      wide
+    >
       <div className={styles.intro}>
         <h1 className={styles.title}>Discover</h1>
         <p className={styles.subtitle}>
-          Search on demand — nothing runs automatically or in the background. Every lookup here fires once, only when you ask for it.
+          Search on demand. YouTube results prefer embeddable videos. Movie-site scrape finds links on a page you paste —
+          only direct media files can play in a room.
         </p>
       </div>
 
@@ -100,12 +132,16 @@ export function ScraperPage() {
             >
               <optgroup label="Search by title">
                 {SEARCHABLE_SITES.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
                 ))}
               </optgroup>
               <optgroup label="Paste a page URL">
                 {MANUAL_SITES.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
                 ))}
               </optgroup>
             </select>
@@ -126,14 +162,19 @@ export function ScraperPage() {
               />
             )}
 
-            <Button type="submit" loading={loading}>Search</Button>
+            <Button type="submit" loading={loading}>
+              Search
+            </Button>
             {results.length > 0 && (
-              <Button type="button" variant="secondary" onClick={clear}>Clear</Button>
+              <Button type="button" variant="secondary" onClick={clear}>
+                Clear
+              </Button>
             )}
           </form>
           {!isSearchableSite && (
             <p className={styles.hint}>
-              This site doesn't have built-in search — open it yourself, search for your title, then paste the results page URL above.
+              Open the site yourself, go to the title page, paste that URL. We extract on-page media URLs when present;
+              many sites only expose HTML download pages (Open/Copy only).
             </p>
           )}
         </Card>
@@ -146,9 +187,13 @@ export function ScraperPage() {
               onChange={(e) => setYtQuery(e.target.value)}
               placeholder="Search YouTube videos..."
             />
-            <Button type="submit" loading={loading}>Search</Button>
+            <Button type="submit" loading={loading}>
+              Search
+            </Button>
             {results.length > 0 && (
-              <Button type="button" variant="secondary" onClick={clear}>Clear</Button>
+              <Button type="button" variant="secondary" onClick={clear}>
+                Clear
+              </Button>
             )}
           </form>
         </Card>
@@ -174,88 +219,77 @@ export function ScraperPage() {
 
       {!loading && !error && results.length === 0 && lastQuery && (
         <div className={styles.empty}>
-          <EmptyState
-            title="No results"
-            description="Try a different query or check the URL."
-          />
+          <EmptyState title="No results" description="Try a different query or check the URL." />
         </div>
       )}
 
       {!loading && !error && results.length === 0 && !lastQuery && (
         <div className={styles.empty}>
-          <EmptyState
-            title="Ready"
-            description="Search for movies or YouTube videos above."
-          />
+          <EmptyState title="Ready" description="Search for movies or YouTube videos above." />
         </div>
       )}
 
       {!loading && !error && results.length > 0 && (
         <div className={styles.grid}>
           {results.map((r, idx) => {
-            const videoLink = isVideoLink(r.link) ? r.link : null
-            
+            const href = r.link || r.url
+            const direct = r.isDirect || isDirectVideoUrl(href)
+            const isYt = r.source === 'youtube' && r.id
+            const embedBlocked = isYt && r.embeddable === false
+
             return (
-              <Card key={idx} className={styles.card}>
+              <Card key={r.id || href || idx} className={styles.card}>
                 {r.image || r.thumbnail ? (
                   <img
                     className={styles.thumb}
                     src={r.image || r.thumbnail}
-                    alt={r.title}
+                    alt=""
                     loading="lazy"
                     onError={(e) => {
                       e.target.style.display = 'none'
-                      e.target.parentElement.style.background = 'var(--surface-2)'
                     }}
                   />
                 ) : (
-                  <div className={styles.thumb} style={{ 
-                    background: 'var(--surface-2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--text-secondary)',
-                    fontSize: '14px'
-                  }}>
-                    No image
-                  </div>
+                  <div className={styles.thumbPlaceholder}>No image</div>
                 )}
                 <div className={styles.cardTitle} title={r.title}>
                   {r.title}
                 </div>
                 <div className={styles.cardMeta}>
                   {r.meta || r.channel || r.source}
+                  {embedBlocked ? ' · may not embed' : ''}
+                  {direct ? ' · direct file' : ''}
                 </div>
                 <div className={styles.cardActions}>
-                  <Button
-                    as="a"
-                    href={r.link || r.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    size="sm"
-                  >
-                    Open
-                  </Button>
-                  {r.link && (
+                  {href && (
+                    <Button as="a" href={href} target="_blank" rel="noreferrer" size="sm">
+                      Open
+                    </Button>
+                  )}
+                  {href && (
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => navigator.clipboard.writeText(r.link)}
+                      onClick={() => {
+                        navigator.clipboard.writeText(href)
+                        toast('Copied', { variant: 'success' })
+                      }}
                     >
                       Copy
                     </Button>
                   )}
-                  {videoLink && (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => createRoomWithVideo(videoLink, r.title)}
-                    >
-                      Watch in Room
+                  {isYt && (
+                    <Button size="sm" onClick={() => startYoutubeRoom(r)}>
+                      Start room
+                    </Button>
+                  )}
+                  {direct && !isYt && (
+                    <Button size="sm" onClick={() => startDirectRoom(href, r.title)}>
+                      Watch in room
                     </Button>
                   )}
                 </div>
-                <Badge variant="secondary" style={{ position: 'absolute', top: 8, right: 8 }}>
+                <Badge variant="secondary" className={styles.badge}>
                   {r.source}
                 </Badge>
               </Card>
