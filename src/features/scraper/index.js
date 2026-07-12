@@ -1,1 +1,1 @@
-export { default as ScraperPage } from './pages/ScraperPage.jsx'
+export { ScraperPage } from './ScraperPage';
