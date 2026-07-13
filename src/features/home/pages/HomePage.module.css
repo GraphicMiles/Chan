@@ -10,19 +10,19 @@
 .badgePill {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 6px;
   background: var(--surface-white);
   border-radius: var(--radius-pill);
-  padding: 0.5rem 1rem;
-  font-size: 0.82rem;
+  padding: 6px 14px;
+  font-size: 0.8rem;
   color: var(--text-body-grey);
   box-shadow: var(--shadow-pill);
   border: 1px solid var(--border-hairline);
 }
 
 .dotRed {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--live-red);
   display: inline-block;
@@ -30,9 +30,9 @@
 }
 
 .heroTitle {
-  font-size: clamp(2rem, 6vw, 3.25rem);
-  line-height: 1.08;
-  margin: 0 0 0.5rem;
+  font-size: clamp(1.85rem, 5.5vw, 3rem);
+  line-height: 1.1;
+  margin: 0 0 8px;
   letter-spacing: -0.03em;
 }
 
@@ -48,17 +48,17 @@
 
 .heroSub {
   color: var(--text-body-grey);
-  font-size: clamp(0.9rem, 2.5vw, 1.05rem);
+  font-size: clamp(0.88rem, 2.2vw, 1rem);
   line-height: 1.55;
-  max-width: 400px;
+  max-width: 380px;
   margin: 0 auto var(--space-6);
 }
 
 .ctaStack {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  max-width: 360px;
+  gap: 10px;
+  max-width: 320px;
   margin: 0 auto var(--space-8);
 }
 
@@ -67,8 +67,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.9rem 1.15rem;
+  gap: 12px;
+  padding: 12px 16px;
   margin-bottom: var(--space-5);
   border-radius: var(--radius-card);
   background: var(--surface-white);
@@ -79,13 +79,15 @@
 .continueInfo {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 10px;
   color: var(--accent-orange);
+  min-width: 0;
+  flex: 1;
 }
 
 .continueLabel {
   margin: 0;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--text-muted-grey);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -93,34 +95,32 @@
 }
 
 .continueTitle {
-  margin: 0.15rem 0 0;
+  margin: 2px 0 0;
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: var(--text-black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Tabs */
 .tabsRow {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 6px;
   margin-bottom: var(--space-4);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
 }
-
-.tabsRow::-webkit-scrollbar { display: none; }
 
 .tab {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.85rem;
+  gap: 5px;
+  font-size: 0.82rem;
   color: var(--text-body-grey);
   white-space: nowrap;
-  padding: 0.55rem 1rem;
+  padding: 7px 14px;
   border-radius: var(--radius-pill);
   border: none;
   background: transparent;
@@ -144,12 +144,11 @@
   background: #2a2a2a;
 }
 
-/* Controls */
+/* Controls bar */
 .controls {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: var(--space-4);
 }
 
@@ -158,24 +157,27 @@
   display: flex;
   align-items: center;
   flex: 1;
-  min-width: 180px;
+  min-width: 0;
 }
 
 .searchIcon {
   position: absolute;
-  left: 0.85rem;
+  left: 12px;
   color: var(--text-muted-grey);
   pointer-events: none;
+  z-index: 1;
 }
 
 .search {
   width: 100%;
-  padding-left: 2.5rem !important;
+  padding-left: 36px !important;
 }
 
 .inviteForm {
   display: flex;
-  gap: 0.4rem;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .inviteWrap {
@@ -186,30 +188,30 @@
 
 .inviteIcon {
   position: absolute;
-  left: 0.7rem;
+  left: 10px;
   color: var(--text-muted-grey);
   pointer-events: none;
+  z-index: 1;
 }
 
 .inviteInput {
-  width: 120px;
+  width: 110px !important;
   text-transform: uppercase;
-  padding-left: 2rem !important;
-  font-family: var(--font-body);
-  letter-spacing: 0.06em;
-  font-size: 0.85rem;
+  padding-left: 28px !important;
+  font-size: 0.8rem !important;
   font-weight: 600;
+  letter-spacing: 0.05em;
 }
 
 /* Stats pill */
 .statPill {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 6px;
   background: var(--surface-white);
   border-radius: var(--radius-pill);
-  padding: 0.7rem 1.15rem;
-  font-size: 0.85rem;
+  padding: 8px 14px;
+  font-size: 0.82rem;
   color: var(--text-black);
   margin-bottom: var(--space-5);
   border: 1px solid var(--border-hairline);
@@ -228,13 +230,13 @@
 .grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-4);
+  gap: 16px;
 }
 
 .skeletonGrid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-4);
+  gap: 16px;
 }
 
 .skeletonCard {
@@ -252,11 +254,7 @@
 
 @media (min-width: 768px) {
   .hero {
-    padding: var(--space-12) 0 var(--space-8);
-  }
-
-  .ctaStack {
-    max-width: 380px;
+    padding: var(--space-10) 0 var(--space-8);
   }
 }
 
@@ -266,10 +264,15 @@
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .controls {
     flex-direction: column;
     align-items: stretch;
+    gap: 8px;
+  }
+
+  .searchWrap {
+    width: 100%;
   }
 
   .inviteForm {
@@ -278,6 +281,7 @@
 
   .inviteWrap {
     flex: 1;
+    min-width: 0;
   }
 
   .inviteInput {

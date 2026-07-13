@@ -9,6 +9,7 @@
   border: 1px solid var(--border-hairline);
   box-shadow: var(--shadow-card);
   transition: box-shadow 0.2s ease, transform 0.2s ease;
+  height: 100%;
 }
 
 .card:hover {
@@ -26,6 +27,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .thumbImg {
@@ -46,62 +48,65 @@
 
 .badgeLive {
   position: absolute;
-  top: 10px;
-  left: 10px;
+  top: 8px;
+  left: 8px;
   background: var(--live-red);
   color: #fff;
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   border-radius: var(--radius-pill);
-  padding: 0.25rem 0.6rem;
+  padding: 3px 8px;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 4px;
   z-index: 1;
 }
 
 .liveDot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: #fff;
 }
 
 .badgeSource {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 8px;
+  right: 8px;
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 600;
   border-radius: var(--radius-sm);
-  padding: 0.25rem 0.55rem;
+  padding: 3px 7px;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 3px;
   z-index: 1;
 }
 
 .body {
-  padding: 0.85rem 1rem 1rem;
+  padding: 10px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .kicker {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted-grey);
   font-weight: 600;
-  margin-bottom: 0.25rem;
+  margin-bottom: 3px;
 }
 
 .titleRow {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: 10px;
 }
 
 .titleWrap {
@@ -110,7 +115,7 @@
 }
 
 .title {
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--text-black);
   line-height: 1.3;
@@ -123,24 +128,24 @@
 }
 
 .meta {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: var(--text-muted-grey);
-  margin-top: 0.15rem;
+  margin-top: 2px;
 }
 
 .rightInfo {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.4rem;
+  gap: 6px;
   flex-shrink: 0;
 }
 
 .viewers {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  font-size: 0.78rem;
+  gap: 3px;
+  font-size: 0.75rem;
   color: var(--text-muted-grey);
   white-space: nowrap;
 }
@@ -150,12 +155,12 @@
   color: #fff;
   border: none;
   border-radius: var(--radius-pill);
-  padding: 0.4rem 0.85rem;
-  font-size: 0.78rem;
+  padding: 5px 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 4px;
   white-space: nowrap;
   transition: background 0.15s ease;
 }

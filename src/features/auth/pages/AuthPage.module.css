@@ -4,57 +4,57 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.25rem;
+  padding: 16px;
 }
 
 .card {
   width: 100%;
-  max-width: 400px;
+  max-width: 380px;
   text-align: center;
-  padding: 2.5rem 2rem;
+  padding: 32px 24px;
 }
 
 .iconWrap {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   border-radius: var(--radius-pill);
   background: rgba(255, 106, 43, 0.08);
   color: var(--accent-orange);
-  margin-bottom: 1.5rem;
+  margin-bottom: 20px;
 }
 
 .title {
-  font-size: 1.75rem;
-  margin-bottom: 0.4rem;
+  font-size: 1.5rem;
+  margin-bottom: 6px;
   color: var(--text-black);
   letter-spacing: -0.02em;
 }
 
 .subtitle {
   color: var(--text-body-grey);
-  margin-bottom: 1.75rem;
-  font-size: 0.92rem;
+  margin-bottom: 24px;
+  font-size: 0.88rem;
   line-height: 1.55;
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 10px;
   text-align: left;
 }
 
 .error {
-  margin-top: 1rem;
-  padding: 0.75rem 1rem;
+  margin-top: 12px;
+  padding: 10px 14px;
   background: rgba(234, 51, 35, 0.06);
   color: var(--live-red);
-  border-radius: var(--radius-card);
-  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
   line-height: 1.5;
   text-align: left;
-  border: 1px solid rgba(234, 51, 35, 0.12);
+  border: 1px solid rgba(234, 51, 35, 0.1);
 }
