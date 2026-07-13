@@ -2,15 +2,15 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   border-bottom: 1px solid var(--border);
-  background: rgba(7, 8, 15, 0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(12, 14, 22, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .logo {
@@ -21,7 +21,7 @@
   text-decoration: none;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 .logo:hover {
@@ -29,12 +29,16 @@
   color: var(--accent);
 }
 
-.logoDot {
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: var(--radius-full);
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent);
+.logoIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-muted);
+  color: var(--accent);
+  box-shadow: var(--glow-drift-sm);
 }
 
 .actions {

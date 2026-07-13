@@ -1,17 +1,22 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
+import {
+  PlayCircle, Link2, Tv, Trophy, ShieldAlert, Search, X, Play,
+  ArrowUpRight, SlidersHorizontal, Clock, Eye, Radio, Film,
+  AlertCircle, Loader2
+} from 'lucide-react'
 import styles from './UnifiedSearch.module.scss'
 import { useUnifiedSearch } from '../../hooks/useUnifiedSearch'
 import { useAuth } from '../../shared/auth/hooks/useAuth.jsx'
 import { isDirectVideoUrl, isMixedContentUrl, normalizeDirectUrl, normalizePlaybackUrl } from '../../shared/lib/youtube.js'
 
 const SEARCH_LAYERS = [
-  { id: 'youtube', label: 'YouTube', icon: '▶️', color: '#FF0000', placeholder: 'Search YouTube videos...', description: 'Search millions of YouTube videos' },
-  { id: 'direct', label: 'Direct Links', icon: '🔗', color: '#4CAF50', placeholder: 'Search movies/shows or paste URL...', description: 'Find direct MP4/M3U8 links from movie sites' },
-  { id: 'iptv', label: 'Live TV', icon: '📺', color: '#2196F3', placeholder: 'Search channels (CNN, ESPN, HBO)...', description: 'Watch live TV channels and streams' },
-  { id: 'sports', label: 'Sports', icon: '⚽', color: '#FF9800', placeholder: 'Search team, league, or match...', description: 'Find live sports matches and events' },
-  { id: 'nsfw', label: 'NSFW', icon: '🔞', color: '#E91E63', placeholder: 'Search adult content (18+ only)...', description: 'Adult content - verification required', adult: true },
+  { id: 'youtube', label: 'YouTube', icon: PlayCircle, placeholder: 'Search YouTube videos...', description: 'Search millions of YouTube videos' },
+  { id: 'direct', label: 'Direct Links', icon: Link2, placeholder: 'Search movies/shows or paste URL...', description: 'Find direct MP4/M3U8 links from movie sites' },
+  { id: 'iptv', label: 'Live TV', icon: Tv, placeholder: 'Search channels (CNN, ESPN, HBO)...', description: 'Watch live TV channels and streams' },
+  { id: 'sports', label: 'Sports', icon: Trophy, placeholder: 'Search team, league, or match...', description: 'Find live sports matches and events' },
+  { id: 'nsfw', label: 'NSFW', icon: ShieldAlert, placeholder: 'Search adult content (18+ only)...', description: 'Adult content - verification required', adult: true },
 ]
 
 export default function UnifiedSearch() {
@@ -26,6 +31,7 @@ export default function UnifiedSearch() {
   const { results, loading, error, search, clear, hasMore, loadMore } = useUnifiedSearch()
   
   const currentLayer = useMemo(() => SEARCH_LAYERS.find(l => l.id === activeLayer), [activeLayer])
+  const CurrentLayerIcon = currentLayer?.icon || Film
 
   const handleSearch = useCallback(async (e) => {
     e?.preventDefault()
@@ -34,8 +40,6 @@ export default function UnifiedSearch() {
       return
     }
     
-    // Age verification for NSFW. Use the local value immediately because
-    // React state updates are asynchronous.
     let verified = adultVerified
     if (activeLayer === 'nsfw' && !verified) {
       const confirmed = window.confirm('This content is for adults 18+ only. By clicking OK, you confirm you are of legal age to view adult content.')
@@ -64,7 +68,6 @@ export default function UnifiedSearch() {
     }
   }, [hasMore, loading, loadMore])
 
-  // Keyboard shortcut: Ctrl+K to focus search
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === 'k') {
@@ -77,8 +80,6 @@ export default function UnifiedSearch() {
   }, [])
 
   const handleResultSelect = useCallback((result) => {
-    // YouTube rooms should receive the video ID, not a watch-page URL. The
-    // create-room page can then validate and persist videoId correctly.
     if ((result.type || activeLayer) === 'youtube' && result.id) {
       const params = new URLSearchParams({
         video: result.id,
@@ -151,7 +152,7 @@ export default function UnifiedSearch() {
     })
   }, [results, filters, showFilters])
 
-  if (authLoading) return <div className={styles.loading}>Loading…</div>
+  if (authLoading) return <div className={styles.loading}>Loading...</div>
   if (!user) return <Navigate to="/auth" replace />
 
   return (
@@ -161,38 +162,34 @@ export default function UnifiedSearch() {
         <p className={styles.subtitle}>Search across YouTube, movie sites, live TV, sports, and more</p>
       </div>
       
-      {/* Layer Tabs */}
       <div className={styles.layerTabs}>
-        {SEARCH_LAYERS.map(layer => (
-          <button
-            key={layer.id}
-            className={`${styles.tab} ${activeLayer === layer.id ? styles.active : ''} ${layer.adult ? styles.adult : ''}`}
-            onClick={() => {
-              setActiveLayer(layer.id)
-              clear()
-              setQuery('')
-            }}
-            style={{ 
-              borderColor: activeLayer === layer.id ? layer.color : 'transparent',
-              backgroundColor: activeLayer === layer.id ? `${layer.color}20` : undefined
-            }}
-          >
-            <span className={styles.icon}>{layer.icon}</span>
-            <span className={styles.label}>{layer.label}</span>
-            {layer.adult && <span className={styles.adultBadge}>18+</span>}
-          </button>
-        ))}
+        {SEARCH_LAYERS.map(layer => {
+          const LayerIcon = layer.icon
+          return (
+            <button
+              key={layer.id}
+              className={`${styles.tab} ${activeLayer === layer.id ? styles.active : ''} ${layer.adult ? styles.adult : ''}`}
+              onClick={() => {
+                setActiveLayer(layer.id)
+                clear()
+                setQuery('')
+              }}
+            >
+              <LayerIcon size={16} />
+              <span className={styles.label}>{layer.label}</span>
+              {layer.adult && <span className={styles.adultBadge}>18+</span>}
+            </button>
+          )
+        })}
       </div>
 
-      {/* Layer Description */}
-      <div className={styles.layerInfo} style={{ borderLeftColor: currentLayer?.color }}>
+      <div className={styles.layerInfo}>
         <p>{currentLayer?.description}</p>
       </div>
 
-      {/* Search Input */}
       <form onSubmit={handleSearch} className={styles.searchForm}>
         <div className={styles.inputWrapper}>
-          <span className={styles.searchIcon}>🔍</span>
+          <Search size={18} className={styles.searchIcon} />
           <input
             id="unified-search-input"
             type="text"
@@ -204,7 +201,7 @@ export default function UnifiedSearch() {
           />
           {query && (
             <button type="button" className={styles.clearBtn} onClick={clearSearch}>
-              ✕
+              <X size={16} />
             </button>
           )}
           <button 
@@ -212,7 +209,8 @@ export default function UnifiedSearch() {
             disabled={loading || !query.trim()}
             className={styles.searchBtn}
           >
-            {loading ? <span className={styles.spinner}></span> : 'Search'}
+            {loading ? <Loader2 size={16} className={styles.spin} /> : <Search size={16} />}
+            Search
           </button>
           {isDirectVideoUrl(query) && (
             <button 
@@ -220,19 +218,19 @@ export default function UnifiedSearch() {
               onClick={handleDirectUrlSubmit}
               className={styles.directBtn}
             >
+              <Play size={14} />
               Play Direct
             </button>
           )}
         </div>
         
-        {/* Filters Toggle */}
         <div className={styles.filterToggle}>
           <button type="button" onClick={() => setShowFilters(!showFilters)}>
+            <SlidersHorizontal size={14} />
             {showFilters ? 'Hide Filters' : 'Show Filters'}
           </button>
         </div>
         
-        {/* Filters */}
         {showFilters && (
           <div className={styles.filters}>
             <label>
@@ -255,25 +253,23 @@ export default function UnifiedSearch() {
         )}
       </form>
 
-      {/* Error */}
       {error && (
         <div className={styles.error}>
-          <strong>Error:</strong> {error}
+          <AlertCircle size={16} />
+          <span>{error}</span>
           <button onClick={() => search({ layer: activeLayer, query, options: { adultVerified } })}>
             Retry
           </button>
         </div>
       )}
 
-      {/* Loading State */}
       {loading && results.length === 0 && (
         <div className={styles.loading}>
-          <div className={styles.spinnerLarge}></div>
+          <Loader2 size={32} className={styles.spinnerLarge} />
           <p>Searching {currentLayer?.label}...</p>
         </div>
       )}
 
-      {/* Results */}
       {filteredResults.length > 0 && (
         <div className={styles.results}>
           <div className={styles.resultsHeader}>
@@ -293,20 +289,26 @@ export default function UnifiedSearch() {
                 className={`${styles.resultCard} ${styles[result.type || activeLayer]} ${result.isLive ? styles.live : ''}`}
                 onClick={() => handleResultSelect(result)}
               >
-                {/* Thumbnail */}
                 <div className={styles.thumbnail}>
                   {result.thumbnail ? (
                     <img src={result.thumbnail} alt={result.title} loading="lazy" />
                   ) : (
-                    <div className={styles.noThumbnail}>{currentLayer?.icon}</div>
+                    <div className={styles.noThumbnail}>
+                      <CurrentLayerIcon size={32} />
+                    </div>
                   )}
                   
-                  {/* Overlays */}
                   {result.duration && (
-                    <span className={styles.duration}>{result.duration}</span>
+                    <span className={styles.duration}>
+                      <Clock size={10} />
+                      {result.duration}
+                    </span>
                   )}
                   {result.isLive && (
-                    <span className={styles.liveBadge}>● LIVE</span>
+                    <span className={styles.liveBadge}>
+                      <Radio size={10} />
+                      LIVE
+                    </span>
                   )}
                   {result.quality && (
                     <span className={styles.qualityBadge}>{result.quality}</span>
@@ -316,7 +318,6 @@ export default function UnifiedSearch() {
                   )}
                 </div>
                 
-                {/* Info */}
                 <div className={styles.info}>
                   <h3 className={styles.title} title={result.title}>
                     {result.title}
@@ -331,7 +332,8 @@ export default function UnifiedSearch() {
                     )}
                     {result.views && (
                       <span className={styles.views}>
-                        {parseInt(result.views).toLocaleString()} views
+                        <Eye size={10} />
+                        {parseInt(result.views).toLocaleString()}
                       </span>
                     )}
                     {result.year && (
@@ -343,14 +345,13 @@ export default function UnifiedSearch() {
                     <p className={styles.description}>{result.description.slice(0, 120)}...</p>
                   )}
 
-                  {/* Sports-specific info */}
                   {activeLayer === 'sports' && result.matchInfo && (
                     <div className={styles.matchInfo}>
                       <div className={styles.teams}>{result.matchInfo.teams}</div>
                       <div className={styles.matchDetails}>
                         <span className={styles.time}>{result.matchInfo.time}</span>
                         <span className={styles.competition}>{result.matchInfo.competition}</span>
-                        {result.isLive && <span className={styles.liveIndicator}>● LIVE NOW</span>}
+                        {result.isLive && <span className={styles.liveIndicator}>LIVE NOW</span>}
                       </div>
                       {result.channelCandidates?.length > 0 && (
                         <div className={styles.candidates}>
@@ -363,22 +364,20 @@ export default function UnifiedSearch() {
                     </div>
                   )}
 
-                  {/* IPTV-specific info */}
                   {activeLayer === 'iptv' && result.program && (
                     <div className={styles.program}>
                       <div className={styles.nowPlaying}>
-                        <span className={styles.label}>Now:</span> {result.program.now}
+                        <span className={styles.progLabel}>Now:</span> {result.program.now}
                       </div>
                       {result.program.next && (
                         <div className={styles.next}>
-                          <span className={styles.label}>Next:</span> {result.program.next}
+                          <span className={styles.progLabel}>Next:</span> {result.program.next}
                         </div>
                       )}
                     </div>
                   )}
                 </div>
 
-                {/* Actions */}
                 <div className={styles.actions}>
                   <button 
                     className={`${styles.watchBtn} ${result.isLive ? styles.liveBtn : ''}`}
@@ -394,7 +393,7 @@ export default function UnifiedSearch() {
                       className={styles.externalLink}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      ↗
+                      <ArrowUpRight size={16} />
                     </a>
                   )}
                 </div>
@@ -402,7 +401,6 @@ export default function UnifiedSearch() {
             ))}
           </div>
 
-          {/* Load More */}
           {hasMore && (
             <div className={styles.loadMore}>
               <button onClick={handleLoadMore} disabled={loading}>
@@ -413,12 +411,13 @@ export default function UnifiedSearch() {
         </div>
       )}
 
-      {/* Empty State */}
       {!loading && filteredResults.length === 0 && query && (
         <div className={styles.empty}>
-          <div className={styles.emptyIcon}>🔍</div>
+          <div className={styles.emptyIcon}>
+            <Search size={32} />
+          </div>
           <h3>No results found</h3>
-          <p>No {currentLayer?.label} results for "{query}"</p>
+          <p>No {currentLayer?.label} results for &quot;{query}&quot;</p>
           {activeLayer === 'nsfw' && !adultVerified && (
             <p className={styles.verifyPrompt}>Age verification required for NSFW content</p>
           )}
@@ -428,10 +427,11 @@ export default function UnifiedSearch() {
         </div>
       )}
 
-      {/* Initial State */}
       {!query && !loading && results.length === 0 && (
         <div className={styles.initial}>
-          <div className={styles.initialIcon}>{currentLayer?.icon}</div>
+          <div className={styles.initialIcon}>
+            <CurrentLayerIcon size={32} />
+          </div>
           <h3>Start Searching</h3>
           <p>Enter a query above to search {currentLayer?.label}</p>
           <div className={styles.tips}>
@@ -446,4 +446,4 @@ export default function UnifiedSearch() {
       )}
     </div>
   )
-    }
+}

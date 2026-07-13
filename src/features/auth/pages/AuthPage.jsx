@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { UserCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import { Button, Input, Card } from '../../../shared/ui/index.js'
@@ -11,7 +12,6 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Never navigate during render — React 18 StrictMode / concurrent safe
   useEffect(() => {
     if (!authLoading && user) navigate('/', { replace: true })
   }, [user, authLoading, navigate])
@@ -20,7 +20,7 @@ export default function AuthPage() {
     return (
       <div className={styles.page}>
         <Card className={styles.card}>
-          <p className={styles.subtitle}>Loading…</p>
+          <p className={styles.subtitle}>Loading...</p>
         </Card>
       </div>
     )
@@ -42,6 +42,9 @@ export default function AuthPage() {
   return (
     <div className={styles.page}>
       <Card className={styles.card}>
+        <div className={styles.iconWrap}>
+          <UserCircle size={48} strokeWidth={1.5} />
+        </div>
         <h1 className={styles.title}>Welcome to Chan</h1>
         <p className={styles.subtitle}>Watch together with an anonymous identity. No email, no tracking.</p>
         <form onSubmit={submit} className={styles.form}>
@@ -53,8 +56,8 @@ export default function AuthPage() {
             maxLength={30}
             autoComplete="nickname"
           />
-          <Button type="submit" loading={loading} fullWidth>
-            Continue anonymously
+          <Button type="submit" loading={loading} fullWidth variant="cta">
+            Continue Anonymously
           </Button>
         </form>
         {error && (

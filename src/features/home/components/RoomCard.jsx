@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
+import { Radio, Users } from 'lucide-react'
 import { getThumbnail } from '../../../shared/lib/youtube.js'
 import { Card, Badge, Avatar } from '../../../shared/ui/index.js'
-import { SyncPulse } from '../../../shared/components/SyncPulse.jsx'
 import styles from './RoomCard.module.css'
 
 export default function RoomCard({ room }) {
@@ -13,32 +13,34 @@ export default function RoomCard({ room }) {
         {thumb ? (
           <img src={thumb} alt="" className={styles.thumb} />
         ) : (
-          <div className={styles.thumb} style={{
-            background: 'var(--surface-2, #1e1e2e)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '2.5rem',
-          }}>
-            🎬
+          <div className={styles.thumbPlaceholder}>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+              <line x1="7" y1="2" x2="7" y2="22"></line>
+              <line x1="17" y1="2" x2="17" y2="22"></line>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <line x1="2" y1="7" x2="7" y2="7"></line>
+              <line x1="2" y1="17" x2="7" y2="17"></line>
+              <line x1="17" y1="17" x2="22" y2="17"></line>
+              <line x1="17" y1="7" x2="22" y2="7"></line>
+            </svg>
           </div>
         )}
+        <div className={styles.scrim} />
         <div className={styles.badge}>
-          <Badge variant="live">
-            <SyncPulse active size={14} />
-            Live
-          </Badge>
+          <Badge variant="live" icon={Radio} pulse>Live</Badge>
+        </div>
+        <div className={styles.viewerCount}>
+          <Users size={14} />
+          <span>{room.participantCount}/{room.capacity || 12}</span>
         </div>
       </div>
       <div className={styles.meta}>
         <h3 className={styles.title}>{room.title}</h3>
-        <span className={styles.host}>Host: {room.hostName}</span>
-      </div>
-      <div className={styles.footer}>
-        <span className={styles.viewers}>
-          <Avatar name={room.hostName} uid={room.hostId} size={20} />
-          {room.participantCount}/{room.capacity || 12} watching
-        </span>
+        <div className={styles.host}>
+          <Avatar name={room.hostName} uid={room.hostId} size={22} isHost />
+          <span>{room.hostName}</span>
+        </div>
       </div>
     </Card>
   )

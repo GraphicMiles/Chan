@@ -1,9 +1,11 @@
 .card {
-  background: var(--bg-surface-raised);
+  background: rgba(22, 24, 33, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 
 .interactive:hover {
@@ -14,6 +16,11 @@
 .clickable {
   cursor: pointer;
   text-decoration: none;
+}
+
+.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
 .compact {

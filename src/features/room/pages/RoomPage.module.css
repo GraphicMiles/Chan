@@ -6,6 +6,9 @@
 .header {
   border-bottom: 1px solid var(--border);
   gap: 0.75rem;
+  background: rgba(12, 14, 22, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .roomTitle {
@@ -25,6 +28,18 @@
   flex-shrink: 0;
 }
 
+.brand:hover {
+  text-decoration: none;
+  color: var(--accent);
+}
+
+.titleSep {
+  width: 1px;
+  height: 20px;
+  background: var(--border-strong);
+  flex-shrink: 0;
+}
+
 .titleText {
   font-family: var(--font-display);
   font-size: 1.05rem;
@@ -40,16 +55,6 @@
   align-items: center;
   min-width: 0;
   flex: 1;
-}
-
-.lockBadge {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  padding: 0.15rem 0.45rem;
-  border-radius: var(--radius-full);
-  background: var(--warning-muted);
-  color: var(--warning);
-  flex-shrink: 0;
 }
 
 .headerActions {
@@ -82,9 +87,10 @@
   flex: 0 0 auto;
   aspect-ratio: 16 / 9;
   max-height: min(62vh, 720px);
-  background: black;
+  background: #000;
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 .shareBanner {
@@ -92,13 +98,19 @@
   left: 50%;
   top: 0.75rem;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(12, 14, 22, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: var(--paper);
-  padding: 0.4rem 0.85rem;
+  padding: 0.45rem 0.95rem;
   border-radius: var(--radius-full);
   font-size: 0.85rem;
   z-index: 2;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
 }
 
 .controlsCard {
@@ -126,7 +138,9 @@
 .metaBar {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--bg-surface-raised);
+  background: rgba(22, 24, 33, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   overflow: hidden;
 }
 
@@ -136,26 +150,38 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1.15rem;
   background: transparent;
   border: none;
   color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 
 .metaToggle:hover {
-  background: var(--bg-surface-raised-hover);
+  background: rgba(30, 33, 45, 0.6);
 }
 
-.metaChevron {
+.metaLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.metaInfo {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.metaSep {
   color: var(--text-muted);
 }
 
 .details {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 0.75rem;
   padding: 0 0.75rem 0.75rem;
 }
@@ -172,10 +198,12 @@
 }
 
 .sidebar {
-  width: 340px;
+  width: 360px;
   max-width: 100%;
   border-left: 1px solid var(--border);
-  background: var(--bg-surface);
+  background: rgba(12, 14, 22, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -226,8 +254,8 @@
 
 .confirmText {
   color: var(--text-secondary);
-  margin: 0 0 1rem;
-  line-height: 1.45;
+  margin: 0 0 1.25rem;
+  line-height: 1.5;
 }
 
 .confirmActions {
@@ -249,7 +277,7 @@
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(12, 14, 22, 0.6);
     z-index: 19;
   }
 
@@ -265,10 +293,10 @@
     z-index: 20;
     border-left: none;
     border-top: 1px solid var(--border);
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     transform: translateY(110%);
     transition: transform 0.25s ease;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
   }
 
   .sidebar.open {
@@ -278,16 +306,10 @@
   .headerActions {
     gap: 0.35rem;
   }
-}
 
-.badge {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius-full);
-  background: var(--accent-muted);
-  color: var(--accent);
-  flex-shrink: 0;
+  .titleSep {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

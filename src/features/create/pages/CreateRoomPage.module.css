@@ -4,12 +4,13 @@
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: radial-gradient(circle at top, rgba(124, 137, 247, 0.08), transparent 60%);
+  background: radial-gradient(ellipse at top, rgba(124, 137, 247, 0.08), transparent 60%);
 }
 
 .card {
   width: 100%;
   max-width: 620px;
+  padding: 2rem;
 }
 
 .title {
@@ -19,14 +20,14 @@
 
 .subtitle {
   color: var(--text-secondary);
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
   font-size: 0.95rem;
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
 
 .row {
@@ -46,6 +47,12 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 0.5rem;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  background: rgba(12, 14, 22, 0.4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
 }
 
 .result {
@@ -53,8 +60,15 @@
   text-align: left;
   cursor: pointer;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   color: inherit;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.result:hover {
+  background: rgba(22, 24, 33, 0.6);
+  border-color: var(--border);
 }
 
 .resultThumb {
@@ -88,9 +102,9 @@
 .warning {
   margin: 0;
   padding: 0.65rem 0.75rem;
-  border-radius: var(--radius-md);
-  background: var(--warning-muted, rgba(251, 191, 36, 0.12));
-  color: var(--warning, #fbbf24);
+  border-radius: var(--radius-sm);
+  background: var(--warning-muted);
+  color: var(--warning);
   font-size: 0.85rem;
   line-height: 1.4;
 }
@@ -100,8 +114,9 @@
   align-items: center;
   gap: 0.75rem;
   background: var(--accent-muted);
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-md);
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(124, 137, 247, 0.15);
 }
 
 .selectedThumb {
@@ -114,6 +129,7 @@
 .selectedText {
   font-family: var(--font-mono);
   color: var(--text-primary);
+  font-size: 0.9rem;
 }
 
 .settings {
@@ -147,14 +163,14 @@
   padding: 0.75rem;
   background: var(--danger-muted);
   color: var(--danger);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   font-size: 0.9rem;
 }
 
 .footer {
   margin-top: 1rem;
+  text-align: center;
 }
-
 
 .tabs {
   display: flex;
@@ -172,6 +188,7 @@
   font-size: 0.9rem;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
+  font-family: var(--font-body);
 }
 
 .tab:hover {
@@ -187,15 +204,23 @@
   font-size: 0.9rem;
   cursor: pointer;
   font-weight: 600;
+  font-family: var(--font-body);
 }
 
 .select {
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(12, 14, 22, 0.6);
   color: var(--text-primary);
   font-size: 0.9rem;
   cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.select:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-muted);
 }

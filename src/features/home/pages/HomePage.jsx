@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore'
+import { Search, Plus, LogOut, Film, ArrowRight, Hash } from 'lucide-react'
 import { db } from '../../../shared/lib/firebase.js'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import { parseJsonResponse } from '../../../shared/lib/api.js'
@@ -32,14 +33,6 @@ export default function HomePage() {
       setRoomsLoading(false)
       return undefined
     }
-    // Firestore evaluates security rules against a query's *potential* result
-    // set, not just what it actually returns. Our rule only allows reading a
-    // room when status == "live" (and isPrivate != true, unless host/participant).
-    // A bare `collection(db, 'rooms')` listener could potentially match ended
-    // or private rooms too, so Firestore rejects the whole listener with
-    // permission-denied -- which is why public rooms never appeared here.
-    // Adding matching `where()` clauses lets the rule prove every possible
-    // result is readable.
     const unsub = onSnapshot(
       query(collection(db, 'rooms'), where('status', '==', 'live'), where('isPrivate', '==', false)),
       (snap) => {
@@ -71,9 +64,6 @@ export default function HomePage() {
     })
   }, [rooms, search, sortBy])
 
-  // Resolve the "continue watching" room. Public rooms are in the local list;
-  // private rooms require a direct Firestore fetch since they're excluded from
-  // the public query.
   useEffect(() => {
     if (!lastRoom?.roomId || !user) {
       setContinueRoom(null)
@@ -132,46 +122,68 @@ export default function HomePage() {
 
   const headerActions = user ? (
     <>
-      <Button as={Link} to="/media" variant="secondary">Media</Button>
-      <Button as={Link} to="/create">Start a Room</Button>
-      <Button variant="secondary" onClick={logout}>New identity</Button>
+      <Button as={Link} to="/media" variant="secondary" size="sm">
+        <Film size={16} />
+        Media
+      </Button>
+      <Button as={Link} to="/create" variant="cta" size="sm">
+        <Plus size={16} />
+        Start a Room
+      </Button>
+      <Button variant="ghost" size="sm" onClick={logout} aria-label="New identity">
+        <LogOut size={16} />
+      </Button>
     </>
   ) : (
-    <Button as={Link} to="/auth">Join</Button>
+    <Button as={Link} to="/auth" variant="cta" size="sm">Join</Button>
   )
 
   return (
     <Layout header={<Header user={user} actions={headerActions} />}>
+      <div className={styles.hero}>
+        <h1 className={styles.heroTitle}>Watch Together</h1>
+        <p className={styles.heroSub}>Synchronized watch rooms for people in different places, sharing one live moment.</p>
+      </div>
+
       <div className={styles.toolbar}>
-        <h2 className={styles.title}>Live rooms</h2>
+        <h2 className={styles.title}>Live Rooms</h2>
         <form onSubmit={joinByInvite} className={styles.inviteForm}>
-          <Input
-            placeholder="Invite code"
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-            className={styles.inviteInput}
-          />
+          <div className={styles.inviteWrap}>
+            <Hash size={16} className={styles.inviteIcon} />
+            <Input
+              placeholder="Invite code"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+              className={styles.inviteInput}
+            />
+          </div>
           <Button variant="secondary" type="submit" loading={joining}>Join</Button>
         </form>
       </div>
 
       {continueRoom && (
         <div className={styles.continue}>
-          <div>
-            <p className={styles.continueLabel}>Continue watching</p>
-            <p className={styles.continueTitle}>{continueRoom.title}</p>
+          <div className={styles.continueInfo}>
+            <ArrowRight size={16} className={styles.continueIcon} />
+            <div>
+              <p className={styles.continueLabel}>Continue Watching</p>
+              <p className={styles.continueTitle}>{continueRoom.title}</p>
+            </div>
           </div>
           <Button as={Link} to={`/room/${continueRoom.id}`} size="sm">Rejoin</Button>
         </div>
       )}
 
       <div className={styles.controls}>
-        <Input
-          placeholder="Search rooms or hosts…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className={styles.search}
-        />
+        <div className={styles.searchWrap}>
+          <Search size={16} className={styles.searchIcon} />
+          <Input
+            placeholder="Search rooms or hosts..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={styles.search}
+          />
+        </div>
         <div className={styles.sort}>
           <button
             type="button"
@@ -194,7 +206,7 @@ export default function HomePage() {
         <div className={styles.skeletonGrid}>
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className={styles.skeletonCard}>
-              <Skeleton height="140px" rounded="lg" />
+              <Skeleton height="160px" rounded="lg" />
               <Skeleton height="1rem" width="70%" style={{ marginTop: '0.75rem' }} />
               <Skeleton height="0.85rem" width="40%" style={{ marginTop: '0.5rem' }} />
             </div>
@@ -210,9 +222,12 @@ export default function HomePage() {
           }
           action={
             user ? (
-              <Button as={Link} to="/create">Start a Room</Button>
+              <Button as={Link} to="/create" variant="cta">
+                <Plus size={16} />
+                Start a Room
+              </Button>
             ) : (
-              <Button as={Link} to="/auth">Join to start</Button>
+              <Button as={Link} to="/auth" variant="cta">Join to Start</Button>
             )
           }
         />

@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  Share2, MessageSquare, X, LogOut, Radio, Lock, Unlock,
+  Pencil, Monitor, Film, ChevronDown, ChevronRight, AlertTriangle,
+  Video, Link2
+} from 'lucide-react'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import { useRoom } from '../hooks/useRoom.js'
 import { usePlayerSync } from '../hooks/usePlayerSync.js'
@@ -10,7 +15,7 @@ import ParticipantList from '../components/ParticipantList.jsx'
 import { SyncPulse } from '../../../shared/components/SyncPulse.jsx'
 import { extractVideoId, isDirectVideoUrl, normalizePlaybackUrl } from '../../../shared/lib/youtube.js'
 import { isDisplayMediaSupported } from '../services/livekit.js'
-import { Button, Input, Card, IconButton, Modal, useToast } from '../../../shared/ui/index.js'
+import { Button, Input, Card, IconButton, Modal, Badge, useToast } from '../../../shared/ui/index.js'
 import { Layout } from '../../../shared/layout/index.js'
 import ShareRoom from '../components/ShareRoom.jsx'
 import styles from './RoomPage.module.css'
@@ -94,12 +99,9 @@ export default function RoomPage() {
       </div>
     )
   }
-  if (!room) return <div className={styles.loading}>Loading room…</div>
-  if (!joined) return <div className={styles.joining}>Joining room…</div>
+  if (!room) return <div className={styles.loading}>Loading room...</div>
+  if (!joined) return <div className={styles.joining}>Joining room...</div>
 
-  // isDirectVideo is derived from the room doc's videoType (source of truth).
-  // isYoutube must exclude direct-video rooms — both had activityType 'youtube'
-  // in older data, so checking videoType is the only reliable way to distinguish.
   const isDirectVideo = room?.videoType === 'direct'
   const isYoutube = !isDirectVideo && (activityType === 'youtube' || activityType === 'direct')
   const canShareScreen = isDisplayMediaSupported()
@@ -130,7 +132,6 @@ export default function RoomPage() {
       setBusy(true)
       
       if (id) {
-        // YouTube video
         await updateRoom({ 
           videoId: id, 
           videoUrl: null,
@@ -139,7 +140,6 @@ export default function RoomPage() {
         })
         await writePlayerState({ videoId: id, videoUrl: null, isPlaying: false, currentTime: 0 })
       } else if (isDirect) {
-        // Direct video URL
         await updateRoom({ 
           videoId: null, 
           videoUrl: playbackUrl,
@@ -229,7 +229,8 @@ export default function RoomPage() {
         <Link to="/" className={styles.brand}>
           Chan
         </Link>
-        <SyncPulse active size={18} />
+        <div className={styles.titleSep} />
+        <SyncPulse active size={16} />
         {editingTitle && isHost ? (
           <form
             className={styles.titleEdit}
@@ -250,18 +251,27 @@ export default function RoomPage() {
         ) : (
           <h1 className={styles.titleText}>{room.title}</h1>
         )}
-        {room.locked && <span className={styles.lockBadge}>Locked</span>}
-        {isDirectVideo && <span className={styles.badge}>Direct</span>}
+        {room.locked && (
+          <Badge variant="warning" icon={Lock}>Locked</Badge>
+        )}
+        {isDirectVideo && (
+          <Badge variant="accent" icon={Link2}>Direct</Badge>
+        )}
       </div>
       <div className={styles.headerActions}>
-        <Button variant="secondary" size="sm" onClick={() => setShareOpen(true)}>Share</Button>
+        <IconButton onClick={() => setShareOpen(true)} aria-label="Share room">
+          <Share2 size={18} />
+        </IconButton>
         <IconButton onClick={() => setShowChat((s) => !s)} active={showChat} aria-label="Toggle chat">
-          {showChat ? '💬' : '🗨️'}
+          <MessageSquare size={18} />
         </IconButton>
         {isHost ? (
-          <Button variant="danger" size="sm" onClick={() => setEndConfirmOpen(true)}>End room</Button>
+          <Button variant="danger" size="sm" onClick={() => setEndConfirmOpen(true)}>End Room</Button>
         ) : (
-          <Button variant="danger" size="sm" onClick={requestLeave}>Leave</Button>
+          <Button variant="danger" size="sm" onClick={requestLeave}>
+            <LogOut size={14} />
+            Leave
+          </Button>
         )}
       </div>
     </header>
@@ -284,32 +294,41 @@ export default function RoomPage() {
             ) : (
               <ScreenShare roomId={roomId} isHost={isHost} user={user} />
             )}
-            {shareBanner && <div className={styles.shareBanner}>{shareBanner}</div>}
+            {shareBanner && (
+              <div className={styles.shareBanner}>
+                <Monitor size={14} />
+                <span>{shareBanner}</span>
+              </div>
+            )}
           </div>
 
           {canControl && (
             <Card className={styles.controlsCard}>
               <div className={styles.controls}>
                 <Button variant="secondary" size="sm" onClick={() => setShowVideoInput((s) => !s)}>
-                  Change video
+                  <Film size={14} />
+                  Change Video
                 </Button>
                 {(isYoutube || isDirectVideo) ? (
                   canShareScreen ? (
                     <Button variant="secondary" size="sm" loading={busy} onClick={() => switchActivity('screenshare')}>
-                      Share screen
+                      <Monitor size={14} />
+                      Share Screen
                     </Button>
                   ) : (
                     <span className={styles.screenNote}>Screen share needs a desktop browser</span>
                   )
                 ) : (
                   <Button variant="secondary" size="sm" loading={busy} onClick={() => switchActivity(room?.videoType === 'direct' ? 'direct' : 'youtube')}>
-                    Stop screen share
+                    <Video size={14} />
+                    Stop Screen Share
                   </Button>
                 )}
                 {isHost && (
                   <>
                     <Button variant="secondary" size="sm" onClick={toggleLock}>
-                      {room.locked ? 'Unlock room' : 'Lock room'}
+                      {room.locked ? <Unlock size={14} /> : <Lock size={14} />}
+                      {room.locked ? 'Unlock Room' : 'Lock Room'}
                     </Button>
                     <Button
                       variant="ghost"
@@ -319,7 +338,8 @@ export default function RoomPage() {
                         setEditingTitle(true)
                       }}
                     >
-                      Edit title
+                      <Pencil size={14} />
+                      Edit Title
                     </Button>
                   </>
                 )}
@@ -344,10 +364,17 @@ export default function RoomPage() {
               onClick={() => setDetailsOpen((s) => !s)}
               aria-expanded={detailsOpen}
             >
-              <span>
-                {participants.length}/{room.capacity} watching · {isDirectVideo ? 'Direct Video' : isYoutube ? 'YouTube' : 'Screen share'}
+              <span className={styles.metaLeft}>
+                <Badge variant="live" icon={Radio} pulse>Live</Badge>
+                <span className={styles.metaInfo}>
+                  {participants.length}/{room.capacity} watching
+                </span>
+                <span className={styles.metaSep}>·</span>
+                <span className={styles.metaInfo}>
+                  {isDirectVideo ? 'Direct Video' : isYoutube ? 'YouTube' : 'Screen Share'}
+                </span>
               </span>
-              <span className={styles.metaChevron}>{detailsOpen ? '▾' : '▸'}</span>
+              {detailsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </button>
             {detailsOpen && (
               <div className={styles.details}>
@@ -384,10 +411,10 @@ export default function RoomPage() {
                   }}
                 />
                 <Card className={styles.infoCard}>
-                  <h3 className={styles.infoTitle}>Room info</h3>
+                  <h3 className={styles.infoTitle}>Room Info</h3>
                   <p className="mono">Host: {room.hostName}</p>
                   <p className="mono">Capacity: {participants.length}/{room.capacity}</p>
-                  <p className="mono">Mode: {isDirectVideo ? 'Direct Video' : isYoutube ? 'YouTube' : 'Screen share'}</p>
+                  <p className="mono">Mode: {isDirectVideo ? 'Direct Video' : isYoutube ? 'YouTube' : 'Screen Share'}</p>
                   {room.isPrivate && <p className="mono">Invite: {room.inviteCode}</p>}
                   {room.locked && <p className="mono">Joins locked</p>}
                 </Card>
@@ -402,7 +429,9 @@ export default function RoomPage() {
             <aside className={`${styles.sidebar} ${showChat ? styles.open : ''}`} role="dialog" aria-label="Chat">
               <div className={styles.sidebarHeader}>
                 <h3 className={styles.sidebarTitle}>Chat</h3>
-                <IconButton onClick={() => setShowChat(false)} aria-label="Close chat">✕</IconButton>
+                <IconButton onClick={() => setShowChat(false)} aria-label="Close chat">
+                  <X size={18} />
+                </IconButton>
               </div>
               <div className={styles.sidebarContent}>
                 <Chat
@@ -421,25 +450,25 @@ export default function RoomPage() {
 
       <ShareRoom room={room} roomId={roomId} open={shareOpen} onClose={() => setShareOpen(false)} />
 
-      <Modal open={endConfirmOpen} title="End this room?" onClose={() => setEndConfirmOpen(false)}>
+      <Modal open={endConfirmOpen} title="End this room?" icon={AlertTriangle} onClose={() => setEndConfirmOpen(false)}>
         <p className={styles.confirmText}>
           This ends the room for everyone. Viewers will be disconnected and the room will be marked ended.
         </p>
         <div className={styles.confirmActions}>
           <Button variant="secondary" onClick={() => setEndConfirmOpen(false)}>Cancel</Button>
-          <Button variant="danger" loading={busy} onClick={confirmEnd}>End room</Button>
+          <Button variant="danger" loading={busy} onClick={confirmEnd}>End Room</Button>
         </div>
       </Modal>
 
-      <Modal open={leaveConfirmOpen} title="Leave while sharing?" onClose={() => setLeaveConfirmOpen(false)}>
+      <Modal open={leaveConfirmOpen} title="Leave while sharing?" icon={AlertTriangle} onClose={() => setLeaveConfirmOpen(false)}>
         <p className={styles.confirmText}>
           You are currently sharing your screen. Leaving will stop the share for everyone.
         </p>
         <div className={styles.confirmActions}>
           <Button variant="secondary" onClick={() => setLeaveConfirmOpen(false)}>Stay</Button>
-          <Button variant="danger" loading={busy} onClick={confirmLeave}>Leave room</Button>
+          <Button variant="danger" loading={busy} onClick={confirmLeave}>Leave Room</Button>
         </div>
       </Modal>
     </Layout>
   )
-        }
+}

@@ -1,3 +1,23 @@
+.hero {
+  text-align: center;
+  padding: var(--space-10) 0 var(--space-8);
+}
+
+.heroTitle {
+  font-size: 2.5rem;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.heroSub {
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  margin: 0;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -17,36 +37,55 @@
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.searchWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--text-muted);
+  pointer-events: none;
 }
 
 .search {
-  width: 200px;
+  width: 240px;
+  padding-left: 2.25rem;
 }
 
 .sort {
   display: flex;
   gap: 0.25rem;
+  background: rgba(22, 24, 33, 0.5);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  border: 1px solid var(--border);
 }
 
 .sortButton {
-  padding: 0.4rem 0.75rem;
+  padding: 0.4rem 0.85rem;
   font-size: 0.85rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-strong);
+  border-radius: calc(var(--radius-sm) - 3px);
+  border: none;
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
+  font-family: var(--font-body);
+  font-weight: 500;
 }
 
 .sortButton:hover {
-  background: var(--bg-surface-raised);
   color: var(--text-primary);
 }
 
 .sortButtonActive {
   background: var(--accent-muted);
-  border-color: var(--accent-muted);
   color: var(--accent);
 }
 
@@ -55,23 +94,31 @@
   gap: 0.5rem;
 }
 
+.inviteWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inviteIcon {
+  position: absolute;
+  left: 0.65rem;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
 .inviteInput {
-  width: 140px;
+  width: 150px;
   text-transform: uppercase;
+  padding-left: 2rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-}
-
-.loading {
-  color: var(--text-secondary);
-  padding: 2rem 0;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
 }
 
 .continue {
@@ -79,11 +126,25 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.85rem 1rem;
-  margin-bottom: 1rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-strong);
-  background: linear-gradient(180deg, rgba(124, 137, 247, 0.12), var(--bg-surface-raised));
+  border: 1px solid rgba(124, 137, 247, 0.2);
+  background: rgba(22, 24, 33, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--glow-drift-sm);
+}
+
+.continueInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.continueIcon {
+  color: var(--accent);
+  flex-shrink: 0;
 }
 
 .continueLabel {
@@ -91,24 +152,48 @@
   font-size: 0.75rem;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
 }
 
 .continueTitle {
   margin: 0.15rem 0 0;
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: 1.1rem;
 }
 
 .skeletonGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
 }
 
 .skeletonCard {
   padding: 0.75rem;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  background: var(--bg-surface-raised);
+  background: rgba(22, 24, 33, 0.7);
+}
+
+@media (max-width: 640px) {
+  .heroTitle {
+    font-size: 1.75rem;
+  }
+
+  .heroSub {
+    font-size: 0.95rem;
+  }
+
+  .search {
+    width: 100%;
+  }
+
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sort {
+    align-self: flex-start;
+  }
 }

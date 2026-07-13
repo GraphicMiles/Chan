@@ -481,8 +481,8 @@ export default function CreateRoomPage() {
             </label>
           </div>
 
-          <Button type="submit" loading={creating} fullWidth disabled={!videoId && !videoUrl}>
-            Create room
+          <Button type="submit" loading={creating} fullWidth disabled={!videoId && !videoUrl} variant="cta">
+            Create Room
           </Button>
         </form>
 
