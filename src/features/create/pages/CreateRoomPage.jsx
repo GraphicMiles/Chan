@@ -372,37 +372,27 @@ export default function CreateRoomPage() {
           ) : (
             <>
               <p className={styles.note}>
-                Prefer a direct .mp4/.m3u8 URL. Scraping often only finds webpage links.
+                Paste a direct .mp4/.m3u8 link, or type movie/show keywords (e.g. Silo) to search automatically across all providers!
               </p>
-              <select
-                className={styles.select}
-                value={scraperSite}
-                onChange={(e) => setScraperSite(e.target.value)}
-              >
-                <option value="netnaija">NetNaija</option>
-                <option value="nkiri">Nkiri</option>
-                <option value="fzmovies">FZMovies</option>
-                <option value="custom">Other Site</option>
-              </select>
-              <Input
-                placeholder="Page URL or direct .mp4 link"
-                value={url}
-                onChange={(e) => onUrlChange(e.target.value)}
-              />
-              <Input
-                placeholder="Or search Nkiri/Thenkiri by title (e.g. Super Girl)"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={onScrape}
-                loading={scraperLoading}
-                fullWidth
-              >
-                Extract links
-              </Button>
+              <div className={styles.row}>
+                <Input
+                  placeholder="Paste direct URL or search keywords (Silo, House of the Dragon...)"
+                  value={url || searchQuery}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    onUrlChange(val)
+                    setSearchQuery(val)
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={onScrape}
+                  loading={scraperLoading}
+                >
+                  Search / Extract
+                </Button>
+              </div>
             </>
           )}
 
@@ -432,7 +422,7 @@ export default function CreateRoomPage() {
                     )}
                     <p className={styles.resultTitle}>{item.title}</p>
                     <span className={styles.resultSource}>
-                      {item.source || 'link'}
+                      Provider: <strong>{item.source || item.provider || 'Direct'}</strong>
                       {playable ? ' · playable' : ' · page only'}
                     </span>
                   </button>

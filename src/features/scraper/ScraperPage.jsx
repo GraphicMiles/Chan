@@ -50,7 +50,7 @@ export default function ScraperPage() {
     await search({
       layer: 'direct',
       query: query.trim() || trimmedUrl,
-      options: { site: site === 'custom' ? undefined : site, resolve: true },
+      options: { resolve: true },
     })
   }, [url, query, search, navigate])
 
@@ -92,20 +92,9 @@ export default function ScraperPage() {
         <p className={styles.subtitle}>Extract video links from movie/series sites or paste a direct .mp4/.m3u8 link</p>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          <div className={styles.row}>
-            <div className={styles.field}>
-              <label htmlFor="site">Site</label>
-              <select id="site" value={site} onChange={(e) => setSite(e.target.value)}>
-                {SITES.map((s) => (
-                  <option key={s.key} value={s.key}>{s.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
           <div className={styles.field}>
             <label htmlFor="url">
-              Page URL or Direct Video Link
+              Page URL or Direct Video Link (.mp4 / .m3u8)
               {isDirectInput && <span className={styles.directIndicator}> - Direct Video Detected</span>}
             </label>
             <input
@@ -118,7 +107,7 @@ export default function ScraperPage() {
             />
             {isDirectInput && (
               <div className={styles.directHint}>
-                This is a direct video link. Click "Extract Links" to create a room with it.
+                This is a direct video link. Click &quot;Extract Links&quot; to create a room with it.
               </div>
             )}
           </div>
