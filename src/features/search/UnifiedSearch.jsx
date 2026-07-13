@@ -39,7 +39,7 @@ export default function UnifiedSearch() {
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({ hdOnly: false, liveOnly: false })
   
-  const { results, loading, error, search, clear, hasMore, loadMore } = useUnifiedSearch()
+  const { results, loading, error, search, clear, hasMore, loadMore, searchMeta } = useUnifiedSearch()
   
   const currentLayer = useMemo(() => SEARCH_LAYERS.find(l => l.id === activeLayer), [activeLayer])
   const CurrentLayerIcon = currentLayer?.icon || Film
@@ -496,6 +496,20 @@ export default function UnifiedSearch() {
           </div>
           <h3>No results found</h3>
           <p>No {currentLayer?.label} results for &quot;{query}&quot;</p>
+          
+          {activeLayer === 'direct' && (
+            <div className={styles.multiLayerAlert}>
+              <h4>Multi-Layer Direct Search Completed</h4>
+              <p>
+                We checked across primary movie & series sites (Nkiri, NetNaija, FZMovies, O2TV) and multiple query formats (/s=, /search, /q=, /k=) and found 0 direct links for &quot;{query}&quot;.
+              </p>
+              <div className={styles.alertTips}>
+                <span>• Try simplifying your keywords (e.g. search &quot;Silo&quot; instead of exact episode name)</span>
+                <span>• Or paste a direct .mp4 / .m3u8 video URL directly into the search bar to play immediately!</span>
+              </div>
+            </div>
+          )}
+
           {activeLayer === 'nsfw' && !adultVerified && (
             <p className={styles.verifyPrompt}>Age verification required for NSFW content</p>
           )}

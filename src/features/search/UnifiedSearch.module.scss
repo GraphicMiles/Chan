@@ -380,6 +380,45 @@
   margin-bottom: var(--s-4);
 }
 
+.multiLayerAlert {
+  max-width: 480px;
+  margin: 0 auto var(--s-4);
+  padding: 16px;
+  background: var(--surface-white);
+  border: 1.5px solid var(--border-hairline);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+}
+
+.multiLayerAlert h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-black);
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+}
+
+.multiLayerAlert p {
+  font-size: 13px;
+  color: var(--text-body-grey);
+  line-height: 1.45;
+  margin: 0 0 10px;
+}
+
+.alertTips {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--brand-green);
+  font-weight: 500;
+  background: rgba(31, 122, 92, 0.08);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--brand-green);
+}
+
 .empty button, .loadMore button {
   display: inline-flex;
   align-items: center;
