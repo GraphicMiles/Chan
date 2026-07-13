@@ -9,7 +9,7 @@ function buildXVideosSearchUrl(query) {
   return url.href
 }
 
-export async function searchXVideos(query, limit = 20) {
+async function searchXVideos(query, limit = 20) {
   const searchUrl = buildXVideosSearchUrl(query)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS)
@@ -54,6 +54,7 @@ export async function searchXVideos(query, limit = 20) {
         duration,
         quality,
         source: 'xvideos',
+        provider: 'xvideos',
         type: 'nsfw',
         isNSFW: true,
         isDirect: false,
@@ -68,4 +69,25 @@ export async function searchXVideos(query, limit = 20) {
   } finally {
     clearTimeout(timer)
   }
+}
+
+// Provider registry: add a new adapter module here rather than changing the
+// media API dispatcher. Each adapter must return the shared result schema and
+// must not bypass login, paywall, CAPTCHA, or anti-bot controls.
+const NSFW_PROVIDERS = {
+  xvideos: {
+    id: 'xvideos',
+    label: 'XVIDEOS',
+    search: searchXVideos,
+  },
+}
+
+export function getNsfwProviderIds() {
+  return Object.keys(NSFW_PROVIDERS)
+}
+
+export async function searchNsfwProvider(provider, query, limit = 20) {
+  const adapter = NSFW_PROVIDERS[provider]
+  if (!adapter) throw Object.assign(new Error(`Unsupported NSFW provider: ${provider}`), { status: 400 })
+  return adapter.search(query, limit)
 }

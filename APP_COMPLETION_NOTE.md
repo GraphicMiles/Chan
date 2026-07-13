@@ -153,7 +153,21 @@ Optional Vercel variables:
 
 ```text
 IPTV_PLAYLIST_URL=https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8
+IPTV_PLAYLISTS_JSON=[]
 IPTV_CHANNELS_JSON=[]
+```
+
+`IPTV_PLAYLISTS_JSON` can contain multiple trusted HTTPS sources:
+
+```json
+[
+  {
+    "id": "free-tv",
+    "label": "Free-TV IPTV",
+    "url": "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8",
+    "enabled": true
+  }
+]
 ```
 
 `IPTV_CHANNELS_JSON` can contain additional licensed/public channels:
