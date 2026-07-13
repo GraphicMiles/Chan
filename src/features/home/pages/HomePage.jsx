@@ -8,6 +8,7 @@ import { parseJsonResponse } from '../../../shared/lib/api.js'
 import { Button, Input, EmptyState, Skeleton, useToast } from '../../../shared/ui/index.js'
 import { Header, Layout } from '../../../shared/layout/index.js'
 import RoomCard from '../components/RoomCard.jsx'
+import MostStreamedCard from '../components/MostStreamedCard.jsx'
 import { getLastRoom } from '../../room/hooks/useRoom.js'
 import styles from './HomePage.module.css'
 
@@ -108,6 +109,11 @@ export default function HomePage() {
     <Button as={Link} to="/auth" variant="primary" size="sm">Sign In</Button>
   )
 
+  const mostWatchedRoom = useMemo(() => {
+    if (!rooms || !rooms.length) return null
+    return [...rooms].sort((a, b) => (b.participantCount || 0) - (a.participantCount || 0))[0]
+  }, [rooms])
+
   return (
     <Layout header={<Header user={user} actions={headerActions} />}>
       <section className={styles.hero}>
@@ -170,6 +176,13 @@ export default function HomePage() {
           Popular
         </button>
       </div>
+
+      {mostWatchedRoom && (
+        <div className={styles.mostStreamedSection}>
+          <h3 className={styles.mostStreamedHeader}>Most Streamed Right Now</h3>
+          <MostStreamedCard room={mostWatchedRoom} />
+        </div>
+      )}
 
       <div className={styles.controls}>
         <div className={styles.searchWrap}>
