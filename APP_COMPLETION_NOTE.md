@@ -67,7 +67,7 @@ These files now detect the problem and prevent the user from creating a room tha
 
 ### Current O2TV solution
 
-The app now rewrites the approved O2TV host through a same-origin HTTPS path:
+The app now rewrites the approved O2TV host through a same origin HTTPS path:
 
 ```text
 /o2tv/*  →  http://d6.o2tv.org/*
