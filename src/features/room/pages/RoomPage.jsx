@@ -32,11 +32,11 @@ const SOUND_FX_URLS = {
 }
 
 const SOUND_FX_NAMES = {
-  airhorn: 'Airhorn 📯',
-  cheer: 'Stadium Cheer 👏',
-  boom: 'Dramatic Boom 💥',
-  laugh: 'Crowd Laugh 🤣',
-  applause: 'Applause 🎉',
+  airhorn: 'Airhorn',
+  cheer: 'Stadium Cheer',
+  boom: 'Dramatic Boom',
+  laugh: 'Crowd Laugh',
+  applause: 'Applause',
 }
 
 export default function RoomPage() {
@@ -481,7 +481,7 @@ export default function RoomPage() {
                 </Button>
                 <Button variant="secondary" size="sm" onClick={() => setVibeLightingEnabled(!vibeLightingEnabled)}>
                   <Sparkles size={14} />
-                  Vibe Glow: {vibeLightingEnabled ? 'On ✨' : 'Off'}
+                  Vibe Glow: {vibeLightingEnabled ? 'On' : 'Off'}
                 </Button>
                 {isHost && (
                   <>
