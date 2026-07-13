@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Share2, MessageSquare, X, LogOut, Radio, Lock, Unlock,
   Pencil, Monitor, Film, ChevronDown, ChevronRight, AlertTriangle,
-  Video, Link2, ListVideo, Play, Trash2
+  Video, Link2, ListVideo, Play, Sparkles
 } from 'lucide-react'
 import { collection, onSnapshot, query, orderBy, limit, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '../../../shared/lib/firebase.js'
@@ -23,6 +23,22 @@ import { Layout } from '../../../shared/layout/index.js'
 import ShareRoom from '../components/ShareRoom.jsx'
 import styles from './RoomPage.module.css'
 
+const SOUND_FX_URLS = {
+  airhorn: 'https://cdn.freesound.org/previews/435/435255_8863641-lq.mp3',
+  cheer: 'https://cdn.freesound.org/previews/337/337049_5121236-lq.mp3',
+  boom: 'https://cdn.freesound.org/previews/266/266105_4486188-lq.mp3',
+  laugh: 'https://cdn.freesound.org/previews/369/369515_6687700-lq.mp3',
+  applause: 'https://cdn.freesound.org/previews/483/483652_1015240-lq.mp3',
+}
+
+const SOUND_FX_NAMES = {
+  airhorn: 'Airhorn 📯',
+  cheer: 'Stadium Cheer 👏',
+  boom: 'Dramatic Boom 💥',
+  laugh: 'Crowd Laugh 🤣',
+  applause: 'Applause 🎉',
+}
+
 export default function RoomPage() {
   const { roomId } = useParams()
   const [searchParams] = useSearchParams()
@@ -31,13 +47,12 @@ export default function RoomPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
 
-  // Apply dark theme to body
   useEffect(() => {
     document.body.classList.add('room-theme')
     return () => document.body.classList.remove('room-theme')
   }, [])
 
-  const [sidebarTab, setSidebarTab] = useState('chat') // 'chat' or 'queue'
+  const [sidebarTab, setSidebarTab] = useState('chat')
   const [showChat, setShowChat] = useState(() => (typeof window !== 'undefined' ? window.innerWidth > 768 : true))
   const [newVideoUrl, setNewVideoUrl] = useState('')
   const [showVideoInput, setShowVideoInput] = useState(false)
@@ -52,14 +67,13 @@ export default function RoomPage() {
   const [queueItems, setQueueItems] = useState([])
   const [autoNextPrompt, setAutoNextPrompt] = useState(null)
   const [floatingReactions, setFloatingReactions] = useState([])
+  const [soundFxBanner, setSoundFxBanner] = useState(null)
+  const [vibeLightingEnabled, setVibeLightingEnabled] = useState(true)
   
   const playerRef = useRef(null)
   const prevActivity = useRef(null)
   const autoNextTimerRef = useRef(null)
-
-  useEffect(() => () => {
-    if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current)
-  }, [])
+  const lastPlayedFxRef = useRef(null)
 
   const {
     room,
@@ -81,6 +95,10 @@ export default function RoomPage() {
 
   const { isHost, writePlayerState, canControl } = usePlayerSync(roomId, room, playerRef)
 
+  useEffect(() => () => {
+    if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current)
+  }, [])
+
   useEffect(() => {
     if (!roomId) return undefined
     const q = query(collection(db, 'rooms', roomId, 'queue'), orderBy('createdAt', 'asc'))
@@ -99,6 +117,29 @@ export default function RoomPage() {
         return now - at < 4000
       })
       setFloatingReactions(items)
+    })
+  }, [roomId])
+
+  useEffect(() => {
+    if (!roomId) return undefined
+    const q = query(collection(db, 'rooms', roomId, 'soundEffects'), orderBy('createdAt', 'desc'), limit(1))
+    return onSnapshot(q, (snap) => {
+      if (snap.empty) return
+      const item = { id: snap.docs[0].id, ...snap.docs[0].data() }
+      const now = Date.now()
+      const at = item.createdAt?.toMillis?.() || item.createdAtMs || 0
+      if (now - at < 3500 && lastPlayedFxRef.current !== item.id) {
+        lastPlayedFxRef.current = item.id
+        const audioUrl = SOUND_FX_URLS[item.soundKey]
+        if (audioUrl) {
+          const audio = new Audio(audioUrl)
+          audio.volume = 0.75
+          audio.play().catch(() => {})
+        }
+        const fxName = SOUND_FX_NAMES[item.soundKey] || item.soundKey
+        setSoundFxBanner(`${fxName} — by ${item.displayName}`)
+        setTimeout(() => setSoundFxBanner(null), 3000)
+      }
     })
   }, [roomId])
 
@@ -205,7 +246,7 @@ export default function RoomPage() {
     e.preventDefault()
     const trimmedUrl = newVideoUrl.trim()
     const id = extractVideoId(trimmedUrl)
-    const isDirect = isDirectVideoUrl(trimmedUrl)
+    const isDirect = isDirectVideoUrl(trimmedUrl) || /\.(mp4|m3u8|mkv|avi|mov|webm|flv|ts)(\?|#|$)/i.test(trimmedUrl)
     const playbackUrl = normalizePlaybackUrl(trimmedUrl)
     
     try {
@@ -219,7 +260,7 @@ export default function RoomPage() {
           activityType: 'youtube' 
         })
         await writePlayerState({ videoId: id, videoUrl: null, isPlaying: false, currentTime: 0 })
-      } else if (isDirect) {
+      } else if (isDirect || trimmedUrl) {
         await updateRoom({ 
           videoId: null, 
           videoUrl: playbackUrl,
@@ -303,6 +344,16 @@ export default function RoomPage() {
     if (canControl) writePlayerState(patch)
   }
 
+  // Calculate dynamic Vibe Lighting (#3)
+  const vibeGlowStyle = (() => {
+    if (!vibeLightingEnabled) return 'none'
+    const count = floatingReactions.length
+    if (count >= 5) return '0 0 55px rgba(255, 59, 48, 0.65), inset 0 0 25px rgba(255, 59, 48, 0.35)'
+    if (count >= 2) return '0 0 45px rgba(255, 106, 43, 0.55), inset 0 0 20px rgba(255, 106, 43, 0.25)'
+    if (count >= 1) return '0 0 35px rgba(31, 122, 92, 0.45), inset 0 0 15px rgba(31, 122, 92, 0.2)'
+    return 'none'
+  })()
+
   const header = (
     <header className={styles.header}>
       <div className={styles.roomTitle}>
@@ -365,7 +416,7 @@ export default function RoomPage() {
     <Layout header={header} wide className={styles.layout}>
       <div className={styles.main}>
         <div className={styles.stage}>
-          <div className={styles.playerWrap}>
+          <div className={styles.playerWrap} style={{ boxShadow: vibeGlowStyle, transition: 'box-shadow 0.4s ease' }}>
             {isYoutube || isDirectVideo ? (
               <VideoPlayer
                 videoId={room.videoId}
@@ -375,6 +426,7 @@ export default function RoomPage() {
                 onReady={onPlayerReady}
                 onPlayerEvent={onPlayerEvent}
                 onEnded={handleVideoEnded}
+                roomId={roomId}
               />
             ) : (
               <ScreenShare roomId={roomId} isHost={isHost} user={user} />
@@ -383,6 +435,11 @@ export default function RoomPage() {
               <div className={styles.shareBanner}>
                 <Monitor size={14} />
                 <span>{shareBanner}</span>
+              </div>
+            )}
+            {soundFxBanner && (
+              <div className={styles.soundFxBanner}>
+                <span>{soundFxBanner}</span>
               </div>
             )}
             {floatingReactions.length > 0 && (
@@ -421,6 +478,10 @@ export default function RoomPage() {
                 <Button variant="secondary" size="sm" onClick={() => { setShowChat(true); setSidebarTab('queue') }}>
                   <ListVideo size={14} />
                   Queue ({queueItems.length}/5)
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setVibeLightingEnabled(!vibeLightingEnabled)}>
+                  <Sparkles size={14} />
+                  Vibe Glow: {vibeLightingEnabled ? 'On ✨' : 'Off'}
                 </Button>
                 {isHost && (
                   <>
