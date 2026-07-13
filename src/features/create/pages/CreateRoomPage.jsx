@@ -216,11 +216,14 @@ export default function CreateRoomPage() {
       }
       
       const finalDirectUrl = normalizePlaybackUrl(videoUrl || url || '')
-      if (
-        videoType === 'direct' &&
-        (!finalDirectUrl || (!isDirectVideoUrl(finalDirectUrl) && !presetIsStream && !finalDirectUrl.includes('/api/proxy')))
-      ) {
-        throw new Error('Paste a direct video file link (.mp4 / .m3u8 / .mkv)')
+      const isActualUrl = typeof finalDirectUrl === 'string' && (/^https?:\/\//i.test(finalDirectUrl) || finalDirectUrl.startsWith('/api/proxy'))
+      if (videoType === 'direct') {
+        if (!isActualUrl && !presetIsStream) {
+          throw new Error(`Please click 'Search / Extract' to find '${url || searchQuery || 'your movie'}' and select a video from the results below, or paste a full URL starting with http:// or https://`)
+        }
+        if (!finalDirectUrl || (!isDirectVideoUrl(finalDirectUrl) && !presetIsStream && !finalDirectUrl.includes('/api/proxy'))) {
+          throw new Error('Paste a direct video file link (.mp4 / .m3u8 / .mkv)')
+        }
       }
 
       if (videoType === 'youtube' && videoId) {
