@@ -12,11 +12,11 @@ import { useAuth } from '../../shared/auth/hooks/useAuth.jsx'
 import { isDirectVideoUrl, isMixedContentUrl, normalizeDirectUrl, normalizePlaybackUrl } from '../../shared/lib/youtube.js'
 
 const SEARCH_LAYERS = [
-  { id: 'youtube', label: 'YouTube', icon: PlayCircle, placeholder: 'Search YouTube videos...', description: 'Search millions of YouTube videos' },
-  { id: 'direct', label: 'Direct Links', icon: Link2, placeholder: 'Search movies/shows or paste URL...', description: 'Find direct MP4/M3U8 links from movie sites' },
-  { id: 'iptv', label: 'Live TV', icon: Tv, placeholder: 'Search channels (CNN, ESPN, HBO)...', description: 'Watch live TV channels and streams' },
-  { id: 'sports', label: 'Sports', icon: Trophy, placeholder: 'Search team, league, or match...', description: 'Find live sports matches and events' },
-  { id: 'nsfw', label: 'NSFW', icon: ShieldAlert, placeholder: 'Search adult content (18+ only)...', description: 'Adult content - verification required', adult: true },
+  { id: 'youtube', label: 'YouTube', icon: PlayCircle, placeholder: 'Search YouTube videos...', description: 'Search millions of YouTube videos with instant playback' },
+  { id: 'direct', label: 'Direct Links', icon: Link2, placeholder: 'Search movies/shows or paste direct URL (.mp4/.m3u8)...', description: 'Find direct MP4/M3U8 links from top movie and series sites' },
+  { id: 'iptv', label: 'Live TV', icon: Tv, placeholder: 'Search channels (CNN, ESPN, HBO)...', description: 'Watch live TV channels and 24/7 streaming networks' },
+  { id: 'sports', label: 'Sports', icon: Trophy, placeholder: 'Search team, league, or match...', description: 'Find live sports matches, scores, and streaming fixtures' },
+  { id: 'nsfw', label: 'NSFW', icon: ShieldAlert, placeholder: 'Search adult content (18+ only)...', description: 'Adult content - legal age verification required', adult: true },
 ]
 
 export default function UnifiedSearch() {
@@ -168,6 +168,7 @@ export default function UnifiedSearch() {
           return (
             <button
               key={layer.id}
+              type="button"
               className={`${styles.tab} ${activeLayer === layer.id ? styles.active : ''} ${layer.adult ? styles.adult : ''}`}
               onClick={() => {
                 setActiveLayer(layer.id)
@@ -184,50 +185,57 @@ export default function UnifiedSearch() {
       </div>
 
       <div className={styles.layerInfo}>
+        <CurrentLayerIcon size={16} className={styles.layerIcon} />
         <p>{currentLayer?.description}</p>
       </div>
 
       <form onSubmit={handleSearch} className={styles.searchForm}>
-        <div className={styles.inputWrapper}>
-          <Search size={18} className={styles.searchIcon} />
-          <input
-            id="unified-search-input"
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={currentLayer?.placeholder || 'Search...'}
-            className={styles.searchInput}
-            disabled={loading}
-          />
-          {query && (
-            <button type="button" className={styles.clearBtn} onClick={clearSearch}>
-              <X size={16} />
-            </button>
-          )}
-          <button 
-            type="submit" 
-            disabled={loading || !query.trim()}
-            className={styles.searchBtn}
-          >
-            {loading ? <Loader2 size={16} className={styles.spin} /> : <Search size={16} />}
-            Search
-          </button>
-          {isDirectVideoUrl(query) && (
+        <div className={styles.searchBoxContainer}>
+          <div className={styles.inputWrapper}>
+            <Search size={18} className={styles.searchIcon} />
+            <input
+              id="unified-search-input"
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={currentLayer?.placeholder || 'Search...'}
+              className={styles.searchInput}
+              disabled={loading}
+            />
+            {query && (
+              <button type="button" className={styles.clearBtn} onClick={clearSearch} title="Clear search">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          
+          <div className={styles.actionButtons}>
             <button 
-              type="button" 
-              onClick={handleDirectUrlSubmit}
-              className={styles.directBtn}
+              type="submit" 
+              disabled={loading || !query.trim()}
+              className={styles.searchBtn}
             >
-              <Play size={14} />
-              Play Direct
+              {loading ? <Loader2 size={16} className={styles.spin} /> : <Search size={16} />}
+              <span>Search</span>
             </button>
-          )}
+            
+            {isDirectVideoUrl(query) && (
+              <button 
+                type="button" 
+                onClick={handleDirectUrlSubmit}
+                className={styles.directBtn}
+              >
+                <Play size={14} />
+                <span>Play Direct</span>
+              </button>
+            )}
+          </div>
         </div>
         
         <div className={styles.filterToggle}>
           <button type="button" onClick={() => setShowFilters(!showFilters)}>
             <SlidersHorizontal size={14} />
-            {showFilters ? 'Hide Filters' : 'Show Filters'}
+            <span>{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
           </button>
         </div>
         
@@ -257,7 +265,7 @@ export default function UnifiedSearch() {
         <div className={styles.error}>
           <AlertCircle size={16} />
           <span>{error}</span>
-          <button onClick={() => search({ layer: activeLayer, query, options: { adultVerified } })}>
+          <button type="button" onClick={() => search({ layer: activeLayer, query, options: { adultVerified } })}>
             Retry
           </button>
         </div>
@@ -278,7 +286,7 @@ export default function UnifiedSearch() {
               {results.length !== filteredResults.length && ` (filtered from ${results.length})`}
             </h2>
             <div className={styles.resultActions}>
-              <button onClick={clear} className={styles.clearAll}>Clear All</button>
+              <button type="button" onClick={clear} className={styles.clearAll}>Clear All</button>
             </div>
           </div>
 
@@ -380,6 +388,7 @@ export default function UnifiedSearch() {
 
                 <div className={styles.actions}>
                   <button 
+                    type="button"
                     className={`${styles.watchBtn} ${result.isLive ? styles.liveBtn : ''}`}
                     disabled={result.channelAvailable === false}
                   >
@@ -403,7 +412,7 @@ export default function UnifiedSearch() {
 
           {hasMore && (
             <div className={styles.loadMore}>
-              <button onClick={handleLoadMore} disabled={loading}>
+              <button type="button" onClick={handleLoadMore} disabled={loading}>
                 {loading ? 'Loading...' : 'Load More'}
               </button>
             </div>
@@ -421,7 +430,7 @@ export default function UnifiedSearch() {
           {activeLayer === 'nsfw' && !adultVerified && (
             <p className={styles.verifyPrompt}>Age verification required for NSFW content</p>
           )}
-          <button onClick={() => { setQuery(''); document.getElementById('unified-search-input')?.focus(); }}>
+          <button type="button" onClick={() => { setQuery(''); document.getElementById('unified-search-input')?.focus(); }}>
             Clear Search
           </button>
         </div>

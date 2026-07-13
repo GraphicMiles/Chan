@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
-import styles from './ScraperPage.module.scss'
+import styles from './ScraperPage.module.css'
 import { useUnifiedSearch } from '../../hooks/useUnifiedSearch.js'
 import { isDirectVideoUrl, normalizePlaybackUrl } from '../../shared/lib/youtube.js'
 

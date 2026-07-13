@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Users, Monitor, Play } from 'lucide-react'
+import { Users, Monitor, Play, Radio } from 'lucide-react'
 import { getThumbnail } from '../../../shared/lib/youtube.js'
 import styles from './RoomCard.module.css'
 
@@ -14,10 +14,10 @@ export default function RoomCard({ room }) {
     <Link to={`/room/${room.id}`} className={styles.card}>
       <div className={styles.thumb}>
         {thumb ? (
-          <img src={thumb} alt="" className={styles.thumbImg} />
+          <img src={thumb} alt={room.title || 'Room'} className={styles.thumbImg} loading="lazy" />
         ) : (
           <div className={styles.thumbPlaceholder}>
-            <Monitor size={28} />
+            <Monitor size={32} />
           </div>
         )}
         <span className={styles.badgeLive}>
@@ -25,27 +25,35 @@ export default function RoomCard({ room }) {
           LIVE
         </span>
         <span className={styles.badgeSource}>
-          {isDirectVideo ? <Monitor size={10} /> : <Play size={10} />}
+          {isDirectVideo ? <Monitor size={11} /> : <Play size={11} />}
           {source}
         </span>
       </div>
+      
       <div className={styles.body}>
-        <div className={styles.kicker}>{source}</div>
-        <div className={styles.titleRow}>
-          <div className={styles.titleWrap}>
-            <h3 className={styles.title}>{room.title}</h3>
-            <div className={styles.meta}>by {room.hostName}</div>
-            {timeAgo && <div className={styles.meta}>Started {timeAgo}</div>}
+        <div className={styles.cardHeader}>
+          <div className={styles.kicker}>{source}</div>
+          <h3 className={styles.title} title={room.title}>{room.title}</h3>
+          <div className={styles.metaRow}>
+            <span>by <strong>{room.hostName}</strong></span>
+            {timeAgo && (
+              <>
+                <span className={styles.metaSep}>·</span>
+                <span>Started {timeAgo}</span>
+              </>
+            )}
           </div>
-          <div className={styles.rightInfo}>
-            <div className={styles.viewers}>
-              <Users size={12} />
-              {room.participantCount}/{room.capacity || 12}
-            </div>
-            <span className={styles.joinBtn}>
-              <Play size={12} /> Join
-            </span>
+        </div>
+
+        <div className={styles.cardFooter}>
+          <div className={styles.viewers}>
+            <Users size={14} />
+            <span>{room.participantCount}/{room.capacity || 12} watching</span>
           </div>
+          <span className={styles.joinBtn}>
+            <Play size={12} />
+            <span>Join</span>
+          </span>
         </div>
       </div>
     </Link>

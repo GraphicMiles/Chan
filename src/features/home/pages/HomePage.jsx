@@ -100,7 +100,7 @@ export default function HomePage() {
       <Button as={Link} to="/create" variant="primary" size="sm">
         <Plus size={14} /> Start a Room
       </Button>
-      <Button variant="ghost" size="sm" onClick={logout} aria-label="Sign out">
+      <Button variant="ghost" size="sm" onClick={logout} aria-label="Sign out" title="Sign out">
         <LogOut size={14} />
       </Button>
     </>
@@ -191,7 +191,7 @@ export default function HomePage() {
               className={styles.inviteInput}
             />
           </div>
-          <Button variant="primary" type="submit" size="sm" loading={joining}>Join</Button>
+          <Button variant="primary" type="submit" size="md" loading={joining}>Join</Button>
         </form>
       </div>
 

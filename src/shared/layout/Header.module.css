@@ -79,7 +79,7 @@
   gap: var(--s-2);
   color: var(--text-body-grey);
   font-size: 13px;
-  max-width: 120px;
+  max-width: 140px;
 }
 
 .userName {
@@ -90,16 +90,23 @@
 
 @media (max-width: 640px) {
   .header {
-    padding: var(--s-2) var(--s-3);
+    padding: var(--s-2) var(--s-2);
   }
 
   .nav {
     padding: var(--s-1) var(--s-1) var(--s-1) var(--s-3);
     gap: var(--s-1);
+    border-radius: var(--radius-card);
   }
 
   .user {
     display: none;
+  }
+
+  .right {
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }
 
