@@ -136,7 +136,7 @@ The required extraction flow is:
 6. The next extraction step searches for a direct file.
 7. Only a verified `.mp4`/`.m3u8`/supported stream is allowed into room creation.
 
-This may still fail if a download site requires JavaScript, CAPTCHA, cookies, or blocks automated requests. That is a source limitation, not a React player bug.
+Downloadwella pages are now identified as provider-action pages. The app opens them for the user and tells the user to complete the provider's own download step and paste the final HTTPS video URL back into Chan. Chan does not bypass provider JavaScript, CAPTCHA, cookies, or download controls. This is intentional; those controls must be completed on the provider page.
 
 ---
 

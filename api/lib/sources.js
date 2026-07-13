@@ -2,10 +2,10 @@ export const SITE_CONFIGS = {
   nkiri: {
     label: 'Nkiri / Thenkiri',
     baseUrl: 'https://thenkiri.com',
-    items: '.list-movies .movie-item, .movies-list .item, .post-item, article',
-    title: '.movie-title, .entry-title, h2 a, h3 a, .title',
+    items: '.list-movies .movie-item, .movies-list .item, .post-item, article, a[href*="downloadwella.com"]',
+    title: '.movie-title, .entry-title, h2 a, h3 a, .title, a[href*="downloadwella.com"]',
     image: 'img[src], .poster img, .thumb img, img[data-src]',
-    link: 'a[href], .download-link a, a[href*="/download/"]',
+    link: 'a[href*="downloadwella.com"], a[href], .download-link a, a[href*="/download/"]',
     meta: '.meta, .date, .year, .quality',
     buildSearchUrl: (q) => `https://thenkiri.com/?s=${encodeURIComponent(q)}`,
   },
@@ -50,10 +50,10 @@ export const SITE_CONFIGS = {
   },
   custom: {
     label: 'Custom URL',
-    items: 'article, .post, .item, .card, .movie, .video',
-    title: 'h1, h2, h3, .title, [class*="title"]',
+    items: 'article, .post, .item, .card, .movie, .video, a[href*="downloadwella.com"]',
+    title: 'h1, h2, h3, .title, [class*="title"], a[href*="downloadwella.com"]',
     image: 'img[src], [class*="poster"] img, img[data-src]',
-    link: 'a[href], a[href*=".mp4"], a[href*=".mkv"]',
+    link: 'a[href*="downloadwella.com"], a[href], a[href*=".mp4"], a[href*=".mkv"]',
     meta: '.meta, .date, .info',
   },
 }

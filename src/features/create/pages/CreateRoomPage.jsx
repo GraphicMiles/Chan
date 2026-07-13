@@ -173,6 +173,15 @@ export default function CreateRoomPage() {
     }
 
     const candidate = item.link || item.url || ''
+    if (item.requiresUserAction && candidate) {
+      window.open(candidate, '_blank', 'noopener,noreferrer')
+      toast('Opened the provider page. Complete its download step there, then paste the final HTTPS video URL into Chan.', {
+        variant: 'info',
+        duration: 8000,
+      })
+      return
+    }
+
     if (item.isDirect || isDirectVideoUrl(candidate)) {
       setVideoUrl(normalizePlaybackUrl(candidate))
       setVideoId('')
