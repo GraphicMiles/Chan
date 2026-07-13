@@ -1,33 +1,35 @@
 .empty {
   text-align: center;
-  padding: var(--space-12) var(--space-4);
+  padding: var(--s-12) var(--s-4);
 }
 
 .iconWrap {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   border-radius: var(--radius-pill);
   background: rgba(0, 0, 0, 0.04);
   color: var(--text-muted-grey);
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--s-5);
 }
 
 .title {
-  font-size: 1.35rem;
-  margin-bottom: var(--space-2);
+  font-size: 20px;
+  margin-bottom: var(--s-2);
   color: var(--text-black);
+  line-height: 1.2;
 }
 
 .description {
   color: var(--text-body-grey);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--s-6);
   max-width: 360px;
   margin-left: auto;
   margin-right: auto;
-  font-size: 0.92rem;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .actionWrap {

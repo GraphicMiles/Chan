@@ -2,7 +2,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--s-3) var(--s-4);
 }
 
 .nav {
@@ -11,21 +11,21 @@
   justify-content: space-between;
   background: var(--surface-white);
   border-radius: var(--radius-pill);
-  padding: 6px 6px 6px 16px;
+  padding: var(--s-1) var(--s-1) var(--s-1) var(--s-4);
   box-shadow: var(--shadow-nav);
   border: 1px solid var(--border-hairline);
   max-width: 1120px;
   margin: 0 auto;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: 18px;
   color: var(--text-black);
   text-decoration: none;
   flex-shrink: 0;
@@ -48,7 +48,7 @@
 .logoDots::after {
   content: '';
   position: absolute;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--accent-orange);
 }
 
@@ -69,18 +69,17 @@
 .right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-2);
   flex-shrink: 0;
 }
 
 .user {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-2);
   color: var(--text-body-grey);
-  font-size: 0.82rem;
+  font-size: 13px;
   max-width: 120px;
-  padding-right: 4px;
 }
 
 .userName {
@@ -89,28 +88,23 @@
   white-space: nowrap;
 }
 
-/* Responsive */
 @media (max-width: 640px) {
   .header {
-    padding: 8px 12px;
+    padding: var(--s-2) var(--s-3);
   }
 
   .nav {
-    padding: 4px 4px 4px 12px;
-    gap: 4px;
+    padding: var(--s-1) var(--s-1) var(--s-1) var(--s-3);
+    gap: var(--s-1);
   }
 
   .user {
     display: none;
   }
-
-  .right {
-    gap: 4px;
-  }
 }
 
 @media (max-width: 380px) {
   .logo {
-    font-size: 1rem;
+    font-size: 16px;
   }
 }

@@ -10,8 +10,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
   border-bottom: 1px solid var(--room-divider);
   background: var(--room-bg);
   flex-shrink: 0;
@@ -20,7 +20,7 @@
 .roomTitle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   min-width: 0;
   flex: 1;
 }
@@ -29,7 +29,7 @@
   font-family: var(--font-display);
   font-weight: 700;
   color: var(--room-text-primary);
-  font-size: 1rem;
+  font-size: 16px;
   text-decoration: none;
   flex-shrink: 0;
 }
@@ -48,7 +48,7 @@
 
 .titleText {
   font-family: var(--font-display);
-  font-size: 0.9rem;
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -60,7 +60,7 @@
 
 .titleEdit {
   display: flex;
-  gap: 4px;
+  gap: var(--s-1);
   align-items: center;
   min-width: 0;
   flex: 1;
@@ -69,7 +69,7 @@
 .headerActions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--s-1);
   flex-shrink: 0;
 }
 
@@ -83,10 +83,10 @@
 .stage {
   flex: 1;
   min-width: 0;
-  padding: 10px;
+  padding: var(--s-3);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--s-2);
   overflow-y: auto;
 }
 
@@ -104,19 +104,19 @@
 .shareBanner {
   position: absolute;
   left: 50%;
-  top: 10px;
+  top: var(--s-3);
   transform: translateX(-50%);
   background: rgba(23, 24, 26, 0.9);
   color: var(--room-text-primary);
-  padding: 5px 12px;
+  padding: var(--s-1) var(--s-3);
   border-radius: var(--radius-pill);
-  font-size: 0.78rem;
+  font-size: 12px;
   font-weight: 500;
   z-index: 2;
   white-space: nowrap;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--s-1);
   border: 1px solid var(--room-divider);
 }
 
@@ -124,25 +124,25 @@
   flex-shrink: 0;
   background: var(--room-surface) !important;
   border-color: var(--room-divider) !important;
-  padding: 10px 12px !important;
+  padding: var(--s-3) !important;
 }
 
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--s-2);
   align-items: center;
 }
 
 .screenNote {
-  font-size: 0.78rem;
+  font-size: 12px;
   color: var(--room-text-secondary);
 }
 
 .videoForm {
   display: flex;
-  gap: 6px;
-  margin-top: 8px;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
   align-items: center;
 }
 
@@ -164,12 +164,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
   background: transparent;
   border: none;
   color: var(--room-text-primary);
-  font-size: 0.82rem;
+  font-size: 13px;
   cursor: pointer;
   transition: background 0.15s ease;
   font-family: var(--font-body);
@@ -182,13 +182,13 @@
 .metaLeft {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   min-width: 0;
   flex-wrap: wrap;
 }
 
 .metaInfo {
-  font-size: 0.78rem;
+  font-size: 12px;
   color: var(--room-text-secondary);
 }
 
@@ -200,8 +200,8 @@
 .details {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
-  padding: 0 8px 8px;
+  gap: var(--s-2);
+  padding: 0 var(--s-2) var(--s-2);
 }
 
 .infoCard {
@@ -210,8 +210,8 @@
 }
 
 .infoTitle {
-  font-size: 0.9rem;
-  margin: 0 0 4px;
+  font-size: 14px;
+  margin: 0 0 var(--s-1);
   color: var(--room-text-primary);
   font-family: var(--font-display);
 }
@@ -232,14 +232,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: var(--s-3) var(--s-4);
   border-bottom: 1px solid var(--room-divider);
   flex-shrink: 0;
 }
 
 .sidebarTitle {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 14px;
   font-weight: 600;
   color: var(--room-text-primary);
   font-family: var(--font-display);
@@ -249,7 +249,7 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding: 10px;
+  padding: var(--s-3);
   display: flex;
   flex-direction: column;
 }
@@ -259,11 +259,11 @@
 .loading,
 .error,
 .joining {
-  padding: 2rem;
+  padding: var(--s-8);
   color: var(--room-text-secondary);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--s-3);
   align-items: flex-start;
 }
 
@@ -271,15 +271,15 @@
 
 .confirmText {
   color: var(--text-body-grey);
-  margin: 0 0 16px;
+  margin: 0 0 var(--s-4);
   line-height: 1.6;
-  font-size: 0.9rem;
+  font-size: 14px;
 }
 
 .confirmActions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 /* Mobile */
@@ -325,17 +325,8 @@
   .titleSep { display: none; }
 
   .stage {
-    padding: 8px;
-    gap: 6px;
-  }
-
-  .header {
-    padding: 6px 10px;
-    gap: 6px;
-  }
-
-  .details {
-    grid-template-columns: 1fr;
+    padding: var(--s-2);
+    gap: var(--s-2);
   }
 }
 
@@ -346,16 +337,16 @@
 }
 
 @media (max-width: 400px) {
-  .headerActions {
-    gap: 2px;
+  .header {
+    padding: var(--s-1) var(--s-2);
   }
 
   .brand {
-    font-size: 0.9rem;
+    font-size: 14px;
   }
 
   .titleText {
-    font-size: 0.82rem;
+    font-size: 13px;
   }
 }
 

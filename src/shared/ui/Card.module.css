@@ -1,7 +1,7 @@
 .card {
   background: var(--surface-white);
   border-radius: var(--radius-card);
-  padding: var(--space-4);
+  padding: var(--s-4);
   box-shadow: var(--shadow-card);
   transition: box-shadow 0.2s ease, transform 0.2s ease;
   border: 1px solid var(--border-hairline);
@@ -21,14 +21,13 @@
 }
 
 .compact {
-  padding: var(--space-3);
+  padding: var(--s-3);
 }
 
 .flush {
   padding: 0;
 }
 
-/* Dark theme card */
 .room-theme .card {
   background: var(--room-surface);
   border-color: var(--room-divider);
