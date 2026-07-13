@@ -177,14 +177,16 @@
   justify-content: center;
   gap: 6px;
   height: 42px;
-  padding: 0 20px;
+  padding: 0 22px;
   cursor: pointer;
   background: var(--pill-black);
   color: #fff;
   font-weight: 600;
   font-family: var(--font-body);
   font-size: 15px;
-  box-shadow: var(--shadow-card);
+  border: none !important;
+  border-radius: 100px !important;
+  box-shadow: none !important;
   transition: background 0.15s ease, transform 0.1s ease;
   white-space: nowrap;
   flex: 0 0 auto;
@@ -209,9 +211,9 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 0;
-  border-radius: var(--radius-card);
-  height: 52px;
+  border: none !important;
+  border-radius: 100px !important;
+  height: 42px;
   padding: 0 20px;
   cursor: pointer;
   background: var(--brand-green);
@@ -906,6 +908,8 @@
     padding: 0 16px;
     font-size: 13px;
     justify-content: center;
+    border-radius: 100px !important;
+    border: none !important;
   }
 
   .resultsHeader {

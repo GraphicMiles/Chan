@@ -49,6 +49,8 @@
 .searchButton {
   flex: 0 0 auto;
   height: 44px !important;
+  border-radius: 100px !important;
+  padding: 0 22px !important;
 }
 
 .results {

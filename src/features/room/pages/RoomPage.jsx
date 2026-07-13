@@ -461,13 +461,11 @@ export default function RoomPage() {
                   Change Video
                 </Button>
                 {(isYoutube || isDirectVideo) ? (
-                  canShareScreen ? (
+                  canShareScreen && (
                     <Button variant="secondary" size="sm" loading={busy} onClick={() => switchActivity('screenshare')}>
                       <Monitor size={14} />
                       Share Screen
                     </Button>
-                  ) : (
-                    <span className={styles.screenNote}>Screen share needs a desktop browser</span>
                   )
                 ) : (
                   <Button variant="secondary" size="sm" loading={busy} onClick={() => switchActivity(room?.videoType === 'direct' ? 'direct' : 'youtube')}>
@@ -490,7 +488,7 @@ export default function RoomPage() {
                       {room.locked ? 'Unlock Room' : 'Lock Room'}
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="secondary"
                       size="sm"
                       onClick={() => {
                         setTitleDraft(room.title || '')
@@ -503,6 +501,12 @@ export default function RoomPage() {
                   </>
                 )}
               </div>
+              {(isYoutube || isDirectVideo) && !canShareScreen && (
+                <div className={styles.controlsFooter}>
+                  <Monitor size={13} />
+                  <span>Screen share requires a desktop browser</span>
+                </div>
+              )}
               {showVideoInput && (
                 <form onSubmit={changeVideo} className={styles.videoForm}>
                   <Input
@@ -593,6 +597,7 @@ export default function RoomPage() {
             <div className={styles.overlay} onClick={() => setShowChat(false)} />
             <aside className={`${styles.sidebar} ${showChat ? styles.open : ''}`} role="dialog" aria-label="Sidebar">
               <div className={styles.sidebarHeader}>
+                <div className={styles.headerLeftSpacer} />
                 <div className={styles.sidebarTabs}>
                   <button
                     type="button"
@@ -609,9 +614,11 @@ export default function RoomPage() {
                     Queue ({queueItems.length}/5)
                   </button>
                 </div>
-                <IconButton onClick={() => setShowChat(false)} aria-label="Close sidebar">
-                  <X size={18} />
-                </IconButton>
+                <div className={styles.headerRightAction}>
+                  <IconButton onClick={() => setShowChat(false)} aria-label="Close sidebar">
+                    <X size={18} />
+                  </IconButton>
+                </div>
               </div>
               <div className={styles.sidebarContent}>
                 {sidebarTab === 'chat' ? (

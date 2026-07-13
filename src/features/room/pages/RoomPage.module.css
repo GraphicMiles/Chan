@@ -172,15 +172,45 @@
 .controlsCard {
   flex-shrink: 0;
   background: var(--room-surface) !important;
-  border-color: var(--room-divider) !important;
-  padding: var(--s-3) !important;
+  border: 1px solid var(--room-divider) !important;
+  border-radius: var(--radius-card) !important;
+  padding: 14px 16px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: none !important;
 }
 
 .controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s-2);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 10px;
   align-items: center;
+}
+
+.controls > button {
+  width: 100% !important;
+  height: 38px !important;
+  padding: 0 16px !important;
+  border-radius: 100px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  white-space: nowrap;
+  box-shadow: none !important;
+}
+
+.controlsFooter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--room-text-secondary);
+  padding-top: 4px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
 }
 
 .screenNote {
@@ -281,44 +311,67 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--room-divider);
+  background: var(--room-bg);
+  min-height: 56px;
   flex-shrink: 0;
 }
 
+.headerLeftSpacer {
+  width: 36px;
+  flex: 0 0 auto;
+}
+
 .sidebarTabs {
-  display: flex;
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
-  background: var(--room-surface-raised);
-  padding: 3px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--room-divider);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 4px;
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 0 auto;
+}
+
+.headerRightAction {
+  width: 36px;
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .sidebarTab, .sidebarTabActive {
-  padding: 5px 14px;
-  border-radius: var(--radius-pill);
-  border: none;
-  font-size: 13px;
+  height: 34px;
+  padding: 0 18px !important;
+  border-radius: 100px !important;
+  border: none !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
   cursor: pointer;
   font-family: var(--font-body);
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .sidebarTab {
-  background: transparent;
-  color: var(--room-text-secondary);
+  background: transparent !important;
+  color: var(--room-text-secondary) !important;
 }
 
 .sidebarTab:hover {
-  color: var(--room-text-primary);
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.05) !important;
 }
 
 .sidebarTabActive {
-  background: var(--room-surface);
-  color: #fff;
-  font-weight: 600;
-  box-shadow: var(--shadow-sm);
+  background: #fff !important;
+  color: #0B0B0C !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
 .sidebarContent {
