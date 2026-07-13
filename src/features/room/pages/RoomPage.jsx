@@ -57,6 +57,10 @@ export default function RoomPage() {
   const prevActivity = useRef(null)
   const autoNextTimerRef = useRef(null)
 
+  useEffect(() => () => {
+    if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current)
+  }, [])
+
   const {
     room,
     participants,
