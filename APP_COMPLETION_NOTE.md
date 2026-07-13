@@ -117,26 +117,19 @@ src/features/search/UnifiedSearch.jsx
 
 ### Required behavior
 
-The app should distinguish these result types:
+The app distinguishes these result types:
 
 ```text
 Direct file       → playable in the room
-HTML page         → open/extract another page
+HTML page         → follow safe page links automatically
+Provider action   → open for the user to complete
 Blocked page      → show a clear error
 Unsupported URL   → do not create a room
 ```
 
-The required extraction flow is:
+The resolver now follows same-site and Downloadwella page links up to a bounded depth, extracts direct media URLs when they are publicly present, and deduplicates results. Downloadwella pages are identified as provider-action pages. The app opens them for the user and tells the user to complete the provider's own download step and paste the final HTTPS video URL back into Chan.
 
-1. User submits the Thenkiri page.
-2. The API extracts page links.
-3. The UI marks them as `Page`, not `Direct`.
-4. User selects a page result.
-5. The page URL is loaded into the scraper.
-6. The next extraction step searches for a direct file.
-7. Only a verified `.mp4`/`.m3u8`/supported stream is allowed into room creation.
-
-Downloadwella pages are now identified as provider-action pages. The app opens them for the user and tells the user to complete the provider's own download step and paste the final HTTPS video URL back into Chan. Chan does not bypass provider JavaScript, CAPTCHA, cookies, or download controls. This is intentional; those controls must be completed on the provider page.
+Chan does not submit or bypass provider JavaScript, CAPTCHA, cookies, or download controls. This is intentional; those controls must be completed on the provider page. Only a verified `.mp4`/`.m3u8`/supported stream is allowed into room creation.
 
 ---
 
