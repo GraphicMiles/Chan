@@ -2,18 +2,19 @@
   display: block;
   background: linear-gradient(
     90deg,
-    rgba(22, 24, 33, 0.6) 0%,
-    rgba(30, 33, 45, 0.8) 50%,
-    rgba(22, 24, 33, 0.6) 100%
+    rgba(0, 0, 0, 0.04) 0%,
+    rgba(0, 0, 0, 0.08) 50%,
+    rgba(0, 0, 0, 0.04) 100%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.6s ease-in-out infinite;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-card);
 }
 
 .r_sm { border-radius: var(--radius-sm); }
-.r_md { border-radius: var(--radius-md); }
-.r_lg { border-radius: var(--radius-lg); }
-.r_full { border-radius: var(--radius-full); }
+.r_md { border-radius: var(--radius-card); }
+.r_lg { border-radius: var(--radius-card); }
+.r_full { border-radius: var(--radius-pill); }
 
 @keyframes shimmer {
   0% { background-position: 200% 0; }
@@ -21,7 +22,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton {
-    animation: none;
-  }
+  .skeleton { animation: none; }
 }

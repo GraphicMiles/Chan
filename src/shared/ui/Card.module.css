@@ -1,18 +1,14 @@
 .card {
-  position: relative;
-  background: rgba(22, 24, 33, 0.78);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-lg);
+  background: var(--surface-white);
+  border-radius: var(--radius-card);
   padding: var(--space-4);
-  transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.2s ease;
-  box-shadow: var(--inner-glow), var(--shadow-sm);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  border: 1px solid var(--border-hairline);
 }
 
 .interactive:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: var(--inner-glow), var(--shadow-md);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .clickable {
@@ -21,9 +17,7 @@
 }
 
 .clickable:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--inner-glow), var(--shadow-xl);
-  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
 }
 
 .compact {
@@ -32,4 +26,16 @@
 
 .flush {
   padding: 0;
+}
+
+/* Dark theme card */
+.room-theme .card {
+  background: var(--room-surface);
+  border-color: var(--room-divider);
+  box-shadow: none;
+}
+
+.room-theme .interactive:hover {
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.1);
 }

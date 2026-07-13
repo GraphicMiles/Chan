@@ -1,14 +1,19 @@
 .layout {
   max-width: none;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--room-bg);
+  color: var(--room-text-primary);
 }
 
 .header {
-  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
-  background: rgba(12, 14, 22, 0.88);
-  backdrop-filter: blur(20px) saturate(1.3);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--room-divider);
+  background: var(--room-bg);
 }
 
 .roomTitle {
@@ -22,32 +27,33 @@
 .brand {
   font-family: var(--font-display);
   font-weight: 700;
-  color: var(--text-primary);
-  font-size: 1.25rem;
+  color: var(--room-text-primary);
+  font-size: 1.1rem;
   text-decoration: none;
   flex-shrink: 0;
 }
 
 .brand:hover {
   text-decoration: none;
-  color: var(--accent);
+  color: var(--accent-orange);
 }
 
 .titleSep {
   width: 1px;
-  height: 20px;
-  background: var(--border-strong);
+  height: 18px;
+  background: var(--room-divider);
   flex-shrink: 0;
 }
 
 .titleText {
   font-family: var(--font-display);
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin: 0;
+  color: var(--room-text-primary);
 }
 
 .titleEdit {
@@ -61,7 +67,7 @@
 .headerActions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   flex-shrink: 0;
 }
 
@@ -75,10 +81,10 @@
 .stage {
   flex: 1;
   min-width: 0;
-  padding: 1rem 1.25rem 1.25rem;
+  padding: 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.65rem;
   overflow-y: auto;
 }
 
@@ -87,66 +93,60 @@
   width: 100%;
   flex: 0 0 auto;
   aspect-ratio: 16 / 9;
-  max-height: min(65vh, 760px);
+  max-height: min(60vh, 680px);
   background: #000;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .shareBanner {
   position: absolute;
   left: 50%;
-  top: 0.85rem;
+  top: 0.75rem;
   transform: translateX(-50%);
-  background: rgba(12, 14, 22, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: var(--paper);
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius-full);
-  font-size: 0.82rem;
+  background: rgba(23, 24, 26, 0.9);
+  color: var(--room-text-primary);
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
   font-weight: 500;
   z-index: 2;
   white-space: nowrap;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: var(--shadow-md);
+  gap: 0.4rem;
+  border: 1px solid var(--room-divider);
 }
 
 .controlsCard {
   flex-shrink: 0;
+  background: var(--room-surface) !important;
+  border-color: var(--room-divider) !important;
 }
 
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.4rem;
   align-items: center;
 }
 
 .screenNote {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+  font-size: 0.82rem;
+  color: var(--room-text-secondary);
 }
 
 .videoForm {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.85rem;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
 }
 
 .metaBar {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: rgba(22, 24, 33, 0.78);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--room-divider);
+  border-radius: var(--radius-card);
+  background: var(--room-surface);
   overflow: hidden;
-  box-shadow: var(--inner-glow);
 }
 
 .metaToggle {
@@ -155,60 +155,59 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.9rem 1.25rem;
+  padding: 0.75rem 1rem;
   background: transparent;
   border: none;
-  color: var(--text-primary);
-  font-size: 0.9rem;
+  color: var(--room-text-primary);
+  font-size: 0.85rem;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .metaToggle:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--room-surface-raised);
 }
 
 .metaLeft {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.65rem;
 }
 
 .metaInfo {
-  font-family: var(--font-mono);
   font-size: 0.82rem;
-  color: var(--text-secondary);
+  color: var(--room-text-secondary);
 }
 
 .metaSep {
-  color: var(--text-muted);
+  color: var(--room-text-secondary);
+  opacity: 0.5;
 }
 
 .details {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 0.85rem;
-  padding: 0 0.85rem 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.65rem;
+  padding: 0 0.65rem 0.65rem;
 }
 
 .infoCard {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  background: var(--room-surface-raised) !important;
+  border-color: var(--room-divider) !important;
 }
 
 .infoTitle {
-  font-size: 1rem;
+  font-size: 0.95rem;
   margin: 0 0 0.35rem;
+  color: var(--room-text-primary);
 }
 
+/* Sidebar / Chat panel */
 .sidebar {
-  width: 380px;
+  width: 360px;
   max-width: 100%;
-  border-left: 1px solid var(--border);
-  background: rgba(12, 14, 22, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  border-left: 1px solid var(--room-divider);
+  background: var(--room-bg);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -218,48 +217,45 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.85rem 1.15rem;
-  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--room-divider);
   flex-shrink: 0;
 }
 
 .sidebarTitle {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--room-text-primary);
+  font-family: var(--font-display);
 }
 
 .sidebarContent {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding: 0.85rem;
+  padding: 0.75rem;
   display: flex;
   flex-direction: column;
 }
 
-.overlay {
-  display: none;
-}
+.overlay { display: none; }
 
 .loading,
 .error,
 .joining {
   padding: 2rem;
-  color: var(--text-secondary);
+  color: var(--room-text-secondary);
   display: flex;
   flex-direction: column;
   gap: 1rem;
   align-items: flex-start;
 }
 
-.error {
-  color: var(--danger);
-}
+.error { color: var(--live-red); }
 
 .confirmText {
-  color: var(--text-secondary);
+  color: var(--text-body-grey);
   margin: 0 0 1.25rem;
   line-height: 1.6;
 }
@@ -270,6 +266,7 @@
   gap: 0.5rem;
 }
 
+/* Mobile responsive */
 @media (max-width: 768px) {
   .main {
     flex-direction: column;
@@ -277,14 +274,14 @@
 
   .playerWrap {
     max-height: none;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
   }
 
   .overlay {
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(12, 14, 22, 0.65);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 19;
   }
 
@@ -296,14 +293,13 @@
     top: auto;
     width: 100%;
     max-width: none;
-    height: min(75vh, 580px);
+    height: min(70vh, 520px);
     z-index: 20;
     border-left: none;
-    border-top: 1px solid var(--border);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-top: 1px solid var(--room-divider);
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
     transform: translateY(110%);
-    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s ease;
   }
 
   .sidebar.open {
@@ -311,20 +307,31 @@
   }
 
   .headerActions {
-    gap: 0.35rem;
+    gap: 0.3rem;
   }
 
-  .titleSep {
-    display: none;
-  }
+  .titleSep { display: none; }
 
   .stage {
-    padding: 0.75rem;
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .header {
+    padding: 0.5rem 0.65rem;
+    gap: 0.5rem;
+  }
+
+  .brand {
+    font-size: 1rem;
+  }
+
+  .titleText {
+    font-size: 0.85rem;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar {
-    transition: none;
-  }
+  .sidebar { transition: none; }
 }

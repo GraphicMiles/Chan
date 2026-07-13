@@ -28,6 +28,12 @@ export default function RoomPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
 
+  // Apply dark theme to body
+  useEffect(() => {
+    document.body.classList.add('room-theme')
+    return () => document.body.classList.remove('room-theme')
+  }, [])
+
   const [showChat, setShowChat] = useState(() => (typeof window !== 'undefined' ? window.innerWidth > 768 : true))
   const [newVideoUrl, setNewVideoUrl] = useState('')
   const [showVideoInput, setShowVideoInput] = useState(false)

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore'
-import { Search, Plus, LogOut, Film, ArrowRight, Hash } from 'lucide-react'
+import { Plus, Search, LogOut, Film, ArrowRight, Hash, Zap } from 'lucide-react'
 import { db } from '../../../shared/lib/firebase.js'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import { parseJsonResponse } from '../../../shared/lib/api.js'
-import { Button, Input, EmptyState, Spinner, Skeleton, useToast } from '../../../shared/ui/index.js'
+import { Button, Input, EmptyState, Skeleton, useToast } from '../../../shared/ui/index.js'
 import { Header, Layout } from '../../../shared/layout/index.js'
 import RoomCard from '../components/RoomCard.jsx'
 import { getLastRoom } from '../../room/hooks/useRoom.js'
@@ -24,15 +24,10 @@ export default function HomePage() {
   const [lastRoom, setLastRoom] = useState(null)
   const [continueRoom, setContinueRoom] = useState(null)
 
-  useEffect(() => {
-    setLastRoom(getLastRoom())
-  }, [])
+  useEffect(() => { setLastRoom(getLastRoom()) }, [])
 
   useEffect(() => {
-    if (!user) {
-      setRoomsLoading(false)
-      return undefined
-    }
+    if (!user) { setRoomsLoading(false); return undefined }
     const unsub = onSnapshot(
       query(collection(db, 'rooms'), where('status', '==', 'live'), where('isPrivate', '==', false)),
       (snap) => {
@@ -42,7 +37,7 @@ export default function HomePage() {
       (err) => {
         console.error(err)
         setRoomsLoading(false)
-        toast('Could not load rooms. Check Firestore rules/network.', { variant: 'error' })
+        toast('Could not load rooms.', { variant: 'error' })
       }
     )
     return unsub
@@ -53,9 +48,7 @@ export default function HomePage() {
     let list = rooms
     if (term) {
       list = rooms.filter(
-        (r) =>
-          r.title?.toLowerCase().includes(term) ||
-          r.hostName?.toLowerCase().includes(term)
+        (r) => r.title?.toLowerCase().includes(term) || r.hostName?.toLowerCase().includes(term)
       )
     }
     return [...list].sort((a, b) => {
@@ -65,22 +58,14 @@ export default function HomePage() {
   }, [rooms, search, sortBy])
 
   useEffect(() => {
-    if (!lastRoom?.roomId || !user) {
-      setContinueRoom(null)
-      return
-    }
+    if (!lastRoom?.roomId || !user) { setContinueRoom(null); return }
     const found = rooms.find((r) => r.id === lastRoom.roomId)
-    if (found) {
-      setContinueRoom(found)
-      return
-    }
+    if (found) { setContinueRoom(found); return }
     getDoc(doc(db, 'rooms', lastRoom.roomId))
       .then((snap) => {
         if (snap.exists() && snap.data().status === 'live') {
           setContinueRoom({ id: snap.id, ...snap.data() })
-        } else {
-          setContinueRoom(null)
-        }
+        } else { setContinueRoom(null) }
       })
       .catch(() => setContinueRoom(null))
   }, [rooms, lastRoom, user])
@@ -88,11 +73,7 @@ export default function HomePage() {
   const joinByInvite = async (e) => {
     e.preventDefault()
     if (!inviteCode.trim()) return
-    if (!user) {
-      toast('Join anonymously first', { variant: 'warning' })
-      navigate('/auth')
-      return
-    }
+    if (!user) { toast('Sign in first', { variant: 'warning' }); navigate('/auth'); return }
     const code = inviteCode.trim().toUpperCase()
     setJoining(true)
     try {
@@ -100,79 +81,95 @@ export default function HomePage() {
       const res = await fetch('/api/room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          action: 'join',
-          inviteCode: code,
-          uid: user.uid,
-          displayName: user.displayName || 'Viewer',
-        }),
+        body: JSON.stringify({ action: 'join', inviteCode: code, uid: user.uid, displayName: user.displayName || 'Viewer' }),
       })
       const data = await parseJsonResponse(res)
-      if (res.ok && data.roomId) {
-        navigate(`/room/${data.roomId}?invite=${code}`)
-      } else {
-        toast(data.error || 'Invalid invite code', { variant: 'error' })
-      }
-    } catch (err) {
-      toast(err.message || 'Could not join', { variant: 'error' })
-    } finally {
-      setJoining(false)
-    }
+      if (res.ok && data.roomId) { navigate(`/room/${data.roomId}?invite=${code}`) }
+      else { toast(data.error || 'Invalid invite code', { variant: 'error' }) }
+    } catch (err) { toast(err.message || 'Could not join', { variant: 'error' }) }
+    finally { setJoining(false) }
   }
+
+  const totalViewers = rooms.reduce((sum, r) => sum + (r.participantCount || 0), 0)
 
   const headerActions = user ? (
     <>
       <Button as={Link} to="/media" variant="secondary" size="sm">
-        <Film size={16} />
-        Media
+        <Film size={14} /> Media
       </Button>
-      <Button as={Link} to="/create" variant="cta" size="sm">
-        <Plus size={16} />
-        Start a Room
+      <Button as={Link} to="/create" variant="primary" size="sm">
+        <Plus size={14} /> Start a Room
       </Button>
-      <Button variant="ghost" size="sm" onClick={logout} aria-label="New identity">
-        <LogOut size={16} />
+      <Button variant="ghost" size="sm" onClick={logout} aria-label="Sign out">
+        <LogOut size={14} />
       </Button>
     </>
   ) : (
-    <Button as={Link} to="/auth" variant="cta" size="sm">Join</Button>
+    <Button as={Link} to="/auth" variant="primary" size="sm">Sign In</Button>
   )
 
   return (
     <Layout header={<Header user={user} actions={headerActions} />}>
-      <div className={styles.hero}>
-        <h1 className={styles.heroTitle}>Watch Together</h1>
-        <p className={styles.heroSub}>Synchronized watch rooms for people in different places, sharing one live moment.</p>
-      </div>
-
-      <div className={styles.toolbar}>
-        <h2 className={styles.title}>Live Rooms</h2>
-        <form onSubmit={joinByInvite} className={styles.inviteForm}>
-          <div className={styles.inviteWrap}>
-            <Hash size={16} className={styles.inviteIcon} />
-            <Input
-              placeholder="Invite code"
-              value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-              className={styles.inviteInput}
-            />
-          </div>
-          <Button variant="secondary" type="submit" loading={joining}>Join</Button>
-        </form>
-      </div>
+      <section className={styles.hero}>
+        <div className={styles.badgeRow}>
+          <span className={styles.badgePill}>
+            <span className={styles.dotRed} />
+            {rooms.length} room{rooms.length !== 1 ? 's' : ''} live right now
+          </span>
+        </div>
+        <h1 className={styles.heroTitle}>
+          <span className={styles.blackLine}>Watch Together.</span>
+          <span className={styles.greenLine}>Feel Together.</span>
+        </h1>
+        <p className={styles.heroSub}>
+          Join live watch parties, sync YouTube videos, or share your screen.
+          No lag. Anyone can join.
+        </p>
+        <div className={styles.ctaStack}>
+          {user ? (
+            <Button as={Link} to="/create" variant="primary" size="lg" fullWidth>
+              <Plus size={18} /> Start a Room
+            </Button>
+          ) : (
+            <Button as={Link} to="/auth" variant="primary" size="lg" fullWidth>
+              <Zap size={18} /> Get Started
+            </Button>
+          )}
+          <Button as={Link} to="/media" variant="secondary" size="lg" fullWidth>
+            <Film size={18} /> Browse Media
+          </Button>
+        </div>
+      </section>
 
       {continueRoom && (
         <div className={styles.continue}>
           <div className={styles.continueInfo}>
-            <ArrowRight size={16} className={styles.continueIcon} />
+            <ArrowRight size={16} />
             <div>
               <p className={styles.continueLabel}>Continue Watching</p>
               <p className={styles.continueTitle}>{continueRoom.title}</p>
             </div>
           </div>
-          <Button as={Link} to={`/room/${continueRoom.id}`} size="sm">Rejoin</Button>
+          <Button as={Link} to={`/room/${continueRoom.id}`} size="sm" variant="primary">Rejoin</Button>
         </div>
       )}
+
+      <div className={styles.tabsRow}>
+        <button
+          type="button"
+          className={`${styles.tab} ${sortBy === 'newest' ? styles.tabActive : ''}`}
+          onClick={() => setSortBy('newest')}
+        >
+          <span className={styles.dotRed} /> Live Now
+        </button>
+        <button
+          type="button"
+          className={`${styles.tab} ${sortBy === 'popular' ? styles.tabActive : ''}`}
+          onClick={() => setSortBy('popular')}
+        >
+          Popular
+        </button>
+      </div>
 
       <div className={styles.controls}>
         <div className={styles.searchWrap}>
@@ -184,50 +181,51 @@ export default function HomePage() {
             className={styles.search}
           />
         </div>
-        <div className={styles.sort}>
-          <button
-            type="button"
-            className={`${styles.sortButton} ${sortBy === 'newest' ? styles.sortButtonActive : ''}`}
-            onClick={() => setSortBy('newest')}
-          >
-            Newest
-          </button>
-          <button
-            type="button"
-            className={`${styles.sortButton} ${sortBy === 'popular' ? styles.sortButtonActive : ''}`}
-            onClick={() => setSortBy('popular')}
-          >
-            Popular
-          </button>
-        </div>
+        <form onSubmit={joinByInvite} className={styles.inviteForm}>
+          <div className={styles.inviteWrap}>
+            <Hash size={14} className={styles.inviteIcon} />
+            <Input
+              placeholder="Invite code"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+              className={styles.inviteInput}
+            />
+          </div>
+          <Button variant="primary" type="submit" size="sm" loading={joining}>Join</Button>
+        </form>
       </div>
+
+      {rooms.length > 0 && (
+        <div className={styles.statPill}>
+          <span className={styles.dotRed} />
+          <strong>{rooms.length} live</strong>
+          <span className={styles.statSep}>&middot;</span>
+          <span>{totalViewers} watching</span>
+        </div>
+      )}
 
       {loading || roomsLoading ? (
         <div className={styles.skeletonGrid}>
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className={styles.skeletonCard}>
-              <Skeleton height="160px" rounded="lg" />
-              <Skeleton height="1rem" width="70%" style={{ marginTop: '0.75rem' }} />
-              <Skeleton height="0.85rem" width="40%" style={{ marginTop: '0.5rem' }} />
+              <Skeleton height="180px" rounded="lg" />
+              <div style={{ padding: '1rem' }}>
+                <Skeleton height="0.75rem" width="30%" style={{ marginBottom: '0.5rem' }} />
+                <Skeleton height="1rem" width="80%" style={{ marginBottom: '0.4rem' }} />
+                <Skeleton height="0.85rem" width="50%" />
+              </div>
             </div>
           ))}
         </div>
       ) : filteredRooms.length === 0 ? (
         <EmptyState
           title={search ? 'No rooms match your search' : 'No live rooms right now'}
-          description={
-            search
-              ? 'Try a different term or start your own.'
-              : 'Start one and invite people to watch together.'
-          }
+          description={search ? 'Try a different term or start your own.' : 'Start one and invite people to watch together.'}
           action={
             user ? (
-              <Button as={Link} to="/create" variant="cta">
-                <Plus size={16} />
-                Start a Room
-              </Button>
+              <Button as={Link} to="/create" variant="primary"><Plus size={16} /> Start a Room</Button>
             ) : (
-              <Button as={Link} to="/auth" variant="cta">Join to Start</Button>
+              <Button as={Link} to="/auth" variant="primary">Sign In to Start</Button>
             )
           }
         />
