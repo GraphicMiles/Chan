@@ -254,6 +254,54 @@
   color: var(--text-black);
 }
 
+.trendingContainer {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.trendingHeader {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-black);
+  font-family: var(--font-display);
+}
+
+.trendingPills {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.trendingPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.05);
+  border: none;
+  color: var(--text-body-grey);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  width: fit-content;
+}
+
+.trendingPill:hover {
+  background: var(--text-black);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
 .filterToggle {
   margin-top: var(--s-3);
   display: flex;
@@ -775,6 +823,15 @@
 @media (max-width: 640px) {
   .unifiedSearch {
     padding: var(--s-5) var(--s-3) var(--s-12);
+  }
+
+  .trendingPills {
+    gap: 8px;
+  }
+
+  .trendingPill {
+    padding: 6px 12px;
+    font-size: 12px;
   }
 
   .searchBarWrapper {

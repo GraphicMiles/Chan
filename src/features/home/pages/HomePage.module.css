@@ -66,25 +66,47 @@
   margin: 0 auto var(--s-6);
 }
 
-/* Continue watching */
+/* Continue watching — Purple Card layout */
 .continue {
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  gap: var(--s-3);
-  padding: var(--s-3) var(--s-4);
+  gap: 16px;
+  padding: 16px 20px;
   margin-bottom: var(--s-6);
-  border-radius: var(--radius-card);
-  background: var(--surface-white);
-  border: 1px solid var(--border-hairline);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #2E1A47 0%, #1A1D2D 100%);
+  border: 1px solid rgba(138, 43, 226, 0.4);
+  color: #fff;
+  max-width: 100%;
 }
 
 .continueInfo {
   display: flex;
   align-items: center;
-  gap: var(--s-3);
-  color: var(--accent-orange);
+  gap: 14px;
+  min-width: 0;
+  flex: 1;
+}
+
+.continueIconBox {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(138, 43, 226, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #D8B4FE;
+  flex-shrink: 0;
+}
+
+.continueTextWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
   flex: 1;
 }
@@ -92,21 +114,45 @@
 .continueLabel {
   margin: 0;
   font-size: 11px;
-  color: var(--text-muted-grey);
+  color: #D8B4FE;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .continueTitle {
-  margin: var(--s-1) 0 0;
+  margin: 0;
   font-family: var(--font-display);
   font-size: 15px;
   font-weight: 700;
-  color: var(--text-black);
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.rejoinBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 20px;
+  border-radius: var(--radius-pill);
+  background: #fff;
+  color: #1A1D2D;
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
+  transition: transform 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+  width: fit-content;
+}
+
+.rejoinBtn:hover {
+  background: #E9D5FF;
+  color: #1A1D2D;
+  transform: scale(1.04);
+  text-decoration: none;
 }
 
 /* Tabs */

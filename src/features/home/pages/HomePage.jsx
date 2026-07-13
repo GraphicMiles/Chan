@@ -150,13 +150,17 @@ export default function HomePage() {
       {continueRoom && (
         <div className={styles.continue}>
           <div className={styles.continueInfo}>
-            <ArrowRight size={16} />
-            <div>
-              <p className={styles.continueLabel}>Continue Watching</p>
-              <p className={styles.continueTitle}>{continueRoom.title}</p>
+            <div className={styles.continueIconBox}>
+              <Play size={18} style={{ marginLeft: '2px' }} />
+            </div>
+            <div className={styles.continueTextWrap}>
+              <span className={styles.continueLabel}>Continue Watching</span>
+              <h4 className={styles.continueTitle}>{continueRoom.title}</h4>
             </div>
           </div>
-          <Button as={Link} to={`/room/${continueRoom.id}`} size="sm" variant="primary">Rejoin</Button>
+          <Link to={`/room/${continueRoom.id}`} className={styles.rejoinBtn}>
+            <span>Rejoin</span>
+          </Link>
         </div>
       )}
 
