@@ -10,6 +10,7 @@ import styles from './UnifiedSearch.module.scss'
 import { useUnifiedSearch } from '../../hooks/useUnifiedSearch'
 import { useAuth } from '../../shared/auth/hooks/useAuth.jsx'
 import { isDirectVideoUrl, isMixedContentUrl, normalizeDirectUrl, normalizePlaybackUrl } from '../../shared/lib/youtube.js'
+import { Modal, Button } from '../../shared/ui/index.js'
 
 const SEARCH_LAYERS = [
   { id: 'youtube', label: 'YouTube', icon: PlayCircle, placeholder: 'Search YouTube videos...', description: 'Search millions of YouTube videos with instant playback' },
@@ -25,6 +26,8 @@ export default function UnifiedSearch() {
   const [activeLayer, setActiveLayer] = useState('youtube')
   const [query, setQuery] = useState('')
   const [adultVerified, setAdultVerified] = useState(false)
+  const [showNsfwModal, setShowNsfwModal] = useState(false)
+  const [pendingNsfwAction, setPendingNsfwAction] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({ hdOnly: false, liveOnly: false })
   
@@ -33,6 +36,22 @@ export default function UnifiedSearch() {
   const currentLayer = useMemo(() => SEARCH_LAYERS.find(l => l.id === activeLayer), [activeLayer])
   const CurrentLayerIcon = currentLayer?.icon || Film
 
+  const runSearchWithVerification = useCallback(async (verifiedState) => {
+    if (!query.trim()) {
+      toast.error('Please enter a search query')
+      return
+    }
+    await search({ 
+      layer: activeLayer, 
+      query: query.trim(),
+      options: { 
+        adultVerified: verifiedState,
+        filters: showFilters ? filters : undefined,
+        resolve: activeLayer === 'direct' || activeLayer === 'nsfw'
+      }
+    })
+  }, [activeLayer, query, filters, showFilters, search])
+
   const handleSearch = useCallback(async (e) => {
     e?.preventDefault()
     if (!query.trim()) {
@@ -40,27 +59,48 @@ export default function UnifiedSearch() {
       return
     }
     
-    let verified = adultVerified
-    if (activeLayer === 'nsfw' && !verified) {
-      const confirmed = window.confirm('This content is for adults 18+ only. By clicking OK, you confirm you are of legal age to view adult content.')
-      if (!confirmed) {
-        toast.info('Age verification required')
-        return
-      }
-      verified = true
-      setAdultVerified(true)
+    if (activeLayer === 'nsfw' && !adultVerified) {
+      setPendingNsfwAction({ type: 'search' })
+      setShowNsfwModal(true)
+      return
     }
     
-    await search({ 
-      layer: activeLayer, 
-      query: query.trim(),
-      options: { 
-        adultVerified: verified,
-        filters: showFilters ? filters : undefined,
-        resolve: activeLayer === 'direct' || activeLayer === 'nsfw'
-      }
-    })
-  }, [activeLayer, query, adultVerified, filters, showFilters, search])
+    await runSearchWithVerification(adultVerified)
+  }, [activeLayer, query, adultVerified, runSearchWithVerification])
+
+  const handleLayerClick = useCallback((layerId) => {
+    if (layerId === 'nsfw' && !adultVerified) {
+      setPendingNsfwAction({ type: 'tab' })
+      setShowNsfwModal(true)
+      return
+    }
+    setActiveLayer(layerId)
+    clear()
+    setQuery('')
+  }, [adultVerified, clear])
+
+  const handleNsfwConfirm = useCallback(() => {
+    setAdultVerified(true)
+    setShowNsfwModal(false)
+    if (pendingNsfwAction?.type === 'tab') {
+      setActiveLayer('nsfw')
+      clear()
+      setQuery('')
+    } else if (pendingNsfwAction?.type === 'search') {
+      runSearchWithVerification(true)
+    }
+    setPendingNsfwAction(null)
+  }, [pendingNsfwAction, clear, runSearchWithVerification])
+
+  const handleNsfwCancel = useCallback(() => {
+    setShowNsfwModal(false)
+    setPendingNsfwAction(null)
+    if (activeLayer === 'nsfw' && !adultVerified) {
+      setActiveLayer('youtube')
+      clear()
+      setQuery('')
+    }
+  }, [activeLayer, adultVerified, clear])
 
   const handleLoadMore = useCallback(() => {
     if (hasMore && !loading) {
@@ -107,11 +147,12 @@ export default function UnifiedSearch() {
       return
     }
 
+    const thumb = result.thumbnail || result.image || ''
     const params = new URLSearchParams({
       videoUrl: playbackUrl,
       title: result.title || 'Untitled',
       type: ['iptv', 'sports', 'nsfw'].includes(result.type) ? result.type : 'direct',
-      thumbnail: result.thumbnail || '',
+      thumbnail: thumb,
     })
     
     if (result.matchInfo) params.set('matchInfo', JSON.stringify(result.matchInfo))
@@ -170,11 +211,7 @@ export default function UnifiedSearch() {
               key={layer.id}
               type="button"
               className={`${styles.tab} ${activeLayer === layer.id ? styles.active : ''} ${layer.adult ? styles.adult : ''}`}
-              onClick={() => {
-                setActiveLayer(layer.id)
-                clear()
-                setQuery('')
-              }}
+              onClick={() => handleLayerClick(layer.id)}
             >
               <LayerIcon size={16} />
               <span className={styles.label}>{layer.label}</span>
@@ -291,123 +328,126 @@ export default function UnifiedSearch() {
           </div>
 
           <div className={styles.resultsGrid}>
-            {filteredResults.map((result, idx) => (
-              <div 
-                key={`${result.id || result.url || idx}`}
-                className={`${styles.resultCard} ${styles[result.type || activeLayer]} ${result.isLive ? styles.live : ''}`}
-                onClick={() => handleResultSelect(result)}
-              >
-                <div className={styles.thumbnail}>
-                  {result.thumbnail ? (
-                    <img src={result.thumbnail} alt={result.title} loading="lazy" />
-                  ) : (
-                    <div className={styles.noThumbnail}>
-                      <CurrentLayerIcon size={32} />
-                    </div>
-                  )}
-                  
-                  {result.duration && (
-                    <span className={styles.duration}>
-                      <Clock size={10} />
-                      {result.duration}
-                    </span>
-                  )}
-                  {result.isLive && (
-                    <span className={styles.liveBadge}>
-                      <Radio size={10} />
-                      LIVE
-                    </span>
-                  )}
-                  {result.quality && (
-                    <span className={styles.qualityBadge}>{result.quality}</span>
-                  )}
-                  {result.isNSFW && (
-                    <span className={styles.nsfwBadge}>18+</span>
-                  )}
-                </div>
-                
-                <div className={styles.info}>
-                  <h3 className={styles.title} title={result.title}>
-                    {result.title}
-                  </h3>
-                  
-                  <div className={styles.meta}>
-                    {result.channel && (
-                      <span className={styles.channel}>{result.channel}</span>
+            {filteredResults.map((result, idx) => {
+              const thumb = result.thumbnail || result.image || null
+              return (
+                <div 
+                  key={`${result.id || result.url || idx}`}
+                  className={`${styles.resultCard} ${styles[result.type || activeLayer]} ${result.isLive ? styles.live : ''}`}
+                  onClick={() => handleResultSelect(result)}
+                >
+                  <div className={styles.thumbnail}>
+                    {thumb ? (
+                      <img src={thumb} alt={result.title} loading="lazy" />
+                    ) : (
+                      <div className={styles.noThumbnail}>
+                        <CurrentLayerIcon size={32} />
+                      </div>
                     )}
-                    {result.source && (
-                      <span className={styles.source}>{result.source}</span>
-                    )}
-                    {result.views && (
-                      <span className={styles.views}>
-                        <Eye size={10} />
-                        {parseInt(result.views).toLocaleString()}
+                    
+                    {result.duration && (
+                      <span className={styles.duration}>
+                        <Clock size={10} />
+                        {result.duration}
                       </span>
                     )}
-                    {result.year && (
-                      <span className={styles.year}>{result.year}</span>
+                    {result.isLive && (
+                      <span className={styles.liveBadge}>
+                        <Radio size={10} />
+                        LIVE
+                      </span>
+                    )}
+                    {result.quality && (
+                      <span className={styles.qualityBadge}>{result.quality}</span>
+                    )}
+                    {result.isNSFW && (
+                      <span className={styles.nsfwBadge}>18+</span>
+                    )}
+                  </div>
+                  
+                  <div className={styles.info}>
+                    <h3 className={styles.title} title={result.title}>
+                      {result.title}
+                    </h3>
+                    
+                    <div className={styles.meta}>
+                      {result.channel && (
+                        <span className={styles.channel}>{result.channel}</span>
+                      )}
+                      {result.source && (
+                        <span className={styles.source}>{result.source}</span>
+                      )}
+                      {result.views && (
+                        <span className={styles.views}>
+                          <Eye size={10} />
+                          {parseInt(result.views).toLocaleString()}
+                        </span>
+                      )}
+                      {result.year && (
+                        <span className={styles.year}>{result.year}</span>
+                      )}
+                    </div>
+
+                    {result.description && (
+                      <p className={styles.description}>{result.description.slice(0, 120)}...</p>
+                    )}
+
+                    {activeLayer === 'sports' && result.matchInfo && (
+                      <div className={styles.matchInfo}>
+                        <div className={styles.teams}>{result.matchInfo.teams}</div>
+                        <div className={styles.matchDetails}>
+                          <span className={styles.time}>{result.matchInfo.time}</span>
+                          <span className={styles.competition}>{result.matchInfo.competition}</span>
+                          {result.isLive && <span className={styles.liveIndicator}>LIVE NOW</span>}
+                        </div>
+                        {result.channelCandidates?.length > 0 && (
+                          <div className={styles.candidates}>
+                            Candidate channels: {result.channelCandidates.join(', ')}
+                          </div>
+                        )}
+                        {result.channelAvailable === false && (
+                          <div className={styles.noChannel}>No mapped IPTV channel for this fixture</div>
+                        )}
+                      </div>
+                    )}
+
+                    {activeLayer === 'iptv' && result.program && (
+                      <div className={styles.program}>
+                        <div className={styles.nowPlaying}>
+                          <span className={styles.progLabel}>Now:</span> {result.program.now}
+                        </div>
+                        {result.program.next && (
+                          <div className={styles.next}>
+                            <span className={styles.progLabel}>Next:</span> {result.program.next}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 
-                  {result.description && (
-                    <p className={styles.description}>{result.description.slice(0, 120)}...</p>
-                  )}
-
-                  {activeLayer === 'sports' && result.matchInfo && (
-                    <div className={styles.matchInfo}>
-                      <div className={styles.teams}>{result.matchInfo.teams}</div>
-                      <div className={styles.matchDetails}>
-                        <span className={styles.time}>{result.matchInfo.time}</span>
-                        <span className={styles.competition}>{result.matchInfo.competition}</span>
-                        {result.isLive && <span className={styles.liveIndicator}>LIVE NOW</span>}
-                      </div>
-                      {result.channelCandidates?.length > 0 && (
-                        <div className={styles.candidates}>
-                          Candidate channels: {result.channelCandidates.join(', ')}
-                        </div>
-                      )}
-                      {result.channelAvailable === false && (
-                        <div className={styles.noChannel}>No mapped IPTV channel for this fixture</div>
-                      )}
-                    </div>
-                  )}
-
-                  {activeLayer === 'iptv' && result.program && (
-                    <div className={styles.program}>
-                      <div className={styles.nowPlaying}>
-                        <span className={styles.progLabel}>Now:</span> {result.program.now}
-                      </div>
-                      {result.program.next && (
-                        <div className={styles.next}>
-                          <span className={styles.progLabel}>Next:</span> {result.program.next}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className={styles.actions}>
-                  <button 
-                    type="button"
-                    className={`${styles.watchBtn} ${result.isLive ? styles.liveBtn : ''}`}
-                    disabled={result.channelAvailable === false}
-                  >
-                    {result.isLive ? 'Watch Live' : 'Watch in Room'}
-                  </button>
-                  {(result.url || result.link) && (
-                    <a 
-                      href={result.url || result.link} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className={styles.externalLink}
-                      onClick={(e) => e.stopPropagation()}
+                  <div className={styles.actions}>
+                    <button 
+                      type="button"
+                      className={`${styles.watchBtn} ${result.isLive ? styles.liveBtn : ''}`}
+                      disabled={result.channelAvailable === false}
                     >
-                      <ArrowUpRight size={16} />
-                    </a>
-                  )}
+                      {result.isLive ? 'Watch Live' : 'Watch in Room'}
+                    </button>
+                    {(result.url || result.link) && (
+                      <a 
+                        href={result.url || result.link} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className={styles.externalLink}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ArrowUpRight size={16} />
+                      </a>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {hasMore && (
@@ -453,6 +493,30 @@ export default function UnifiedSearch() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={showNsfwModal}
+        title="Adult Content Verification (18+)"
+        icon={ShieldAlert}
+        onClose={handleNsfwCancel}
+      >
+        <div className={styles.nsfwModalBody}>
+          <p className={styles.nsfwModalText}>
+            This section contains sexually explicit material restricted to adults aged 18 years and older (or the age of legal majority in your jurisdiction).
+          </p>
+          <p className={styles.nsfwModalSubtext}>
+            By continuing, you confirm that you are at least 18 years old, that accessing adult content is permitted by the laws where you reside, and that you wish to view such material.
+          </p>
+          <div className={styles.nsfwModalActions}>
+            <Button variant="secondary" onClick={handleNsfwCancel}>
+              Cancel / Leave
+            </Button>
+            <Button variant="danger" onClick={handleNsfwConfirm}>
+              I Am 18+ — Continue
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

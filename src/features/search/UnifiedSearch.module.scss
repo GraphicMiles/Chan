@@ -163,19 +163,20 @@
 .actionButtons {
   display: flex;
   align-items: center;
-  gap: var(--s-2);
+  gap: 12px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .searchBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--s-2);
+  gap: 8px;
   border: 0;
   border-radius: var(--radius-card);
   height: 52px;
-  padding: 0 var(--s-6);
+  padding: 0 20px;
   cursor: pointer;
   background: var(--pill-black);
   color: #fff;
@@ -185,6 +186,8 @@
   box-shadow: var(--shadow-card);
   transition: background 0.15s ease, transform 0.1s ease;
   white-space: nowrap;
+  flex: 0 0 auto;
+  width: fit-content;
 }
 
 .searchBtn:hover:not(:disabled) {
@@ -204,11 +207,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--s-2);
+  gap: 8px;
   border: 0;
   border-radius: var(--radius-card);
   height: 52px;
-  padding: 0 var(--s-5);
+  padding: 0 20px;
   cursor: pointer;
   background: var(--brand-green);
   color: #fff;
@@ -218,6 +221,8 @@
   box-shadow: var(--shadow-card);
   transition: background 0.15s ease, transform 0.1s ease;
   white-space: nowrap;
+  flex: 0 0 auto;
+  width: fit-content;
 }
 
 .directBtn:hover {
@@ -685,6 +690,36 @@
   margin-top: var(--s-2);
 }
 
+/* Modal styles */
+.nsfwModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.nsfwModalText {
+  color: var(--text-black);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.nsfwModalSubtext {
+  color: var(--text-body-grey);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.nsfwModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-3);
+  margin-top: var(--s-2);
+  flex-wrap: wrap;
+}
+
 @media (min-width: 520px) {
   .resultsGrid { grid-template-columns: repeat(2, 1fr); }
 }
@@ -704,7 +739,7 @@
 
   .searchBoxContainer {
     flex-direction: column;
-    gap: var(--s-2);
+    gap: 12px;
   }
 
   .inputWrapper {
@@ -715,14 +750,17 @@
 
   .actionButtons {
     display: flex;
-    gap: var(--s-2);
-    width: 100%;
+    gap: 12px;
+    width: auto;
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   .searchBtn, .directBtn {
-    flex: 1;
+    flex: 0 0 auto;
+    width: fit-content;
     height: 48px;
-    padding: 0 var(--s-4);
+    padding: 0 20px;
     font-size: 14px;
     justify-content: center;
   }
