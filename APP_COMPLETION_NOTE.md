@@ -168,17 +168,26 @@ This may still fail if a download site requires JavaScript, CAPTCHA, cookies, or
 
 ### Current status
 
-Fake and duplicate IPTV URLs were removed. The IPTV layer now expects configured channels instead of returning placeholder streams.
+The app now reads the supplied Free-TV M3U playlist by default:
+
+```text
+https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8
+```
+
+The parser extracts channel name, group, country, logo, and HTTPS stream URL. It filters out HTTP-only streams, placeholder URLs, and known page links such as YouTube/Twitch pages so they are not shown as playable channels in the HTTPS deployment.
+
+The playlist is cached in the serverless instance for five minutes to avoid downloading the catalog on every query.
 
 ### Configuration
 
-Add real, licensed/public channels to the Vercel environment variable:
+Optional Vercel variables:
 
 ```text
-IPTV_CHANNELS_JSON
+IPTV_PLAYLIST_URL=https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8
+IPTV_CHANNELS_JSON=[]
 ```
 
-Example:
+`IPTV_CHANNELS_JSON` can contain additional licensed/public channels:
 
 ```json
 [
@@ -191,24 +200,29 @@ Example:
 ]
 ```
 
-### Files to update
+### Files updated
 
 ```text
+api/lib/iptv.js
 api/media.js
+.env.example
+```
+
+The existing UI/player files consume the normalized IPTV result schema:
+
+```text
 src/features/search/UnifiedSearch.jsx
 src/features/room/components/VideoPlayer.jsx
 src/features/create/pages/CreateRoomPage.jsx
-.env.example
 ```
 
 For production, also add:
 
-- Channel URL validation.
 - Channel health checks.
 - EPG/program metadata.
 - Source licensing/permission checks.
 - Per-channel CORS and HTTPS validation.
-- A database or admin interface instead of sending arbitrary user channels in a request body.
+- A database or admin interface instead of allowing arbitrary user channels in a request body.
 
 ---
 
