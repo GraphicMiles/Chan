@@ -162,11 +162,6 @@ export default function UnifiedSearch() {
       return
     }
     const playbackUrl = normalizePlaybackUrl(resultUrl)
-    if (isMixedContentUrl(playbackUrl)) {
-      toast.error('This HTTP stream is blocked by the secure app. Choose an HTTPS source.')
-      return
-    }
-
     const thumb = result.thumbnail || result.image || ''
     const params = new URLSearchParams({
       videoUrl: playbackUrl,
@@ -184,10 +179,6 @@ export default function UnifiedSearch() {
   const handleDirectUrlSubmit = useCallback(() => {
     if (isDirectVideoUrl(query)) {
       const normalized = normalizePlaybackUrl(query.trim())
-      if (isMixedContentUrl(normalized)) {
-        toast.error('This HTTP stream is blocked by the secure app. Choose an HTTPS source.')
-        return
-      }
       const title = normalized.split('/').pop()?.replace(/\.(mp4|m3u8|mkv|avi|mov|webm|ogg|flv|ts)$/i, '') || 'Direct Video'
       navigate(`/create?videoUrl=${encodeURIComponent(normalized)}&title=${encodeURIComponent(title)}&type=direct`)
     }

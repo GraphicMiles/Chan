@@ -7,7 +7,6 @@ import {
   extractVideoId,
   getThumbnail,
   isDirectVideoUrl,
-  isMixedContentUrl,
   normalizeDirectUrl,
   normalizePlaybackUrl,
   checkEmbeddable,
@@ -48,8 +47,8 @@ export default function CreateRoomPage() {
   )
   const [scraperSite, setScraperSite] = useState('netnaija')
   const [videoId, setVideoId] = useState(presetVideo)
-  const [videoUrl, setVideoUrl] = useState(presetVideoUrl)
-  const [videoType, setVideoType] = useState(presetIsStream ? 'direct' : 'youtube')
+  const [videoUrl, setVideoUrl] = useState(presetVideoUrl ? normalizePlaybackUrl(presetVideoUrl) : '')
+  const [videoType, setVideoType] = useState(presetIsStream || presetVideoUrl ? 'direct' : 'youtube')
   const [error, setError] = useState(null)
   const [creating, setCreating] = useState(false)
   const [embedWarning, setEmbedWarning] = useState(null)
@@ -67,7 +66,7 @@ export default function CreateRoomPage() {
       return
     }
 
-    if (presetIsStream || isDirectVideoUrl(presetVideoUrl)) {
+    if (presetIsStream || isDirectVideoUrl(presetVideoUrl) || presetVideoUrl) {
       setVideoUrl(normalizePlaybackUrl(presetVideoUrl))
       setVideoType('direct')
       setVideoId('')
@@ -92,16 +91,11 @@ export default function CreateRoomPage() {
       })
       return
     }
-    if (isDirectVideoUrl(value)) {
+    if (isDirectVideoUrl(value) || /\.(mp4|m3u8|mkv|avi|mov|webm|flv|ts)(\?|#|$)/i.test(value)) {
       const playbackUrl = normalizePlaybackUrl(value.trim())
       setVideoUrl(playbackUrl)
       setVideoId('')
       setVideoType('direct')
-      setEmbedWarning(
-        isMixedContentUrl(playbackUrl)
-          ? 'This HTTP stream will be blocked by an HTTPS deployment. Use an HTTPS source.'
-          : null
-      )
       clear()
       setYtResults([])
     }
@@ -177,7 +171,7 @@ export default function CreateRoomPage() {
     }
 
     const candidate = item.link || item.url || ''
-    if (item.requiresUserAction && candidate) {
+    if (item.requiresUserAction && candidate && !item.isDirect && !isDirectVideoUrl(candidate)) {
       window.open(candidate, '_blank', 'noopener,noreferrer')
       toast('Opened the provider page. Complete its download step there, then paste the final HTTPS video URL into Chan.', {
         variant: 'info',
@@ -186,8 +180,9 @@ export default function CreateRoomPage() {
       return
     }
 
-    if (item.isDirect || isDirectVideoUrl(candidate)) {
-      setVideoUrl(normalizePlaybackUrl(candidate))
+    if (item.isDirect || isDirectVideoUrl(candidate) || candidate) {
+      const normalizedCandidate = normalizePlaybackUrl(candidate)
+      setVideoUrl(normalizedCandidate)
       setVideoId('')
       setVideoType('direct')
       setUrl(candidate)
@@ -220,14 +215,13 @@ export default function CreateRoomPage() {
       if (videoType === 'youtube' && !videoId) {
         throw new Error('Pick a valid YouTube video')
       }
+      
+      const finalDirectUrl = normalizePlaybackUrl(videoUrl || url || '')
       if (
         videoType === 'direct' &&
-        (!videoUrl || (!isDirectVideoUrl(videoUrl) && !presetIsStream))
+        (!finalDirectUrl || (!isDirectVideoUrl(finalDirectUrl) && !presetIsStream && !finalDirectUrl.includes('/api/proxy')))
       ) {
-        throw new Error('Paste a direct video file link (.mp4 / .m3u8)')
-      }
-      if (videoType === 'direct' && isMixedContentUrl(videoUrl)) {
-        throw new Error('This HTTP stream cannot play from the secure app. Use an HTTPS video source.')
+        throw new Error('Paste a direct video file link (.mp4 / .m3u8 / .mkv)')
       }
 
       if (videoType === 'youtube' && videoId) {
@@ -262,8 +256,8 @@ export default function CreateRoomPage() {
       if (videoType === 'youtube' && videoId) {
         roomData.videoId = videoId
         roomData.videoType = 'youtube'
-      } else if (videoType === 'direct' && videoUrl) {
-        roomData.videoUrl = videoUrl
+      } else if (videoType === 'direct' && finalDirectUrl) {
+        roomData.videoUrl = finalDirectUrl
         roomData.videoType = 'direct'
         roomData.activityType = 'direct'
       }
@@ -277,7 +271,7 @@ export default function CreateRoomPage() {
         updatedBy: user.uid,
       }
       if (videoId) playerState.videoId = videoId
-      if (videoUrl) playerState.videoUrl = videoUrl
+      if (finalDirectUrl) playerState.videoUrl = finalDirectUrl
 
       await setDoc(doc(db, 'rooms', roomId, 'playerState', 'current'), playerState)
 
