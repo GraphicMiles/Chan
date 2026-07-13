@@ -4,7 +4,7 @@ import { toast } from 'react-toastify'
 import styles from './UnifiedSearch.module.scss'
 import { useUnifiedSearch } from '../../hooks/useUnifiedSearch'
 import { useAuth } from '../../shared/auth/hooks/useAuth.jsx'
-import { isDirectVideoUrl, normalizeDirectUrl } from '../../shared/lib/youtube.js'
+import { isDirectVideoUrl, isMixedContentUrl, normalizeDirectUrl } from '../../shared/lib/youtube.js'
 
 const SEARCH_LAYERS = [
   { id: 'youtube', label: 'YouTube', icon: '▶️', color: '#FF0000', placeholder: 'Search YouTube videos...', description: 'Search millions of YouTube videos' },
@@ -94,6 +94,10 @@ export default function UnifiedSearch() {
       toast.error('This result is not a playable video stream')
       return
     }
+    if (isMixedContentUrl(resultUrl)) {
+      toast.error('This HTTP stream is blocked by the secure app. Choose an HTTPS source.')
+      return
+    }
 
     const params = new URLSearchParams({
       videoUrl: resultUrl,
@@ -110,6 +114,10 @@ export default function UnifiedSearch() {
 
   const handleDirectUrlSubmit = useCallback(() => {
     if (isDirectVideoUrl(query)) {
+      if (isMixedContentUrl(query.trim())) {
+        toast.error('This HTTP stream is blocked by the secure app. Choose an HTTPS source.')
+        return
+      }
       const normalized = normalizeDirectUrl(query.trim())
       const title = normalized.split('/').pop()?.replace(/\.(mp4|m3u8|mkv|avi|mov|webm|ogg|flv|ts)$/i, '') || 'Direct Video'
       navigate(`/create?videoUrl=${encodeURIComponent(normalized)}&title=${encodeURIComponent(title)}&type=direct`)

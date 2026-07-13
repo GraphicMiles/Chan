@@ -7,6 +7,7 @@ import {
   extractVideoId,
   getThumbnail,
   isDirectVideoUrl,
+  isMixedContentUrl,
   normalizeDirectUrl,
   checkEmbeddable,
   searchYouTube,
@@ -93,6 +94,11 @@ export default function CreateRoomPage() {
       setVideoUrl(normalizeDirectUrl(value.trim()))
       setVideoId('')
       setVideoType('direct')
+      setEmbedWarning(
+        isMixedContentUrl(value)
+          ? 'This HTTP stream will be blocked by an HTTPS deployment. Use an HTTPS source.'
+          : null
+      )
       clear()
       setYtResults([])
     }
@@ -200,6 +206,9 @@ export default function CreateRoomPage() {
       }
       if (videoType === 'direct' && (!videoUrl || !isDirectVideoUrl(videoUrl))) {
         throw new Error('Paste a direct video file link (.mp4 / .m3u8)')
+      }
+      if (videoType === 'direct' && isMixedContentUrl(videoUrl)) {
+        throw new Error('This HTTP stream cannot play from the secure app. Use an HTTPS video source.')
       }
 
       if (videoType === 'youtube' && videoId) {
