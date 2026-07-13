@@ -80,6 +80,20 @@ function directUrlsFromHtml(html, pageUrl) {
   return [...urls]
 }
 
+function extractPageThumbnail(html, pageUrl) {
+  try {
+    const $ = cheerio.load(html)
+    const raw = $('meta[property="og:image"]').attr('content') ||
+                $('meta[name="twitter:image"]').attr('content') ||
+                $('.poster img, .thumb img, article img, .post-thumbnail img').first().attr('src') ||
+                $('img[src]').first().attr('src') || null
+    if (!raw) return null
+    return new URL(raw, pageUrl).href
+  } catch {
+    return null
+  }
+}
+
 async function request(url, options = {}) {
   const { headers = {}, ...rest } = options
   return fetch(url, {
@@ -94,7 +108,7 @@ async function request(url, options = {}) {
 }
 
 export async function resolveDownloadwellaPage(pageUrl) {
-  if (!isDownloadHost(pageUrl)) return { directUrls: [], requiresUserAction: false }
+  if (!isDownloadHost(pageUrl)) return { directUrls: [], thumbnail: null, requiresUserAction: false }
 
   let currentUrl = pageUrl
   let cookies = ''
@@ -118,19 +132,20 @@ export async function resolveDownloadwellaPage(pageUrl) {
     break
   }
 
-  if (!html) return { directUrls: [], requiresUserAction: true }
+  if (!html) return { directUrls: [], thumbnail: null, requiresUserAction: true }
 
+  const thumbnail = extractPageThumbnail(html, currentUrl)
   const pageDirectUrls = directUrlsFromHtml(html, currentUrl)
-  if (pageDirectUrls.length) return { directUrls: pageDirectUrls, requiresUserAction: false }
+  if (pageDirectUrls.length) return { directUrls: pageDirectUrls, thumbnail, requiresUserAction: false }
 
   const $ = cheerio.load(html)
   const form = $('form').filter((_, element) => $(element).find('input[name="op"][value="download2"]').length > 0).first()
-  if (!form.length) return { directUrls: [], requiresUserAction: true }
+  if (!form.length) return { directUrls: [], thumbnail, requiresUserAction: true }
 
   const action = form.attr('action')
     ? new URL(form.attr('action'), currentUrl).href
     : currentUrl
-  if (!isDownloadHost(action)) return { directUrls: [], requiresUserAction: true }
+  if (!isDownloadHost(action)) return { directUrls: [], thumbnail, requiresUserAction: true }
 
   const response = await request(action, {
     method: 'POST',
@@ -149,13 +164,20 @@ export async function resolveDownloadwellaPage(pageUrl) {
       const redirected = await request(new URL(location, action).href, {
         headers: { Referer: action, ...(cookies ? { Cookie: cookies } : {}) },
       })
-      if (redirected.ok) return { directUrls: directUrlsFromHtml(await redirected.text(), redirected.url || action), requiresUserAction: false }
+      if (redirected.ok) {
+        const redirectedHtml = await redirected.text()
+        return {
+          directUrls: directUrlsFromHtml(redirectedHtml, redirected.url || action),
+          thumbnail: extractPageThumbnail(redirectedHtml, redirected.url || action) || thumbnail,
+          requiresUserAction: false,
+        }
+      }
     }
-    return { directUrls: [], requiresUserAction: true }
+    return { directUrls: [], thumbnail, requiresUserAction: true }
   }
 
-  if (!response.ok) return { directUrls: [], requiresUserAction: true }
+  if (!response.ok) return { directUrls: [], thumbnail, requiresUserAction: true }
   const resultHtml = await response.text()
   const directUrls = directUrlsFromHtml(resultHtml, action)
-  return { directUrls, requiresUserAction: directUrls.length === 0 }
+  return { directUrls, thumbnail: extractPageThumbnail(resultHtml, action) || thumbnail, requiresUserAction: directUrls.length === 0 }
 }

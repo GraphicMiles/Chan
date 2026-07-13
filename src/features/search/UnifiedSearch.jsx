@@ -20,6 +20,14 @@ const SEARCH_LAYERS = [
   { id: 'nsfw', label: 'NSFW', icon: ShieldAlert, placeholder: 'Search adult content (18+ only)...', description: 'Adult content - legal age verification required', adult: true },
 ]
 
+const TRENDING_SUGGESTIONS = {
+  youtube: ['Top 10 Movies 2026', 'House of the Dragon', 'Alan Walker Stay', 'Afrobeats Hits', 'Burn', 'Silo Season 3', 'Burna Boy Live', 'Gaming Highlights'],
+  direct: ['House of the Dragon', 'Silo Season 2', 'Squid Game Season 2', 'The Last of Us', 'Stranger Things', 'Deadpool & Wolverine', 'Gladiator 2', 'Dune Part Two'],
+  iptv: ['CNN News Live', 'ESPN Sports 24/7', 'HBO HD Channel', 'BBC World News', 'Sky Sports Live', 'Discovery Channel', 'Al Jazeera Live News'],
+  sports: ['Premier League Highlights', 'Real Madrid vs Barcelona', 'Arsenal vs Chelsea', 'Champions League Goals', 'NBA Finals Live', 'Formula 1 Grand Prix'],
+  nsfw: ['Trending Scenes', 'College Action 2026', 'Yoga Studio Scene', 'After Class Party', 'Summer Vacation', 'Weekend Party HD'],
+}
+
 export default function UnifiedSearch() {
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
@@ -36,14 +44,14 @@ export default function UnifiedSearch() {
   const currentLayer = useMemo(() => SEARCH_LAYERS.find(l => l.id === activeLayer), [activeLayer])
   const CurrentLayerIcon = currentLayer?.icon || Film
 
-  const runSearchWithVerification = useCallback(async (verifiedState) => {
-    if (!query.trim()) {
+  const runSearchWithVerification = useCallback(async (verifiedState, targetQuery = query.trim()) => {
+    if (!targetQuery) {
       toast.error('Please enter a search query')
       return
     }
     await search({ 
       layer: activeLayer, 
-      query: query.trim(),
+      query: targetQuery,
       options: { 
         adultVerified: verifiedState,
         filters: showFilters ? filters : undefined,
@@ -65,8 +73,18 @@ export default function UnifiedSearch() {
       return
     }
     
-    await runSearchWithVerification(adultVerified)
+    await runSearchWithVerification(adultVerified, query.trim())
   }, [activeLayer, query, adultVerified, runSearchWithVerification])
+
+  const handleTrendingClick = useCallback((item) => {
+    setQuery(item)
+    if (activeLayer === 'nsfw' && !adultVerified) {
+      setPendingNsfwAction({ type: 'trending', query: item })
+      setShowNsfwModal(true)
+      return
+    }
+    runSearchWithVerification(adultVerified, item)
+  }, [activeLayer, adultVerified, runSearchWithVerification])
 
   const handleLayerClick = useCallback((layerId) => {
     if (layerId === 'nsfw' && !adultVerified) {
@@ -87,10 +105,12 @@ export default function UnifiedSearch() {
       clear()
       setQuery('')
     } else if (pendingNsfwAction?.type === 'search') {
-      runSearchWithVerification(true)
+      runSearchWithVerification(true, query.trim())
+    } else if (pendingNsfwAction?.type === 'trending' && pendingNsfwAction.query) {
+      runSearchWithVerification(true, pendingNsfwAction.query)
     }
     setPendingNsfwAction(null)
-  }, [pendingNsfwAction, clear, runSearchWithVerification])
+  }, [pendingNsfwAction, query, clear, runSearchWithVerification])
 
   const handleNsfwCancel = useCallback(() => {
     setShowNsfwModal(false)
@@ -227,8 +247,8 @@ export default function UnifiedSearch() {
       </div>
 
       <form onSubmit={handleSearch} className={styles.searchForm}>
-        <div className={styles.searchBoxContainer}>
-          <div className={styles.inputWrapper}>
+        <div className={styles.searchBarWrapper}>
+          <div className={styles.inputInner}>
             <Search size={18} className={styles.searchIcon} />
             <input
               id="unified-search-input"
@@ -246,13 +266,13 @@ export default function UnifiedSearch() {
             )}
           </div>
           
-          <div className={styles.actionButtons}>
+          <div className={styles.searchButtonsRow}>
             <button 
               type="submit" 
               disabled={loading || !query.trim()}
               className={styles.searchBtn}
             >
-              {loading ? <Loader2 size={16} className={styles.spin} /> : <Search size={16} />}
+              <Search size={16} />
               <span>Search</span>
             </button>
             
@@ -268,6 +288,24 @@ export default function UnifiedSearch() {
             )}
           </div>
         </div>
+
+        {!query && (
+          <div className={styles.trendingContainer}>
+            <span className={styles.trendingHeader}>Trending</span>
+            <div className={styles.trendingPills}>
+              {(TRENDING_SUGGESTIONS[activeLayer] || TRENDING_SUGGESTIONS.youtube).map((item, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  className={styles.trendingPill}
+                  onClick={() => handleTrendingClick(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         
         <div className={styles.filterToggle}>
           <button type="button" onClick={() => setShowFilters(!showFilters)}>
@@ -482,12 +520,12 @@ export default function UnifiedSearch() {
             <CurrentLayerIcon size={32} />
           </div>
           <h3>Start Searching</h3>
-          <p>Enter a query above to search {currentLayer?.label}</p>
+          <p>Enter a query above or choose a trending topic to search {currentLayer?.label}</p>
           <div className={styles.tips}>
             <p>Tips:</p>
             <ul>
-              <li>Use specific titles for better results</li>
-              <li>For direct links, you can paste a full URL</li>
+              <li>Click any trending pill above to search instantly</li>
+              <li>For direct links, you can paste a full URL (.mp4/.m3u8)</li>
               <li>Press Ctrl+K to quickly focus the search box</li>
             </ul>
           </div>
