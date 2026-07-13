@@ -1,16 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Share2, MessageSquare, X, LogOut, Radio, Lock, Unlock,
   Pencil, Monitor, Film, ChevronDown, ChevronRight, AlertTriangle,
-  Video, Link2
+  Video, Link2, ListVideo, Play, Trash2
 } from 'lucide-react'
+import { collection, onSnapshot, query, orderBy, limit, deleteDoc, doc } from 'firebase/firestore'
+import { db } from '../../../shared/lib/firebase.js'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import { useRoom } from '../hooks/useRoom.js'
 import { usePlayerSync } from '../hooks/usePlayerSync.js'
 import VideoPlayer from '../components/VideoPlayer.jsx'
 import ScreenShare from '../components/ScreenShare.jsx'
 import Chat from '../components/Chat.jsx'
+import QueuePanel from '../components/QueuePanel.jsx'
 import ParticipantList from '../components/ParticipantList.jsx'
 import { SyncPulse } from '../../../shared/components/SyncPulse.jsx'
 import { extractVideoId, isDirectVideoUrl, normalizePlaybackUrl } from '../../../shared/lib/youtube.js'
@@ -34,6 +37,7 @@ export default function RoomPage() {
     return () => document.body.classList.remove('room-theme')
   }, [])
 
+  const [sidebarTab, setSidebarTab] = useState('chat') // 'chat' or 'queue'
   const [showChat, setShowChat] = useState(() => (typeof window !== 'undefined' ? window.innerWidth > 768 : true))
   const [newVideoUrl, setNewVideoUrl] = useState('')
   const [showVideoInput, setShowVideoInput] = useState(false)
@@ -45,8 +49,13 @@ export default function RoomPage() {
   const [titleDraft, setTitleDraft] = useState('')
   const [shareBanner, setShareBanner] = useState('')
   const [busy, setBusy] = useState(false)
+  const [queueItems, setQueueItems] = useState([])
+  const [autoNextPrompt, setAutoNextPrompt] = useState(null)
+  const [floatingReactions, setFloatingReactions] = useState([])
+  
   const playerRef = useRef(null)
   const prevActivity = useRef(null)
+  const autoNextTimerRef = useRef(null)
 
   const {
     room,
@@ -69,6 +78,27 @@ export default function RoomPage() {
   const { isHost, writePlayerState, canControl } = usePlayerSync(roomId, room, playerRef)
 
   useEffect(() => {
+    if (!roomId) return undefined
+    const q = query(collection(db, 'rooms', roomId, 'queue'), orderBy('createdAt', 'asc'))
+    return onSnapshot(q, (snap) => {
+      setQueueItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    })
+  }, [roomId])
+
+  useEffect(() => {
+    if (!roomId) return undefined
+    const q = query(collection(db, 'rooms', roomId, 'floatingReactions'), orderBy('createdAt', 'desc'), limit(15))
+    return onSnapshot(q, (snap) => {
+      const now = Date.now()
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((item) => {
+        const at = item.createdAt?.toMillis?.() || item.createdAtMs || 0
+        return now - at < 4000
+      })
+      setFloatingReactions(items)
+    })
+  }, [roomId])
+
+  useEffect(() => {
     if (!activityType) return
     if (prevActivity.current && prevActivity.current !== activityType) {
       if (activityType === 'screenshare') {
@@ -89,6 +119,46 @@ export default function RoomPage() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [showChat])
+
+  const onPlayNextQueueItem = useCallback(async (item) => {
+    if (!canControl || !item) return
+    try {
+      setBusy(true)
+      if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current)
+      setAutoNextPrompt(null)
+      
+      await updateRoom({
+        videoId: item.videoId || null,
+        videoUrl: item.videoUrl || null,
+        videoType: item.videoType || 'youtube',
+        activityType: item.videoType || 'youtube',
+        title: item.title || 'Untitled',
+      })
+      await writePlayerState({
+        videoId: item.videoId || '',
+        videoUrl: item.videoUrl || null,
+        isPlaying: true,
+        currentTime: 0,
+      }, true)
+      toast('Playing queued stream!', { variant: 'success' })
+    } catch (err) {
+      toast(err.message || 'Could not play next stream', { variant: 'error' })
+    } finally {
+      setBusy(false)
+    }
+  }, [canControl, updateRoom, writePlayerState, toast])
+
+  const handleVideoEnded = useCallback(() => {
+    if (!canControl || queueItems.length === 0) return
+    const nextItem = queueItems[0]
+    setAutoNextPrompt(nextItem)
+    if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current)
+    autoNextTimerRef.current = setTimeout(async () => {
+      setAutoNextPrompt(null)
+      await onPlayNextQueueItem(nextItem)
+      await deleteDoc(doc(db, 'rooms', roomId, 'queue', nextItem.id)).catch(() => {})
+    }, 5000)
+  }, [canControl, queueItems, onPlayNextQueueItem, roomId])
 
   if (!user) {
     return (
@@ -265,10 +335,14 @@ export default function RoomPage() {
         )}
       </div>
       <div className={styles.headerActions}>
-        <IconButton onClick={() => setShareOpen(true)} aria-label="Share room">
+        <IconButton onClick={() => setShareOpen(true)} aria-label="Share room" title="Share room">
           <Share2 size={18} />
         </IconButton>
-        <IconButton onClick={() => setShowChat((s) => !s)} active={showChat} aria-label="Toggle chat">
+        <IconButton onClick={() => { setShowChat(true); setSidebarTab('queue') }} active={showChat && sidebarTab === 'queue'} aria-label="Toggle queue" title="Queue">
+          <ListVideo size={18} />
+          {queueItems.length > 0 && <span className={styles.queueCountBadge}>{queueItems.length}</span>}
+        </IconButton>
+        <IconButton onClick={() => { setShowChat(true); setSidebarTab('chat') }} active={showChat && sidebarTab === 'chat'} aria-label="Toggle chat" title="Chat">
           <MessageSquare size={18} />
         </IconButton>
         {isHost ? (
@@ -296,6 +370,7 @@ export default function RoomPage() {
                 canControl={canControl}
                 onReady={onPlayerReady}
                 onPlayerEvent={onPlayerEvent}
+                onEnded={handleVideoEnded}
               />
             ) : (
               <ScreenShare roomId={roomId} isHost={isHost} user={user} />
@@ -304,6 +379,15 @@ export default function RoomPage() {
               <div className={styles.shareBanner}>
                 <Monitor size={14} />
                 <span>{shareBanner}</span>
+              </div>
+            )}
+            {floatingReactions.length > 0 && (
+              <div className={styles.floatingReactionsOverlay}>
+                {floatingReactions.map((item) => (
+                  <span key={item.id} className={styles.floatingEmoji}>
+                    {item.emoji}
+                  </span>
+                ))}
               </div>
             )}
           </div>
@@ -330,6 +414,10 @@ export default function RoomPage() {
                     Stop Screen Share
                   </Button>
                 )}
+                <Button variant="secondary" size="sm" onClick={() => { setShowChat(true); setSidebarTab('queue') }}>
+                  <ListVideo size={14} />
+                  Queue ({queueItems.length}/5)
+                </Button>
                 {isHost && (
                   <>
                     <Button variant="secondary" size="sm" onClick={toggleLock}>
@@ -379,6 +467,12 @@ export default function RoomPage() {
                 <span className={styles.metaInfo}>
                   {isDirectVideo ? 'Direct Video' : isYoutube ? 'YouTube' : 'Screen Share'}
                 </span>
+                {queueItems.length > 0 && (
+                  <>
+                    <span className={styles.metaSep}>·</span>
+                    <span className={styles.metaInfo}>Queue: {queueItems.length} waiting</span>
+                  </>
+                )}
               </span>
               {detailsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </button>
@@ -432,22 +526,49 @@ export default function RoomPage() {
         {showChat && (
           <>
             <div className={styles.overlay} onClick={() => setShowChat(false)} />
-            <aside className={`${styles.sidebar} ${showChat ? styles.open : ''}`} role="dialog" aria-label="Chat">
+            <aside className={`${styles.sidebar} ${showChat ? styles.open : ''}`} role="dialog" aria-label="Sidebar">
               <div className={styles.sidebarHeader}>
-                <h3 className={styles.sidebarTitle}>Chat</h3>
-                <IconButton onClick={() => setShowChat(false)} aria-label="Close chat">
+                <div className={styles.sidebarTabs}>
+                  <button
+                    type="button"
+                    className={sidebarTab === 'chat' ? styles.sidebarTabActive : styles.sidebarTab}
+                    onClick={() => setSidebarTab('chat')}
+                  >
+                    Chat
+                  </button>
+                  <button
+                    type="button"
+                    className={sidebarTab === 'queue' ? styles.sidebarTabActive : styles.sidebarTab}
+                    onClick={() => setSidebarTab('queue')}
+                  >
+                    Queue ({queueItems.length}/5)
+                  </button>
+                </div>
+                <IconButton onClick={() => setShowChat(false)} aria-label="Close sidebar">
                   <X size={18} />
                 </IconButton>
               </div>
               <div className={styles.sidebarContent}>
-                <Chat
-                  messages={messages}
-                  sendMessage={sendMessage}
-                  user={user}
-                  roomId={roomId}
-                  typing={typing}
-                  setTyping={setTyping}
-                />
+                {sidebarTab === 'chat' ? (
+                  <Chat
+                    messages={messages}
+                    sendMessage={sendMessage}
+                    user={user}
+                    roomId={roomId}
+                    typing={typing}
+                    setTyping={setTyping}
+                  />
+                ) : (
+                  <QueuePanel
+                    roomId={roomId}
+                    room={room}
+                    user={user}
+                    isHost={isHost}
+                    canControl={canControl}
+                    onPlayNext={onPlayNextQueueItem}
+                    toast={toast}
+                  />
+                )}
               </div>
             </aside>
           </>
@@ -475,6 +596,38 @@ export default function RoomPage() {
           <Button variant="danger" loading={busy} onClick={confirmLeave}>Leave Room</Button>
         </div>
       </Modal>
+
+      {/* Auto-Next Queue Prompt */}
+      {autoNextPrompt && (
+        <Modal open={Boolean(autoNextPrompt)} title="Up Next from Queue!" icon={Play} onClose={() => { clearTimeout(autoNextTimerRef.current); setAutoNextPrompt(null) }}>
+          <div className={styles.autoNextModal}>
+            <p className={styles.confirmText}>
+              Current video finished playing. Automatically playing the next queued item in <strong>5 seconds</strong>...
+            </p>
+            <div className={styles.autoNextItemPreview}>
+              {autoNextPrompt.thumbnail && <img src={autoNextPrompt.thumbnail} alt="" className={styles.autoNextThumb} />}
+              <div>
+                <h4 className={styles.autoNextTitle}>{autoNextPrompt.title}</h4>
+                <span className={styles.autoNextMeta}>Added by {autoNextPrompt.addedByName}</span>
+              </div>
+            </div>
+            <div className={styles.confirmActions}>
+              <Button variant="secondary" onClick={() => { clearTimeout(autoNextTimerRef.current); setAutoNextPrompt(null) }}>
+                Cancel
+              </Button>
+              <Button variant="cta" loading={busy} onClick={async () => {
+                if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current)
+                const item = autoNextPrompt
+                setAutoNextPrompt(null)
+                await onPlayNextQueueItem(item)
+                await deleteDoc(doc(db, 'rooms', roomId, 'queue', item.id)).catch(() => {})
+              }}>
+                Play Next Now
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </Layout>
   )
 }
