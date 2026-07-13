@@ -236,26 +236,38 @@ The sports layer no longer displays fake fallback matches when the API is not co
 FOOTBALL_DATA_KEY
 ```
 
-### Files to update
+Sports-to-IPTV matching is now supported through an explicit channel mapping. This avoids guessing that an arbitrary sports channel is carrying a particular fixture.
+
+### Files updated
 
 ```text
 api/media.js
+api/lib/iptv.js
 src/features/search/UnifiedSearch.jsx
+src/features/create/pages/CreateRoomPage.jsx
 .env.example
 ```
 
-### Still required for the intended sports flow
+### Sports mapping configuration
+
+Configure a mapping against channel names in the M3U catalog:
+
+```text
+SPORTS_CHANNEL_MAP_JSON=[{"competition":"Premier League","channels":["SuperSport","Sky Sports"]}]
+```
+
+The API matches the fixture competition/team to the configured channel names. A result becomes playable only when a matching HTTPS IPTV channel is found. Otherwise, it remains informational and shows that no mapped channel is available.
+
+### Still required for production sports
 
 - Configure the football-data API key.
+- Use licensed/authorized channel mappings.
 - Add date/competition filtering.
 - Add pagination or a current-match window.
-- Match competitions/teams to valid IPTV channels.
-- Return a playable channel URL only when a valid licensed channel is available.
-- Keep unavailable matches informational and non-playable.
 - Add timezone-aware match times.
 - Handle API quota and error states visibly.
 
-The current sports results may identify fixtures, but they do not automatically provide a watchable stream.
+The system can now perform a configured metadata-to-channel match, but it cannot determine broadcast rights from fixture metadata alone.
 
 ---
 

@@ -17,6 +17,8 @@ function isSupportedStreamUrl(value) {
     if (host.includes('youtube.com') || host.includes('youtu.be') || host.includes('twitch.tv')) {
       return false
     }
+    // The current player supports HLS and browser-playable files, not MPEG-DASH.
+    if (/\.mpd(?:\?|#|$)/i.test(url.pathname)) return false
     return !value.includes('...')
   } catch {
     return false

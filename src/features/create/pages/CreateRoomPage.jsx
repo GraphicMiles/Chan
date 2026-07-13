@@ -33,6 +33,7 @@ export default function CreateRoomPage() {
   const presetVideoUrl = searchParams.get('videoUrl') || ''
   const presetTitle = searchParams.get('title') || ''
   const presetType = searchParams.get('type') || 'youtube'
+  const presetIsStream = presetType === 'direct' || presetType === 'iptv' || presetType === 'sports'
 
   const [title, setTitle] = useState(presetTitle)
   const [url, setUrl] = useState(
@@ -47,7 +48,7 @@ export default function CreateRoomPage() {
   const [scraperSite, setScraperSite] = useState('netnaija')
   const [videoId, setVideoId] = useState(presetVideo)
   const [videoUrl, setVideoUrl] = useState(presetVideoUrl)
-  const [videoType, setVideoType] = useState(presetType === 'direct' ? 'direct' : 'youtube')
+  const [videoType, setVideoType] = useState(presetIsStream ? 'direct' : 'youtube')
   const [error, setError] = useState(null)
   const [creating, setCreating] = useState(false)
   const [embedWarning, setEmbedWarning] = useState(null)
@@ -65,12 +66,12 @@ export default function CreateRoomPage() {
       return
     }
 
-    if (isDirectVideoUrl(presetVideoUrl)) {
+    if (presetIsStream || isDirectVideoUrl(presetVideoUrl)) {
       setVideoUrl(normalizeDirectUrl(presetVideoUrl))
       setVideoType('direct')
       setVideoId('')
     }
-  }, [presetVideoUrl])
+  }, [presetIsStream, presetVideoUrl])
 
   if (!user) return <Link to="/auth">Sign in to create a room</Link>
 
@@ -204,7 +205,10 @@ export default function CreateRoomPage() {
       if (videoType === 'youtube' && !videoId) {
         throw new Error('Pick a valid YouTube video')
       }
-      if (videoType === 'direct' && (!videoUrl || !isDirectVideoUrl(videoUrl))) {
+      if (
+        videoType === 'direct' &&
+        (!videoUrl || (!isDirectVideoUrl(videoUrl) && !presetIsStream))
+      ) {
         throw new Error('Paste a direct video file link (.mp4 / .m3u8)')
       }
       if (videoType === 'direct' && isMixedContentUrl(videoUrl)) {

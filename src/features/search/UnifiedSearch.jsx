@@ -102,7 +102,7 @@ export default function UnifiedSearch() {
     const params = new URLSearchParams({
       videoUrl: resultUrl,
       title: result.title || 'Untitled',
-      type: 'direct',
+      type: result.type === 'iptv' || result.type === 'sports' ? result.type : 'direct',
       thumbnail: result.thumbnail || '',
     })
     
@@ -345,8 +345,13 @@ export default function UnifiedSearch() {
                         <span className={styles.competition}>{result.matchInfo.competition}</span>
                         {result.isLive && <span className={styles.liveIndicator}>● LIVE NOW</span>}
                       </div>
+                      {result.channelCandidates?.length > 0 && (
+                        <div className={styles.candidates}>
+                          Candidate channels: {result.channelCandidates.join(', ')}
+                        </div>
+                      )}
                       {result.channelAvailable === false && (
-                        <div className={styles.noChannel}>No stream available - check back later</div>
+                        <div className={styles.noChannel}>No mapped IPTV channel for this fixture</div>
                       )}
                     </div>
                   )}

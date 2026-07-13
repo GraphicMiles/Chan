@@ -41,6 +41,7 @@
 .teams { font-weight: 700; }
 .liveIndicator { color: #ff7185; font-weight: 700; }
 .noChannel { color: #ffb2bd; }
+.candidates { color: var(--fog, #9aa0ae); font-size: .78rem; }
 .actions { padding: .7rem .8rem; border-top: 1px solid var(--line, #343746); }
 .watchBtn { flex: 1; border: 0; border-radius: .5rem; padding: .6rem; background: var(--drift, #7c89f7); color: white; cursor: pointer; }
 .watchBtn:disabled { opacity: .45; cursor: not-allowed; }
