@@ -7,7 +7,6 @@ import {
   extractVideoId,
   getThumbnail,
   isDirectVideoUrl,
-  normalizeDirectUrl,
   normalizePlaybackUrl,
   checkEmbeddable,
   searchYouTube,

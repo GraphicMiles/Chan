@@ -9,7 +9,7 @@ import {
 import styles from './UnifiedSearch.module.scss'
 import { useUnifiedSearch } from '../../hooks/useUnifiedSearch'
 import { useAuth } from '../../shared/auth/hooks/useAuth.jsx'
-import { isDirectVideoUrl, isMixedContentUrl, normalizeDirectUrl, normalizePlaybackUrl } from '../../shared/lib/youtube.js'
+import { isDirectVideoUrl, normalizePlaybackUrl } from '../../shared/lib/youtube.js'
 import { Modal, Button } from '../../shared/ui/index.js'
 
 const SEARCH_LAYERS = [
