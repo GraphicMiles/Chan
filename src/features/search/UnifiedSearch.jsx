@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import styles from './UnifiedSearch.module.scss'
 import { useUnifiedSearch } from '../../hooks/useUnifiedSearch'
+import { useAuth } from '../../shared/auth/hooks/useAuth.jsx'
 import { isDirectVideoUrl, normalizeDirectUrl } from '../../shared/lib/youtube.js'
 
 const SEARCH_LAYERS = [
@@ -15,6 +16,7 @@ const SEARCH_LAYERS = [
 
 export default function UnifiedSearch() {
   const navigate = useNavigate()
+  const { user, loading: authLoading } = useAuth()
   const [activeLayer, setActiveLayer] = useState('youtube')
   const [query, setQuery] = useState('')
   const [adultVerified, setAdultVerified] = useState(false)
@@ -32,23 +34,24 @@ export default function UnifiedSearch() {
       return
     }
     
-    // Age verification for NSFW
-    if (activeLayer === 'nsfw') {
-      if (!adultVerified) {
-        const confirmed = window.confirm('This content is for adults 18+ only. By clicking OK, you confirm you are of legal age to view adult content.')
-        if (!confirmed) {
-          toast.info('Age verification required')
-          return
-        }
-        setAdultVerified(true)
+    // Age verification for NSFW. Use the local value immediately because
+    // React state updates are asynchronous.
+    let verified = adultVerified
+    if (activeLayer === 'nsfw' && !verified) {
+      const confirmed = window.confirm('This content is for adults 18+ only. By clicking OK, you confirm you are of legal age to view adult content.')
+      if (!confirmed) {
+        toast.info('Age verification required')
+        return
       }
+      verified = true
+      setAdultVerified(true)
     }
     
     await search({ 
       layer: activeLayer, 
       query: query.trim(),
       options: { 
-        adultVerified,
+        adultVerified: verified,
         filters: showFilters ? filters : undefined
       }
     })
@@ -73,25 +76,34 @@ export default function UnifiedSearch() {
   }, [])
 
   const handleResultSelect = useCallback((result) => {
-    if (!result.url && !result.link) {
-      toast.error('No playable URL found for this result')
+    // YouTube rooms should receive the video ID, not a watch-page URL. The
+    // create-room page can then validate and persist videoId correctly.
+    if ((result.type || activeLayer) === 'youtube' && result.id) {
+      const params = new URLSearchParams({
+        video: result.id,
+        title: result.title || 'Untitled',
+        type: 'youtube',
+      })
+      navigate(`/create?${params.toString()}`)
       return
     }
-    
+
+    const resultUrl = result.url || result.link
+    const playable = result.isDirect || isDirectVideoUrl(resultUrl)
+    if (!resultUrl || !playable) {
+      toast.error('This result is not a playable video stream')
+      return
+    }
+
     const params = new URLSearchParams({
-      videoUrl: result.url || result.link,
+      videoUrl: resultUrl,
       title: result.title || 'Untitled',
-      type: result.type || activeLayer,
+      type: 'direct',
       thumbnail: result.thumbnail || '',
     })
     
-    // Add extra metadata for sports/iptv
-    if (result.matchInfo) {
-      params.set('matchInfo', JSON.stringify(result.matchInfo))
-    }
-    if (result.isLive) {
-      params.set('isLive', 'true')
-    }
+    if (result.matchInfo) params.set('matchInfo', JSON.stringify(result.matchInfo))
+    if (result.isLive) params.set('isLive', 'true')
     
     navigate(`/create?${params.toString()}`)
   }, [navigate, activeLayer])
@@ -123,6 +135,9 @@ export default function UnifiedSearch() {
       return true
     })
   }, [results, filters, showFilters])
+
+  if (authLoading) return <div className={styles.loading}>Loading…</div>
+  if (!user) return <Navigate to="/auth" replace />
 
   return (
     <div className={styles.unifiedSearch}>

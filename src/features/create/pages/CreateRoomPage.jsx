@@ -54,7 +54,17 @@ export default function CreateRoomPage() {
   const [ytLoading, setYtLoading] = useState(false)
 
   useEffect(() => {
-    if (presetVideoUrl && isDirectVideoUrl(presetVideoUrl)) {
+    if (!presetVideoUrl) return
+
+    const id = extractVideoId(presetVideoUrl)
+    if (id) {
+      setVideoId(id)
+      setVideoUrl('')
+      setVideoType('youtube')
+      return
+    }
+
+    if (isDirectVideoUrl(presetVideoUrl)) {
       setVideoUrl(normalizeDirectUrl(presetVideoUrl))
       setVideoType('direct')
       setVideoId('')
@@ -177,8 +187,11 @@ export default function CreateRoomPage() {
     setCreating(true)
     try {
       if (!title.trim()) throw new Error('Give the room a title')
-      if (!videoId && !videoUrl) {
-        throw new Error('Pick a YouTube video or paste a direct video file link (.mp4 / .m3u8)')
+      if (videoType === 'youtube' && !videoId) {
+        throw new Error('Pick a valid YouTube video')
+      }
+      if (videoType === 'direct' && (!videoUrl || !isDirectVideoUrl(videoUrl))) {
+        throw new Error('Paste a direct video file link (.mp4 / .m3u8)')
       }
 
       if (videoType === 'youtube' && videoId) {

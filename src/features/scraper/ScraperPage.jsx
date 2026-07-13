@@ -46,8 +46,12 @@ export default function ScraperPage() {
       return
     }
 
-    // Use unified search with 'direct' layer
-    await search({ layer: 'direct', query: query.trim() || trimmedUrl })
+    // Use unified search with 'direct' layer and honor the selected source.
+    await search({
+      layer: 'direct',
+      query: query.trim() || trimmedUrl,
+      options: { site: site === 'custom' ? undefined : site },
+    })
   }, [url, query, search, navigate])
 
   const handleResultClick = useCallback((result) => {

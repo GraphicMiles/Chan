@@ -1,0 +1,49 @@
+.unifiedSearch { max-width: 1180px; margin: 0 auto; padding: 2rem 1rem 4rem; color: var(--paper, #f5f3ef); }
+.header { margin-bottom: 1.5rem; }
+.subtitle, .description, .hint, .empty p, .initial p { color: var(--fog, #9aa0ae); }
+.layerTabs { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: 1rem; }
+.tab { display: inline-flex; align-items: center; gap: .4rem; padding: .65rem .8rem; border: 1px solid transparent; border-radius: .7rem; background: var(--surface, #191b25); color: inherit; cursor: pointer; }
+.active { box-shadow: 0 0 0 1px currentColor; }
+.adult { color: #ff9ab7; }
+.icon { font-size: 1.1rem; }
+.label, .source, .channel, .views, .year { color: inherit; }
+.adultBadge, .liveBadge, .qualityBadge, .nsfwBadge, .duration { position: absolute; z-index: 1; padding: .2rem .4rem; border-radius: .35rem; font-size: .72rem; background: rgba(0,0,0,.72); color: white; }
+.adultBadge { position: static; background: #8e2145; }
+.layerInfo { margin: 1rem 0; padding: .7rem 1rem; border-left: 3px solid; background: var(--surface, #191b25); }
+.searchForm { margin-bottom: 1.5rem; }
+.inputWrapper { display: flex; align-items: center; gap: .5rem; padding: .5rem; border: 1px solid var(--line, #343746); border-radius: .8rem; background: var(--surface, #191b25); }
+.searchInput { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: inherit; padding: .65rem; }
+.searchBtn, .directBtn, .clearBtn, .filterToggle button, .loadMore button, .empty button { border: 0; border-radius: .5rem; padding: .6rem .8rem; cursor: pointer; }
+.searchBtn { background: var(--drift, #7c89f7); color: white; }
+.directBtn { background: #347d4c; color: white; }
+.clearBtn { background: transparent; color: inherit; }
+.filterToggle { margin-top: .6rem; }
+.filters { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: .7rem; color: var(--fog, #9aa0ae); }
+.error { margin: 1rem 0; padding: .8rem; border-radius: .6rem; background: rgba(180, 45, 65, .2); color: #ffb2bd; }
+.loading, .initial, .empty { padding: 3rem 1rem; text-align: center; color: var(--fog, #9aa0ae); }
+.resultsHeader { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.resultActions { display: flex; gap: .5rem; }
+.resultsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+.resultCard { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line, #343746); border-radius: .8rem; background: var(--surface, #191b25); cursor: pointer; }
+.thumbnail { position: relative; aspect-ratio: 16 / 9; background: #101116; }
+.thumbnail img { width: 100%; height: 100%; object-fit: cover; }
+.noThumbnail { display: grid; place-items: center; height: 100%; font-size: 2rem; }
+.duration { right: .5rem; bottom: .5rem; }
+.liveBadge { top: .5rem; left: .5rem; background: #b5263d; }
+.qualityBadge { right: .5rem; top: .5rem; }
+.nsfwBadge { top: .5rem; left: .5rem; background: #8e2145; }
+.info { padding: .8rem; flex: 1; }
+.title { margin: 0 0 .5rem; font-size: 1rem; }
+.meta, .matchDetails, .program, .actions { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; }
+.meta { color: var(--fog, #9aa0ae); font-size: .82rem; }
+.description { margin: .7rem 0 0; font-size: .85rem; }
+.matchInfo, .program { margin-top: .7rem; font-size: .82rem; }
+.teams { font-weight: 700; }
+.liveIndicator { color: #ff7185; font-weight: 700; }
+.noChannel { color: #ffb2bd; }
+.actions { padding: .7rem .8rem; border-top: 1px solid var(--line, #343746); }
+.watchBtn { flex: 1; border: 0; border-radius: .5rem; padding: .6rem; background: var(--drift, #7c89f7); color: white; cursor: pointer; }
+.watchBtn:disabled { opacity: .45; cursor: not-allowed; }
+.externalLink { color: var(--drift, #7c89f7); font-size: 1.2rem; }
+.loadMore { display: flex; justify-content: center; margin-top: 1.5rem; }
+@media (max-width: 600px) { .inputWrapper { flex-wrap: wrap; } .searchInput { flex-basis: 100%; } .searchBtn, .directBtn { flex: 1; } .resultsHeader { align-items: flex-start; flex-direction: column; } }

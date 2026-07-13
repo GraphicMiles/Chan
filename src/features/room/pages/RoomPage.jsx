@@ -8,7 +8,7 @@ import ScreenShare from '../components/ScreenShare.jsx'
 import Chat from '../components/Chat.jsx'
 import ParticipantList from '../components/ParticipantList.jsx'
 import { SyncPulse } from '../../../shared/components/SyncPulse.jsx'
-import { extractVideoId } from '../../../shared/lib/youtube.js'
+import { extractVideoId, isDirectVideoUrl } from '../../../shared/lib/youtube.js'
 import { isDisplayMediaSupported } from '../services/livekit.js'
 import { Button, Input, Card, IconButton, Modal, useToast } from '../../../shared/ui/index.js'
 import { Layout } from '../../../shared/layout/index.js'
@@ -122,7 +122,7 @@ export default function RoomPage() {
   const changeVideo = async (e) => {
     e.preventDefault()
     const id = extractVideoId(newVideoUrl)
-    const isDirect = newVideoUrl.match(/\.(mp4|mkv|avi|mov|webm)$/i)
+    const isDirect = isDirectVideoUrl(newVideoUrl.trim())
     
     try {
       setBusy(true)
