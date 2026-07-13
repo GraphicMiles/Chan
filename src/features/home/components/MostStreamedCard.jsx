@@ -17,87 +17,111 @@ export default function MostStreamedCard({ room }) {
   const { user } = useAuth()
   const { toast } = useToast()
   
-  const [isMuted, setIsMuted] = useState(true) // Off by default as requested
+  const [isMuted, setIsMuted] = useState(true) // Off by default
   const [showMenu, setShowMenu] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [playerState, setPlayerState] = useState(null)
+  const [playbackError, setPlaybackError] = useState(false)
   
   const videoRef = useRef(null)
   const playerRef = useRef(null)
 
-  const isDirect = room?.videoType === 'direct' || (!room?.videoId && room?.videoUrl)
+  const safeRoomId = room?.id || ''
+  const safeTitle = room?.title || 'Untitled Stream'
+  const safeHostName = room?.hostName || 'Host'
+  const isDirect = room?.videoType === 'direct' || (!room?.videoId && Boolean(room?.videoUrl))
+
   const streamUrl = useMemo(() => {
     if (!room) return ''
-    if (isDirect) return normalizePlaybackUrl(room.videoUrl)
-    return normalizePlaybackUrl(youtubeUrl(room.videoId))
+    try {
+      if (isDirect) return normalizePlaybackUrl(room.videoUrl || '')
+      return normalizePlaybackUrl(youtubeUrl(room.videoId || ''))
+    } catch {
+      return ''
+    }
   }, [room, isDirect])
 
   // Check if saved in private Watch Later list
   useEffect(() => {
-    if (!user || !room?.id) return undefined
+    if (!user || !safeRoomId) return undefined
     let active = true
-    getDoc(doc(db, 'users', user.uid, 'watchLater', room.id))
+    getDoc(doc(db, 'users', user.uid, 'watchLater', safeRoomId))
       .then((snap) => {
         if (active && snap.exists()) setIsSaved(true)
       })
       .catch(() => {})
     return () => { active = false }
-  }, [user, room?.id])
+  }, [user, safeRoomId])
 
-  // Subscribe to room player state to keep auto-playing video synchronized with room participants
+  // Subscribe to room player state
   useEffect(() => {
-    if (!room?.id) return undefined
+    if (!safeRoomId) return undefined
     const unsub = onSnapshot(
-      doc(db, 'rooms', room.id, 'playerState', 'current'),
+      doc(db, 'rooms', safeRoomId, 'playerState', 'current'),
       (snap) => {
         if (snap.exists()) {
           setPlayerState(snap.data())
         }
+      },
+      () => {
+        /* ignore snapshot error on preview */
       }
     )
     return unsub
-  }, [room?.id])
+  }, [safeRoomId])
 
-  // Sync direct <video> playback to current room time
+  // Sync direct <video> playback
   useEffect(() => {
-    if (!isDirect || !videoRef.current || !playerState) return
-    const baseMs = playerState.clientTimeMs || (playerState.updatedAt?.toMillis ? playerState.updatedAt.toMillis() : Date.now())
-    const elapsedSec = playerState.isPlaying ? Math.max(0, (Date.now() - baseMs) / 1000) : 0
-    const targetSec = (playerState.currentTime || 0) + elapsedSec
-    const cur = videoRef.current.currentTime || 0
+    if (!isDirect || !videoRef.current || !playerState || playbackError) return
+    try {
+      const baseMs = playerState.clientTimeMs || (playerState.updatedAt?.toMillis ? playerState.updatedAt.toMillis() : Date.now())
+      const elapsedSec = playerState.isPlaying ? Math.max(0, (Date.now() - baseMs) / 1000) : 0
+      const targetSec = (Number(playerState.currentTime) || 0) + elapsedSec
+      const cur = videoRef.current.currentTime || 0
 
-    if (Math.abs(cur - targetSec) > 2) {
-      videoRef.current.currentTime = targetSec
+      if (Math.abs(cur - targetSec) > 2) {
+        videoRef.current.currentTime = targetSec
+      }
+      if (playerState.isPlaying && videoRef.current.paused) {
+        videoRef.current.play().catch(() => {})
+      } else if (!playerState.isPlaying && !videoRef.current.paused) {
+        videoRef.current.pause()
+      }
+    } catch {
+      /* ignore video sync error */
     }
-    if (playerState.isPlaying && videoRef.current.paused) {
-      videoRef.current.play().catch(() => {})
-    } else if (!playerState.isPlaying && !videoRef.current.paused) {
-      videoRef.current.pause()
-    }
-  }, [isDirect, playerState])
+  }, [isDirect, playerState, playbackError])
 
-  // Sync ReactPlayer (YouTube) to current room time
+  // Sync ReactPlayer (YouTube)
   useEffect(() => {
-    if (isDirect || !playerRef.current || !playerState) return
-    const baseMs = playerState.clientTimeMs || (playerState.updatedAt?.toMillis ? playerState.updatedAt.toMillis() : Date.now())
-    const elapsedSec = playerState.isPlaying ? Math.max(0, (Date.now() - baseMs) / 1000) : 0
-    const targetSec = (playerState.currentTime || 0) + elapsedSec
-    const cur = playerRef.current.getCurrentTime?.() || 0
+    if (isDirect || !playerRef.current || !playerState || playbackError) return
+    try {
+      const baseMs = playerState.clientTimeMs || (playerState.updatedAt?.toMillis ? playerState.updatedAt.toMillis() : Date.now())
+      const elapsedSec = playerState.isPlaying ? Math.max(0, (Date.now() - baseMs) / 1000) : 0
+      const targetSec = (Number(playerState.currentTime) || 0) + elapsedSec
+      const cur = playerRef.current.getCurrentTime?.() || 0
 
-    if (Math.abs(cur - targetSec) > 2.5) {
-      playerRef.current.seekTo(targetSec, 'seconds')
+      if (Math.abs(cur - targetSec) > 2.5) {
+        playerRef.current.seekTo(targetSec, 'seconds')
+      }
+    } catch {
+      /* ignore reactplayer sync error */
     }
-  }, [isDirect, playerState])
-
-  if (!room) return null
+  }, [isDirect, playerState, playbackError])
 
   const hoursWatched = useMemo(() => {
-    const createdMs = room.createdAt?.toMillis?.() || Date.now()
-    const diffHours = (Date.now() - createdMs) / 3600000
-    return `${Math.max(1, Math.round(diffHours))}h`
-  }, [room.createdAt])
+    try {
+      const createdMs = room?.createdAt?.toMillis?.() || (typeof room?.createdAtMs === 'number' ? room.createdAtMs : Date.now())
+      const diffHours = (Date.now() - createdMs) / 3600000
+      return `${Math.max(1, Math.round(diffHours))}h`
+    } catch {
+      return '1h'
+    }
+  }, [room?.createdAt, room?.createdAtMs])
 
-  const watchersCount = `${room.participantCount || 1} watching`
+  const watchersCount = `${Number(room?.participantCount) || 1} watching`
+
+  if (!room || !safeRoomId) return null
 
   const handleWatchLater = async (e) => {
     e.stopPropagation()
@@ -106,7 +130,7 @@ export default function MostStreamedCard({ room }) {
       toast('Sign in to save to your private Watch Later list', { variant: 'warning' })
       return
     }
-    const ref = doc(db, 'users', user.uid, 'watchLater', room.id)
+    const ref = doc(db, 'users', user.uid, 'watchLater', safeRoomId)
     try {
       if (isSaved) {
         await deleteDoc(ref)
@@ -114,8 +138,8 @@ export default function MostStreamedCard({ room }) {
         toast('Removed from Watch Later', { variant: 'success' })
       } else {
         await setDoc(ref, {
-          roomId: room.id,
-          title: room.title,
+          roomId: safeRoomId,
+          title: safeTitle,
           videoId: room.videoId || null,
           videoUrl: room.videoUrl || null,
           videoType: room.videoType || 'youtube',
@@ -132,19 +156,18 @@ export default function MostStreamedCard({ room }) {
   const handleShare = (e) => {
     e.stopPropagation()
     setShowMenu(false)
-    const link = `${window.location.origin}/room/${room.id}`
+    const link = `${window.location.origin}/room/${safeRoomId}`
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(link)
+      navigator.clipboard.writeText(link).catch(() => {})
       toast('Room link copied to clipboard!', { variant: 'success' })
     }
   }
 
-  const formattedTitle = room.title.length > 45 ? `${room.title.slice(0, 45)}...` : room.title
+  const formattedTitle = safeTitle.length > 45 ? `${safeTitle.slice(0, 45)}...` : safeTitle
 
   return (
     <div className={styles.cardContainer} onClick={() => setShowMenu(false)}>
       <div className={styles.stageWrapper}>
-        {/* Top Left Stats Overlay Pill */}
         <div className={styles.statsPill}>
           <Clock size={12} className={styles.statIcon} />
           <span>{hoursWatched} stream time</span>
@@ -153,7 +176,6 @@ export default function MostStreamedCard({ room }) {
           <span>{watchersCount}</span>
         </div>
 
-        {/* Top Right Controls (Mute & ⋮ Menu) */}
         <div className={styles.topRightControls}>
           <button
             type="button"
@@ -195,51 +217,67 @@ export default function MostStreamedCard({ room }) {
           </div>
         </div>
 
-        {/* Synchronized Auto-Playing Preview Video */}
         <div className={styles.videoContainer}>
-          {isDirect ? (
-            <video
-              ref={videoRef}
-              src={streamUrl}
-              autoPlay
-              playsInline
-              muted={isMuted}
-              controls={false}
-              className={styles.videoElement}
-            />
-          ) : (
-            <div className={styles.reactPlayerWrap}>
-              <ReactPlayer
-                ref={playerRef}
-                url={streamUrl}
-                playing={Boolean(playerState?.isPlaying ?? true)}
+          {!playbackError && streamUrl ? (
+            isDirect ? (
+              <video
+                ref={videoRef}
+                src={streamUrl}
+                autoPlay
+                playsInline
                 muted={isMuted}
-                width="100%"
-                height="100%"
                 controls={false}
-                config={{
-                  youtube: {
-                    playerVars: { rel: 0, modestbranding: 1, playsInline: 1, controls: 0, disablekb: 1, autoplay: 1 },
-                  },
-                }}
+                onError={() => setPlaybackError(true)}
+                className={styles.videoElement}
               />
+            ) : (
+              <div className={styles.reactPlayerWrap}>
+                <ReactPlayer
+                  ref={playerRef}
+                  url={streamUrl}
+                  playing={Boolean(playerState?.isPlaying ?? true)}
+                  muted={isMuted}
+                  width="100%"
+                  height="100%"
+                  controls={false}
+                  onError={() => setPlaybackError(true)}
+                  config={{
+                    youtube: {
+                      playerVars: { rel: 0, modestbranding: 1, playsInline: 1, controls: 0, disablekb: 1, autoplay: 1 },
+                    },
+                  }}
+                />
+              </div>
+            )
+          ) : (
+            <div style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#0c0d10',
+              color: 'var(--room-text-secondary)',
+              fontSize: '13px',
+              padding: '20px',
+              textAlign: 'center'
+            }}>
+              <span>Preview stream temporarily unavailable</span>
             </div>
           )}
-          {/* Transparent click-blocker layer so users can't pause or seek the preview directly */}
           <div className={styles.clickBlocker} />
         </div>
       </div>
 
-      {/* Bottom Footer Section */}
       <div className={styles.footerRow}>
         <div className={styles.titleWrap}>
-          <h4 className={styles.mediaTitle} title={room.title}>
+          <h4 className={styles.mediaTitle} title={safeTitle}>
             {formattedTitle}
           </h4>
-          <span className={styles.hostMeta}>Hosted by {room.hostName}</span>
+          <span className={styles.hostMeta}>Hosted by {safeHostName}</span>
         </div>
 
-        <Link to={`/room/${room.id}`} className={styles.watchNowBtn}>
+        <Link to={`/room/${safeRoomId}`} className={styles.watchNowBtn}>
           <Play size={15} className={styles.playIcon} />
           <span>Watch Now</span>
         </Link>

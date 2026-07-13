@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore'
-import { Plus, Search, LogOut, Film, ArrowRight, Hash, Zap } from 'lucide-react'
+import { Plus, Search, LogOut, Film, Hash, Zap, Play } from 'lucide-react'
 import { db } from '../../../shared/lib/firebase.js'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import { parseJsonResponse } from '../../../shared/lib/api.js'
@@ -9,6 +9,7 @@ import { Button, Input, EmptyState, Skeleton, useToast } from '../../../shared/u
 import { Header, Layout } from '../../../shared/layout/index.js'
 import RoomCard from '../components/RoomCard.jsx'
 import MostStreamedCard from '../components/MostStreamedCard.jsx'
+import { ErrorBoundary } from '../../../shared/components/ErrorBoundary.jsx'
 import { getLastRoom } from '../../room/hooks/useRoom.js'
 import styles from './HomePage.module.css'
 
@@ -95,18 +96,18 @@ export default function HomePage() {
 
   const headerActions = user ? (
     <>
-      <Button as={Link} to="/media" variant="secondary" size="sm">
-        <Film size={14} /> Media
+      <Button as={Link} to="/media" variant="secondary" size="md">
+        <Film size={16} /> Browse Media
       </Button>
-      <Button as={Link} to="/create" variant="primary" size="sm">
-        <Plus size={14} /> Start a Room
+      <Button as={Link} to="/create" variant="primary" size="md">
+        <Plus size={16} /> Start a Room
       </Button>
-      <Button variant="ghost" size="sm" onClick={logout} aria-label="Sign out" title="Sign out">
-        <LogOut size={14} />
+      <Button variant="ghost" size="md" onClick={logout} aria-label="Sign out" title="Sign out">
+        <LogOut size={16} />
       </Button>
     </>
   ) : (
-    <Button as={Link} to="/auth" variant="primary" size="sm">Sign In</Button>
+    <Button as={Link} to="/auth" variant="primary" size="md">Sign In</Button>
   )
 
   const mostWatchedRoom = useMemo(() => {
@@ -148,20 +149,22 @@ export default function HomePage() {
       </section>
 
       {continueRoom && (
-        <div className={styles.continue}>
-          <div className={styles.continueInfo}>
-            <div className={styles.continueIconBox}>
-              <Play size={18} style={{ marginLeft: '2px' }} />
+        <ErrorBoundary>
+          <div className={styles.continue}>
+            <div className={styles.continueInfo}>
+              <div className={styles.continueIconBox}>
+                <Play size={18} style={{ marginLeft: '2px' }} />
+              </div>
+              <div className={styles.continueTextWrap}>
+                <span className={styles.continueLabel}>Continue Watching</span>
+                <h4 className={styles.continueTitle}>{continueRoom.title || 'Ongoing Room'}</h4>
+              </div>
             </div>
-            <div className={styles.continueTextWrap}>
-              <span className={styles.continueLabel}>Continue Watching</span>
-              <h4 className={styles.continueTitle}>{continueRoom.title}</h4>
-            </div>
+            <Link to={`/room/${continueRoom.id}`} className={styles.rejoinBtn}>
+              <span>Rejoin</span>
+            </Link>
           </div>
-          <Link to={`/room/${continueRoom.id}`} className={styles.rejoinBtn}>
-            <span>Rejoin</span>
-          </Link>
-        </div>
+        </ErrorBoundary>
       )}
 
       <div className={styles.tabsRow}>
@@ -184,7 +187,9 @@ export default function HomePage() {
       {mostWatchedRoom && (
         <div className={styles.mostStreamedSection}>
           <h3 className={styles.mostStreamedHeader}>Most Streamed Right Now</h3>
-          <MostStreamedCard room={mostWatchedRoom} />
+          <ErrorBoundary>
+            <MostStreamedCard room={mostWatchedRoom} />
+          </ErrorBoundary>
         </div>
       )}
 
@@ -249,7 +254,9 @@ export default function HomePage() {
       ) : (
         <div className={styles.grid}>
           {filteredRooms.map((room) => (
-            <RoomCard key={room.id} room={room} />
+            <ErrorBoundary key={room.id}>
+              <RoomCard room={room} />
+            </ErrorBoundary>
           ))}
         </div>
       )}
