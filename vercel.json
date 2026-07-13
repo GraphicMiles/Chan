@@ -1,6 +1,9 @@
 {
   "version": 2,
   "rewrites": [
+    { "source": "/api/refreshCatalog", "destination": "/api/media?legacy=refreshCatalog" },
+    { "source": "/api/search", "destination": "/api/media?legacy=search" },
+    { "source": "/api/scrape", "destination": "/api/media?legacy=scrape" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/o2tv/(.*)", "destination": "http://d6.o2tv.org/$1" },
     { "source": "/(.*)", "destination": "/" }

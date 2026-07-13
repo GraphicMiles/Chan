@@ -324,17 +324,16 @@ api/createLiveKitToken.js
 api/media.js
 api/moderate.js
 api/room.js
-api/search.js
-api/scrape.js
 ```
 
-`api/search.js` and `api/scrape.js` are now backward-compatible aliases to `api/media.js`. They are retained for compatibility but add two extra Vercel functions.
+The legacy `/api/search`, `/api/scrape`, and `/api/refreshCatalog` paths are consolidated through the `/api/media` action dispatcher or Vercel rewrite. This keeps the deployment at five top-level serverless functions.
 
-If no external client uses the legacy paths, they can be removed:
+Examples:
 
-```text
-api/search.js
-api/scrape.js
+```json
+{"action":"search","layer":"youtube","query":"..."}
+{"action":"scrape","url":"https://...","options":{"resolve":true}}
+{"action":"refreshCatalog","offset":0,"limit":50}
 ```
 
 After removal, update:
