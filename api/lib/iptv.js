@@ -15,7 +15,7 @@ function readAttribute(line, name) {
 function isSupportedStreamUrl(value) {
   try {
     const url = new URL(value)
-    if (url.protocol !== 'https:') return false
+    if (!['http:', 'https:'].includes(url.protocol)) return false
     const host = url.hostname.toLowerCase()
     if (host.includes('youtube.com') || host.includes('youtu.be') || host.includes('twitch.tv')) return false
     if (/\.mpd(?:\?|#|$)/i.test(url.pathname)) return false
@@ -115,7 +115,7 @@ function parseConfiguredChannels() {
 
 async function fetchPlaylist(source) {
   const parsed = new URL(source.url)
-  if (parsed.protocol !== 'https:') throw new Error(`IPTV playlist ${source.id} must use HTTPS`)
+  if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error(`IPTV playlist ${source.id} must use HTTP/HTTPS`)
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
