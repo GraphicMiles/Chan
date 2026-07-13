@@ -127,9 +127,9 @@ Blocked page      → show a clear error
 Unsupported URL   → do not create a room
 ```
 
-The resolver now follows same-site and Downloadwella page links up to a bounded depth, extracts direct media URLs when they are publicly present, and deduplicates results. Downloadwella pages are identified as provider-action pages. The app opens them for the user and tells the user to complete the provider's own download step and paste the final HTTPS video URL back into Chan.
+The resolver now follows same-site and Downloadwella page links up to a bounded depth, extracts direct media URLs when they are publicly present, and deduplicates results. Downloadwella pages are automatically resolved when they expose their normal `download2` form. Chan preserves the provider session cookie, submits the ordinary form, extracts the generated HTTPS media URL, and validates that it is a generated media-host URL before returning it to the player.
 
-Chan does not submit or bypass provider JavaScript, CAPTCHA, cookies, or download controls. This is intentional; those controls must be completed on the provider page. Only a verified `.mp4`/`.m3u8`/supported stream is allowed into room creation.
+Chan does not bypass CAPTCHA, JavaScript challenges, access controls, or other protections. If the provider requires those, the result remains a provider-action page. Only a verified `.mp4`/`.m3u8`/supported stream is allowed into room creation.
 
 ---
 
