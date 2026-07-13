@@ -344,13 +344,13 @@ export default function RoomPage() {
     if (canControl) writePlayerState(patch)
   }
 
-  // Calculate dynamic Vibe Lighting (#3)
+  // Calculate dynamic Vibe Lighting (#3) — crisp border instead of blur shadow
   const vibeGlowStyle = (() => {
     if (!vibeLightingEnabled) return 'none'
     const count = floatingReactions.length
-    if (count >= 5) return '0 0 55px rgba(255, 59, 48, 0.65), inset 0 0 25px rgba(255, 59, 48, 0.35)'
-    if (count >= 2) return '0 0 45px rgba(255, 106, 43, 0.55), inset 0 0 20px rgba(255, 106, 43, 0.25)'
-    if (count >= 1) return '0 0 35px rgba(31, 122, 92, 0.45), inset 0 0 15px rgba(31, 122, 92, 0.2)'
+    if (count >= 5) return '0 0 0 3px #FF3B30'
+    if (count >= 2) return '0 0 0 2px #FF6A2B'
+    if (count >= 1) return '0 0 0 2px #1F7A5C'
     return 'none'
   })()
 

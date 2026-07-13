@@ -111,6 +111,7 @@
   background: #000;
   border-radius: var(--radius-card);
   overflow: hidden;
+  box-shadow: none;
 }
 
 .shareBanner {

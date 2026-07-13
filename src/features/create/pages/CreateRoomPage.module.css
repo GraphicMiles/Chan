@@ -273,9 +273,9 @@
 }
 
 .select:focus {
-  border-color: var(--accent-orange);
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 106, 43, 0.08);
+  border-color: var(--text-black);
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 @media (max-width: 640px) {
