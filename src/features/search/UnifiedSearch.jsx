@@ -4,7 +4,7 @@ import { toast } from 'react-toastify'
 import {
   PlayCircle, Link2, Tv, Trophy, ShieldAlert, Search, X, Play,
   ArrowUpRight, SlidersHorizontal, Clock, Eye, Radio, Film,
-  AlertCircle, Loader2
+  AlertCircle, Loader2, Compass
 } from 'lucide-react'
 import styles from './UnifiedSearch.module.scss'
 import { useUnifiedSearch } from '../../hooks/useUnifiedSearch'
@@ -13,6 +13,7 @@ import { isDirectVideoUrl, normalizePlaybackUrl } from '../../shared/lib/youtube
 import { Modal, Button } from '../../shared/ui/index.js'
 
 const SEARCH_LAYERS = [
+  { id: 'all', label: 'All Media', icon: Compass, placeholder: 'Search movies, live TV, YouTube, sports, anime...', description: 'Search across all providers and media layers simultaneously' },
   { id: 'youtube', label: 'YouTube', icon: PlayCircle, placeholder: 'Search YouTube videos...', description: 'Search millions of YouTube videos with instant playback' },
   { id: 'direct', label: 'Direct Links', icon: Link2, placeholder: 'Search movies/shows or paste direct URL (.mp4/.m3u8)...', description: 'Find direct MP4/M3U8 links from top movie and series sites' },
   { id: 'iptv', label: 'Live TV', icon: Tv, placeholder: 'Search channels (CNN, ESPN, HBO)...', description: 'Watch live TV channels and 24/7 streaming networks' },
@@ -21,6 +22,7 @@ const SEARCH_LAYERS = [
 ]
 
 const TRENDING_SUGGESTIONS = {
+  all: ['Top 10 Movies 2026', 'House of the Dragon', 'Silo Season 3', 'Premier League Highlights', 'CNN News Live', 'Anime Hits', 'Alan Walker Stay'],
   youtube: ['Top 10 Movies 2026', 'House of the Dragon', 'Alan Walker Stay', 'Afrobeats Hits', 'Burn', 'Silo Season 3', 'Burna Boy Live', 'Gaming Highlights'],
   direct: ['House of the Dragon', 'Silo Season 2', 'Squid Game Season 2', 'The Last of Us', 'Stranger Things', 'Deadpool & Wolverine', 'Gladiator 2', 'Dune Part Two'],
   iptv: ['CNN News Live', 'ESPN Sports 24/7', 'HBO HD Channel', 'BBC World News', 'Sky Sports Live', 'Discovery Channel', 'Al Jazeera Live News'],
@@ -31,13 +33,14 @@ const TRENDING_SUGGESTIONS = {
 export default function UnifiedSearch() {
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
-  const [activeLayer, setActiveLayer] = useState('youtube')
+  const [activeLayer, setActiveLayer] = useState('all')
   const [query, setQuery] = useState('')
   const [adultVerified, setAdultVerified] = useState(false)
   const [showNsfwModal, setShowNsfwModal] = useState(false)
   const [pendingNsfwAction, setPendingNsfwAction] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({ hdOnly: false, liveOnly: false })
+  const [categoryFilter, setCategoryFilter] = useState('all')
   
   const { results, loading, error, search, clear, hasMore, loadMore, searchMeta } = useUnifiedSearch()
   
@@ -93,6 +96,7 @@ export default function UnifiedSearch() {
       return
     }
     setActiveLayer(layerId)
+    setCategoryFilter('all')
     clear()
     setQuery('')
   }, [adultVerified, clear])
@@ -191,9 +195,23 @@ export default function UnifiedSearch() {
   }, [clear])
 
   const filteredResults = useMemo(() => {
-    if (!showFilters) return results
+    let list = results
+    if (categoryFilter !== 'all') {
+      list = list.filter((r) => {
+        const t = r.type || r.source || activeLayer
+        if (categoryFilter === 'direct') return t === 'direct' || t === 'omdb' || t === 'movie'
+        if (categoryFilter === 'anime') return t === 'anime' || r.source === 'animedrive'
+        if (categoryFilter === 'youtube') return t === 'youtube'
+        if (categoryFilter === 'iptv') return t === 'iptv' || r.isLive
+        if (categoryFilter === 'sports') return t === 'sports'
+        if (categoryFilter === 'nsfw') return t === 'nsfw' || r.isNSFW
+        return true
+      })
+    }
+
+    if (!showFilters) return list
     
-    return results.filter(r => {
+    return list.filter(r => {
       if (filters.hdOnly && !['720p', '1080p', '4K', 'HD'].some(q => (r.quality || '').includes(q))) {
         return false
       }
@@ -202,7 +220,7 @@ export default function UnifiedSearch() {
       }
       return true
     })
-  }, [results, filters, showFilters])
+  }, [results, categoryFilter, filters, showFilters, activeLayer])
 
   if (authLoading) return <div className={styles.loading}>Loading...</div>
   if (!user) return <Navigate to="/auth" replace />
@@ -354,6 +372,27 @@ export default function UnifiedSearch() {
             <div className={styles.resultActions}>
               <button type="button" onClick={clear} className={styles.clearAll}>Clear All</button>
             </div>
+          </div>
+
+          <div className={styles.categoryFilterRow}>
+            {[
+              { id: 'all', label: 'All Results' },
+              { id: 'direct', label: 'Movies & Shows' },
+              { id: 'anime', label: 'Anime' },
+              { id: 'youtube', label: 'YouTube' },
+              { id: 'iptv', label: 'Live TV' },
+              { id: 'sports', label: 'Sports' },
+              { id: 'nsfw', label: 'NSFW 18+' },
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                className={`${styles.categoryPill} ${categoryFilter === cat.id ? styles.categoryPillActive : ''}`}
+                onClick={() => setCategoryFilter(cat.id)}
+              >
+                {cat.label}
+              </button>
+            ))}
           </div>
 
           <div className={styles.resultsGrid}>
