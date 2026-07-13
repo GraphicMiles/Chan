@@ -1,13 +1,13 @@
 export const SITE_CONFIGS = {
   nkiri: {
-    label: 'Nkiri',
-    baseUrl: 'https://nkiri.com',
+    label: 'Nkiri / Thenkiri',
+    baseUrl: 'https://thenkiri.com',
     items: '.list-movies .movie-item, .movies-list .item, .post-item, article',
     title: '.movie-title, .entry-title, h2 a, h3 a, .title',
     image: 'img[src], .poster img, .thumb img, img[data-src]',
     link: 'a[href], .download-link a, a[href*="/download/"]',
     meta: '.meta, .date, .year, .quality',
-    buildSearchUrl: (q) => `https://nkiri.com/?s=${encodeURIComponent(q)}`,
+    buildSearchUrl: (q) => `https://thenkiri.com/?s=${encodeURIComponent(q)}`,
   },
   netnaija: {
     label: 'NetNaija',

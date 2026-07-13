@@ -175,10 +175,18 @@ export default function CreateRoomPage() {
       return
     }
 
-    toast(
-      'That’s a webpage link, not a playable file. Open it or paste a direct .mp4/.m3u8 URL.',
-      { variant: 'warning', duration: 6000 }
-    )
+    if (candidate) {
+      setSearchMode('scraper')
+      setScraperSite('custom')
+      setUrl(candidate)
+      setYtResults([])
+      toast('Page link loaded. Click Extract links to look for a playable file.', {
+        variant: 'info',
+        duration: 6000,
+      })
+    } else {
+      toast('That result has no usable URL.', { variant: 'warning' })
+    }
   }
 
   const create = async (e) => {
