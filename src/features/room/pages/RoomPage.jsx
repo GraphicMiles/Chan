@@ -8,7 +8,7 @@ import ScreenShare from '../components/ScreenShare.jsx'
 import Chat from '../components/Chat.jsx'
 import ParticipantList from '../components/ParticipantList.jsx'
 import { SyncPulse } from '../../../shared/components/SyncPulse.jsx'
-import { extractVideoId, isDirectVideoUrl } from '../../../shared/lib/youtube.js'
+import { extractVideoId, isDirectVideoUrl, normalizePlaybackUrl } from '../../../shared/lib/youtube.js'
 import { isDisplayMediaSupported } from '../services/livekit.js'
 import { Button, Input, Card, IconButton, Modal, useToast } from '../../../shared/ui/index.js'
 import { Layout } from '../../../shared/layout/index.js'
@@ -121,8 +121,10 @@ export default function RoomPage() {
 
   const changeVideo = async (e) => {
     e.preventDefault()
-    const id = extractVideoId(newVideoUrl)
-    const isDirect = isDirectVideoUrl(newVideoUrl.trim())
+    const trimmedUrl = newVideoUrl.trim()
+    const id = extractVideoId(trimmedUrl)
+    const isDirect = isDirectVideoUrl(trimmedUrl)
+    const playbackUrl = normalizePlaybackUrl(trimmedUrl)
     
     try {
       setBusy(true)
@@ -140,11 +142,11 @@ export default function RoomPage() {
         // Direct video URL
         await updateRoom({ 
           videoId: null, 
-          videoUrl: newVideoUrl,
+          videoUrl: playbackUrl,
           videoType: 'direct',
           activityType: 'direct' 
         })
-        await writePlayerState({ videoId: null, videoUrl: newVideoUrl, isPlaying: false, currentTime: 0 })
+        await writePlayerState({ videoId: null, videoUrl: playbackUrl, isPlaying: false, currentTime: 0 })
       } else {
         toast('Paste a valid YouTube URL or direct video link (.mp4, .mkv, etc.)', { variant: 'error' })
         return

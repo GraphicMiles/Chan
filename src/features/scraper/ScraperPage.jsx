@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import styles from './ScraperPage.module.scss'
 import { useUnifiedSearch } from '../../hooks/useUnifiedSearch.js'
-import { isDirectVideoUrl, normalizeDirectUrl } from '../../shared/lib/youtube.js'
+import { isDirectVideoUrl, normalizePlaybackUrl } from '../../shared/lib/youtube.js'
 
 const SITES = [
   { key: 'nkiri', label: 'Nkiri' },
@@ -40,7 +40,7 @@ export default function ScraperPage() {
 
     // Direct video URL - go straight to create
     if (isDirectVideoUrl(trimmedUrl)) {
-      const normalized = normalizeDirectUrl(trimmedUrl)
+      const normalized = normalizePlaybackUrl(trimmedUrl)
       const title = normalized.split('/').pop()?.replace(/\.(mp4|m3u8|mkv|avi|mov|webm|ogg|flv)$/i, '') || 'Video'
       navigate(`/create?videoUrl=${encodeURIComponent(normalized)}&title=${encodeURIComponent(title)}&type=direct`)
       return
@@ -206,7 +206,7 @@ export default function ScraperPage() {
           <div className={styles.quickAction}>
             <p>This URL is a direct video file and can be played immediately.</p>
             <button
-              onClick={() => navigate(`/create?videoUrl=${encodeURIComponent(normalizeDirectUrl(url))}&title=${encodeURIComponent(url.split('/').pop()?.replace(/\.(mp4|m3u8|mkv|avi|mov|webm|ogg|flv)$/i, '') || 'Video')}&type=direct`)}
+              onClick={() => navigate(`/create?videoUrl=${encodeURIComponent(normalizePlaybackUrl(url))}&title=${encodeURIComponent(url.split('/').pop()?.replace(/\.(mp4|m3u8|mkv|avi|mov|webm|ogg|flv)$/i, '') || 'Video')}&type=direct`)}
               className={styles.primary}
             >
               Create Room Now

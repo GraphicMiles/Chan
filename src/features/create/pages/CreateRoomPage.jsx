@@ -9,6 +9,7 @@ import {
   isDirectVideoUrl,
   isMixedContentUrl,
   normalizeDirectUrl,
+  normalizePlaybackUrl,
   checkEmbeddable,
   searchYouTube,
   hasYouTubeApiKey,
@@ -67,7 +68,7 @@ export default function CreateRoomPage() {
     }
 
     if (presetIsStream || isDirectVideoUrl(presetVideoUrl)) {
-      setVideoUrl(normalizeDirectUrl(presetVideoUrl))
+      setVideoUrl(normalizePlaybackUrl(presetVideoUrl))
       setVideoType('direct')
       setVideoId('')
     }
@@ -92,11 +93,12 @@ export default function CreateRoomPage() {
       return
     }
     if (isDirectVideoUrl(value)) {
-      setVideoUrl(normalizeDirectUrl(value.trim()))
+      const playbackUrl = normalizePlaybackUrl(value.trim())
+      setVideoUrl(playbackUrl)
       setVideoId('')
       setVideoType('direct')
       setEmbedWarning(
-        isMixedContentUrl(value)
+        isMixedContentUrl(playbackUrl)
           ? 'This HTTP stream will be blocked by an HTTPS deployment. Use an HTTPS source.'
           : null
       )
@@ -172,7 +174,7 @@ export default function CreateRoomPage() {
 
     const candidate = item.link || item.url || ''
     if (item.isDirect || isDirectVideoUrl(candidate)) {
-      setVideoUrl(normalizeDirectUrl(candidate))
+      setVideoUrl(normalizePlaybackUrl(candidate))
       setVideoId('')
       setVideoType('direct')
       setUrl(candidate)

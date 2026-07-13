@@ -65,55 +65,31 @@ api/lib/sources.js
 
 These files now detect the problem and prevent the user from creating a room that will definitely fail.
 
-### What must be updated for true O2TV playback
+### Current O2TV solution
 
-There are three possible solutions:
-
-#### Preferred solution: use an HTTPS-compatible source
-
-No proxy code is needed. The result returned by the O2TV source must contain a URL that supports:
-
-- HTTPS
-- `video/mp4` or HLS `application/vnd.apple.mpegurl`
-- Browser playback from the Chan origin
-- Appropriate CORS behavior where required
-
-The main source configuration belongs in:
+The app now rewrites the approved O2TV host through a same-origin HTTPS path:
 
 ```text
-api/lib/sources.js
-api/media.js
+/o2tv/*  →  http://d6.o2tv.org/*
 ```
 
-#### Alternative: add a restricted external media proxy
+The client converts legacy O2TV HTTP URLs into `/o2tv/...` before room creation or playback. This avoids browser mixed-content blocking while keeping the rewrite restricted to the known O2TV host.
 
-A proxy should not be added as an unrestricted `fetch(url)` endpoint. It would need to:
-
-- Allow only approved hosts such as `d6.o2tv.org`.
-- Reject private IPs and arbitrary domains.
-- Validate the requested path.
-- Support `Range` requests for seeking.
-- Forward `Content-Type`, `Content-Length`, `Accept-Ranges`, and range responses.
-- Limit response size and duration.
-- Avoid buffering a large video entirely in memory.
-- Require authenticated users.
-- Apply rate limits.
-
-Files that would likely be added or updated:
+Files updated:
 
 ```text
-api/mediaProxy.js                  # New restricted proxy, if used
-api/lib/mediaAllowlist.js          # Approved host/path rules
-api/lib/http.js                    # Shared response/CORS handling if needed
-src/shared/lib/youtube.js          # Proxy URL/unsupported-source detection
+vercel.json
+src/shared/lib/youtube.js
 src/features/room/components/VideoPlayer.jsx
 src/features/create/pages/CreateRoomPage.jsx
 src/features/search/UnifiedSearch.jsx
-vercel.json                         # Only if a route/rewrite is required
-.env.example                        # Proxy configuration, if any
+src/features/room/pages/RoomPage.jsx
+src/hooks/useScraper.js
 ```
 
-A Vercel proxy is not necessarily the best solution for a 70 MB+ file because of serverless execution, bandwidth, timeout, and response-size constraints. An edge worker or a properly designed media gateway may be more suitable.
+The rewrite depends on Vercel forwarding stream responses and range requests correctly. If a deployment cannot stream the large response or seek reliably, use a dedicated HTTPS media gateway/edge worker rather than an unrestricted serverless proxy.
+
+The rewrite must not be generalized to arbitrary URLs. Keep the O2TV host allowlisted and continue rejecting private-network targets.
 
 ---
 
@@ -329,7 +305,7 @@ The following combinations need manual testing in a staging deployment:
 - Host leaving and room ending.
 - Mobile browser behavior.
 
-The O2TV HTTP URL should be classified as unsupported on the HTTPS deployment rather than creating a room that fails later.
+The O2TV HTTP URL should be converted to the restricted same-origin `/o2tv/...` rewrite on the HTTPS deployment, or rejected clearly if it is not an approved O2TV host.
 
 ---
 

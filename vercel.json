@@ -2,6 +2,7 @@
   "version": 2,
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/o2tv/(.*)", "destination": "http://d6.o2tv.org/$1" },
     { "source": "/(.*)", "destination": "/" }
   ]
 }
