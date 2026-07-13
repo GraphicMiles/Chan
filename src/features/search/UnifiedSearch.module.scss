@@ -111,32 +111,34 @@
   margin-bottom: var(--s-8);
 }
 
-.searchBoxContainer {
+.searchBarWrapper {
   display: flex;
-  align-items: stretch;
-  gap: var(--s-3);
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--surface-white);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-pill);
+  padding: 5px 6px 5px 16px;
   width: 100%;
+  transition: border-color 0.15s ease;
 }
 
-.inputWrapper {
+.searchBarWrapper:focus-within {
+  border-color: var(--text-black);
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.inputInner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   flex: 1;
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  padding: 0 var(--s-4);
-  height: 52px;
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--radius-card);
-  background: var(--surface-white);
-  box-shadow: var(--shadow-card);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.inputWrapper:focus-within {
-  border-color: var(--text-black);
-  box-shadow: none !important;
-  outline: none !important;
+  height: 42px;
 }
 
 .searchIcon {
@@ -161,22 +163,20 @@
   color: var(--text-muted-grey);
 }
 
-.actionButtons {
+.searchButtonsRow {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   flex-shrink: 0;
-  flex-wrap: wrap;
 }
 
 .searchBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border: 0;
-  border-radius: var(--radius-card);
-  height: 52px;
+  gap: 6px;
+  height: 42px;
   padding: 0 20px;
   cursor: pointer;
   background: var(--pill-black);
@@ -777,31 +777,42 @@
     padding: var(--s-5) var(--s-3) var(--s-12);
   }
 
-  .searchBoxContainer {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .inputWrapper {
-    width: 100%;
-    height: 48px;
-    padding: 0 var(--s-3);
-  }
-
-  .actionButtons {
+  .searchBarWrapper {
     display: flex;
-    gap: 12px;
-    width: auto;
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 4px 5px 4px 14px;
+    height: 48px;
+    border-radius: var(--radius-pill);
+    width: 100%;
+  }
+
+  .inputInner {
+    height: 40px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .searchButtonsRow {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
   }
 
   .searchBtn, .directBtn {
     flex: 0 0 auto;
     width: fit-content;
-    height: 48px;
-    padding: 0 20px;
-    font-size: 14px;
+    height: 40px;
+    padding: 0 16px;
+    font-size: 13px;
     justify-content: center;
   }
 

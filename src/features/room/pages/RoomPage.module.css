@@ -395,6 +395,11 @@
 
 /* Mobile */
 @media (max-width: 768px) {
+  .controls {
+    gap: 8px;
+    justify-content: flex-start;
+  }
+
   .main {
     flex-direction: column;
   }

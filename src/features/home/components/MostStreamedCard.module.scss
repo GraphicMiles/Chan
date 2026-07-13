@@ -217,15 +217,24 @@
 
 @media (max-width: 640px) {
   .footerRow {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
     gap: 12px;
-    padding: 14px;
+    padding: 12px 14px;
+  }
+  
+  .titleWrap {
+    flex: 1;
+    min-width: 0;
   }
   
   .watchNowBtn {
-    width: 100%;
-    justify-content: center;
+    width: fit-content;
+    flex: 0 0 auto;
+    height: 38px;
+    padding: 0 16px;
+    font-size: 13px;
   }
   
   .statsPill {

@@ -58,10 +58,12 @@
 
 .ctaStack {
   display: flex;
-  flex-direction: column;
-  gap: var(--s-3);
-  max-width: 340px;
-  margin: 0 auto var(--s-8);
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin: 0 auto var(--s-6);
 }
 
 /* Continue watching */

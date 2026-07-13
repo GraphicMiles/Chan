@@ -133,16 +133,16 @@ export default function HomePage() {
         </p>
         <div className={styles.ctaStack}>
           {user ? (
-            <Button as={Link} to="/create" variant="primary" size="lg" fullWidth>
-              <Plus size={18} /> Start a Room
+            <Button as={Link} to="/create" variant="primary" size="md">
+              <Plus size={16} /> Start a Room
             </Button>
           ) : (
-            <Button as={Link} to="/auth" variant="primary" size="lg" fullWidth>
-              <Zap size={18} /> Get Started
+            <Button as={Link} to="/auth" variant="primary" size="md">
+              <Zap size={16} /> Get Started
             </Button>
           )}
-          <Button as={Link} to="/media" variant="secondary" size="lg" fullWidth>
-            <Film size={18} /> Browse Media
+          <Button as={Link} to="/media" variant="secondary" size="md">
+            <Film size={16} /> Browse Media
           </Button>
         </div>
       </section>
