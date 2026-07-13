@@ -3,6 +3,8 @@
   display: flex;
   flex-direction: column;
   background: var(--bg-base);
+  position: relative;
+  z-index: 1;
 }
 
 .main {
@@ -10,7 +12,7 @@
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: var(--space-4);
+  padding: var(--space-5) var(--space-6);
 }
 
 .centered {
@@ -21,4 +23,5 @@
 
 .wide {
   max-width: none;
+  padding: 0;
 }

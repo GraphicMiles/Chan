@@ -2,12 +2,12 @@
   display: block;
   background: linear-gradient(
     90deg,
-    var(--bg-surface-raised) 0%,
-    var(--bg-surface-raised-hover) 50%,
-    var(--bg-surface-raised) 100%
+    rgba(22, 24, 33, 0.6) 0%,
+    rgba(30, 33, 45, 0.8) 50%,
+    rgba(22, 24, 33, 0.6) 100%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
+  animation: shimmer 1.6s ease-in-out infinite;
 }
 
 .r_sm { border-radius: var(--radius-sm); }
