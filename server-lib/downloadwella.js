@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio'
+import { isSuitableThumbnail } from './sources.js'
 
 const DOWNLOAD_HOST = 'downloadwella.com'
 const MEDIA_RE = /\.(mp4|mkv|m3u8|webm|mov|avi|flv|ts)(?:\?|#|$)/i
@@ -83,12 +84,22 @@ function directUrlsFromHtml(html, pageUrl) {
 function extractPageThumbnail(html, pageUrl) {
   try {
     const $ = cheerio.load(html)
-    const raw = $('meta[property="og:image"]').attr('content') ||
-                $('meta[name="twitter:image"]').attr('content') ||
-                $('.poster img, .thumb img, article img, .post-thumbnail img').first().attr('src') ||
-                $('img[src]').first().attr('src') || null
-    if (!raw) return null
-    return new URL(raw, pageUrl).href
+    const candidates = [
+      $('meta[property="og:image"]').attr('content'),
+      $('meta[name="twitter:image"]').attr('content'),
+      $('.poster img, .thumb img, article img, .post-thumbnail img').first().attr('src'),
+      $('img[src]').first().attr('src')
+    ]
+    for (const raw of candidates) {
+      if (!raw) continue
+      try {
+        const resolved = new URL(raw, pageUrl).href
+        if (isSuitableThumbnail(resolved)) return resolved
+      } catch {
+        /* ignore invalid url */
+      }
+    }
+    return null
   } catch {
     return null
   }
