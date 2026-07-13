@@ -50,7 +50,7 @@ export default function ScraperPage() {
     await search({
       layer: 'direct',
       query: query.trim() || trimmedUrl,
-      options: { site: site === 'custom' ? undefined : site },
+      options: { site: site === 'custom' ? undefined : site, resolve: true },
     })
   }, [url, query, search, navigate])
 

@@ -52,7 +52,8 @@ export default function UnifiedSearch() {
       query: query.trim(),
       options: { 
         adultVerified: verified,
-        filters: showFilters ? filters : undefined
+        filters: showFilters ? filters : undefined,
+        resolve: activeLayer === 'direct'
       }
     })
   }, [activeLayer, query, adultVerified, filters, showFilters, search])
@@ -89,6 +90,11 @@ export default function UnifiedSearch() {
     }
 
     const resultUrl = result.url || result.link
+    if (result.requiresUserAction && resultUrl) {
+      window.open(resultUrl, '_blank', 'noopener,noreferrer')
+      toast.info('The provider requires a normal download step. Complete it there, then paste the final HTTPS URL into Chan if needed.')
+      return
+    }
     const playable = result.isDirect || isDirectVideoUrl(resultUrl)
     if (!resultUrl || !playable) {
       toast.error('This result is not a playable video stream')

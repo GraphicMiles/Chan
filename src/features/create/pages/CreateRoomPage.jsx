@@ -142,8 +142,8 @@ export default function CreateRoomPage() {
 
   const onScrape = async (e) => {
     e?.preventDefault?.()
-    if (!url.trim()) {
-      toast('Paste a page URL first', { variant: 'warning' })
+    if (!url.trim() && !searchQuery.trim()) {
+      toast('Paste a page URL or enter a title to search', { variant: 'warning' })
       return
     }
     if (isDirectVideoUrl(url)) {
@@ -151,7 +151,11 @@ export default function CreateRoomPage() {
       toast('Direct video link selected', { variant: 'success' })
       return
     }
-    await scrape({ url: url.trim(), site: scraperSite })
+    await scrape({
+      url: url.trim() || undefined,
+      query: searchQuery.trim() || undefined,
+      site: scraperSite,
+    })
   }
 
   const selectVideo = (item) => {
@@ -390,6 +394,11 @@ export default function CreateRoomPage() {
                 placeholder="Page URL or direct .mp4 link"
                 value={url}
                 onChange={(e) => onUrlChange(e.target.value)}
+              />
+              <Input
+                placeholder="Or search Nkiri/Thenkiri by title (e.g. Super Girl)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
               <Button
                 type="button"
