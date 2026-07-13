@@ -1,26 +1,6 @@
-/**
- * Consolidated host moderation endpoint (counts as 1 Vercel function).
- *
- * POST /api/moderate
- * Authorization: Bearer <Firebase ID token>
- * body: { action: 'kick' | 'promote' | 'mute', roomId, uid, ... }
- *
- * Replaces: kickParticipant, promoteParticipant, muteParticipant
- */
-import { getDb, FieldValue, verifyIdToken } from './lib/firebaseAdmin.js'
-import { preflight, ok, fail, statusForError } from './lib/http.js'
+import { FieldValue } from './firebaseAdmin.js'
 
-async function requireUser(req) {
-  const token = req.headers.authorization?.split('Bearer ')[1]
-  if (!token) throw Object.assign(new Error('Missing token'), { status: 401 })
-  try {
-    return await verifyIdToken(token)
-  } catch {
-    throw Object.assign(new Error('Invalid or expired token'), { status: 401 })
-  }
-}
-
-async function kick(db, requesterUid, body) {
+export async function kickParticipant(db, requesterUid, body) {
   const { roomId, uid } = body || {}
   if (!roomId || !uid) throw new Error('Missing roomId or uid')
 
@@ -48,7 +28,7 @@ async function kick(db, requesterUid, body) {
   return { success: true }
 }
 
-async function promote(db, requesterUid, body) {
+export async function promoteParticipant(db, requesterUid, body) {
   const { roomId, uid, role } = body || {}
   if (!roomId || !uid || !role) throw new Error('Missing roomId, uid, or role')
   if (!['co-host', 'viewer'].includes(role)) throw new Error('Invalid role')
@@ -74,7 +54,7 @@ async function promote(db, requesterUid, body) {
   return { success: true }
 }
 
-async function mute(db, requesterUid, body) {
+export async function muteParticipant(db, requesterUid, body) {
   const { roomId, uid, muted } = body || {}
   if (!roomId || !uid || typeof muted !== 'boolean') {
     throw new Error('Missing roomId, uid, or muted')
@@ -98,28 +78,4 @@ async function mute(db, requesterUid, body) {
   })
 
   return { success: true }
-}
-
-export default async function handler(req, res) {
-  try {
-    if (preflight(req, res, { methods: ['POST'] })) return
-
-    const decoded = await requireUser(req)
-    const body = req.body || {}
-    const action = String(body.action || '').toLowerCase()
-    if (!action) return fail(res, 400, 'Missing action (kick | promote | mute)')
-
-    const db = getDb()
-    let result
-    if (action === 'kick') result = await kick(db, decoded.uid, body)
-    else if (action === 'promote') result = await promote(db, decoded.uid, body)
-    else if (action === 'mute') result = await mute(db, decoded.uid, body)
-    else return fail(res, 400, `Unknown action: ${action}`)
-
-    return ok(res, result)
-  } catch (err) {
-    console.error('moderate API error', err)
-    const status = err.status || statusForError(err)
-    return fail(res, status, err.message || 'Internal error')
-  }
 }

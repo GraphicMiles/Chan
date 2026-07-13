@@ -1,6 +1,10 @@
 {
   "version": 2,
   "rewrites": [
+    { "source": "/api/moderate", "destination": "/api/room?action=moderate" },
+    { "source": "/api/cleanupStaleRooms", "destination": "/api/room?action=cleanupStaleRooms" },
+    { "source": "/api/createLiveKitToken", "destination": "/api/room?action=createLiveKitToken" },
+    { "source": "/api/ai", "destination": "/api/room?action=ai" },
     { "source": "/api/refreshCatalog", "destination": "/api/media?legacy=refreshCatalog" },
     { "source": "/api/search", "destination": "/api/media?legacy=search" },
     { "source": "/api/scrape", "destination": "/api/media?legacy=scrape" },
