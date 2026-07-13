@@ -53,7 +53,7 @@ export default function UnifiedSearch() {
       options: { 
         adultVerified: verified,
         filters: showFilters ? filters : undefined,
-        resolve: activeLayer === 'direct'
+        resolve: activeLayer === 'direct' || activeLayer === 'nsfw'
       }
     })
   }, [activeLayer, query, adultVerified, filters, showFilters, search])
@@ -109,7 +109,7 @@ export default function UnifiedSearch() {
     const params = new URLSearchParams({
       videoUrl: playbackUrl,
       title: result.title || 'Untitled',
-      type: result.type === 'iptv' || result.type === 'sports' ? result.type : 'direct',
+      type: ['iptv', 'sports', 'nsfw'].includes(result.type) ? result.type : 'direct',
       thumbnail: result.thumbnail || '',
     })
     

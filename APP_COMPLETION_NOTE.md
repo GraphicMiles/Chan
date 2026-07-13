@@ -244,19 +244,31 @@ The system can now perform a configured metadata-to-channel match, but it cannot
 
 ### Current status
 
-The NSFW layer reports that it is not configured instead of silently returning an empty result set.
-
-### Files that would need approved implementation
+An XVIDEOS provider adapter is now implemented but remains disabled by default:
 
 ```text
+NSFW_ENABLED=false
+NSFW_PROVIDER=xvideos
+```
+
+When enabled, a keyword is converted into the provider search form:
+
+```text
+https://www.xvideos.com/?k=super+girl
+```
+
+The resolver parses search result pages, follows individual video pages, and extracts publicly embedded HTTPS MP4/HLS URLs. Preview clips are excluded.
+
+### Files implemented
+
+```text
+api/lib/nsfw.js
 api/media.js
 src/features/search/UnifiedSearch.jsx
-src/shared/auth/hooks/useAuth.jsx
-firestore.rules
 .env.example
 ```
 
-A real implementation would need:
+A real production rollout still needs:
 
 - A legally permitted/approved provider.
 - Server-side access control.
@@ -266,7 +278,7 @@ A real implementation would need:
 - Privacy and retention decisions.
 - No direct exposure of adult-provider credentials.
 
-The client-side `adultVerified` flag alone is not a real age-verification system.
+The client-side `adultVerified` flag alone is not a real age-verification system. Keep the feature disabled until compliant age/access controls are in place.
 
 ---
 

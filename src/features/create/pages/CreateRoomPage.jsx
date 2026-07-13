@@ -34,7 +34,7 @@ export default function CreateRoomPage() {
   const presetVideoUrl = searchParams.get('videoUrl') || ''
   const presetTitle = searchParams.get('title') || ''
   const presetType = searchParams.get('type') || 'youtube'
-  const presetIsStream = presetType === 'direct' || presetType === 'iptv' || presetType === 'sports'
+  const presetIsStream = ['direct', 'iptv', 'sports', 'nsfw'].includes(presetType)
 
   const [title, setTitle] = useState(presetTitle)
   const [url, setUrl] = useState(
