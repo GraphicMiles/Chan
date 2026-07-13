@@ -1,6 +1,9 @@
+import { getDb } from './firebaseAdmin.js'
+
 const DEFAULT_PLAYLIST_URL = 'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8'
 const CACHE_TTL_MS = 5 * 60 * 1000
 const FETCH_TIMEOUT_MS = 8000
+const HEALTH_TIMEOUT_MS = 4000
 
 let playlistCache = { expiresAt: 0, channels: [] }
 
@@ -100,20 +103,82 @@ async function fetchPlaylist(url) {
   }
 }
 
+export async function getPlaylistChannels({ force = false } = {}) {
+  if (!force && playlistCache.expiresAt > Date.now()) return [...playlistCache.channels]
+  const playlistUrl = process.env.IPTV_PLAYLIST_URL || DEFAULT_PLAYLIST_URL
+  const playlistChannels = await fetchPlaylist(playlistUrl)
+  const unique = new Map(playlistChannels.map((channel) => [channel.url, channel]))
+  playlistCache = { expiresAt: Date.now() + CACHE_TTL_MS, channels: [...unique.values()] }
+  return [...playlistCache.channels]
+}
+
+export async function checkIptvChannel(url) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS)
+  try {
+    let response = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Chan IPTV health check/1.0' },
+    })
+
+    // Some streaming hosts reject HEAD. A one-byte ranged GET checks the same
+    // endpoint without downloading the full stream.
+    if (response.status === 405 || response.status === 403 || response.status === 501) {
+      response = await fetch(url, {
+        method: 'GET',
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: { Range: 'bytes=0-0', 'User-Agent': 'Chan IPTV health check/1.0' },
+      })
+      await response.body?.cancel?.()
+    }
+
+    const contentType = response.headers.get('content-type') || ''
+    const healthy = response.ok && !contentType.toLowerCase().includes('text/html')
+    return { healthy, status: response.status, contentType, error: healthy ? null : `HTTP ${response.status}` }
+  } catch (error) {
+    return {
+      healthy: false,
+      status: 0,
+      contentType: '',
+      error: error.name === 'AbortError' ? 'timeout' : error.message,
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function readHealthyCatalog() {
+  if (process.env.IPTV_USE_FIRESTORE_CATALOG !== 'true') return []
+  try {
+    const snap = await getDb()
+      .collection('mediaCatalog')
+      .doc('iptv')
+      .collection('channels')
+      .where('healthy', '==', true)
+      .limit(2000)
+      .get()
+    return snap.docs.map((doc) => normalizeChannel(doc.data())).filter(Boolean)
+  } catch (error) {
+    console.error('IPTV Firestore catalog read failed:', error.message)
+    return []
+  }
+}
+
 export async function getIptvChannels(extraChannels = []) {
   const configured = [...parseConfiguredChannels(), ...extraChannels.map(normalizeChannel).filter(Boolean)]
-  const playlistUrl = process.env.IPTV_PLAYLIST_URL || DEFAULT_PLAYLIST_URL
-
-  if (playlistCache.expiresAt > Date.now()) {
-    return [...playlistCache.channels, ...configured]
+  const catalog = await readHealthyCatalog()
+  if (catalog.length) {
+    const unique = new Map([...catalog, ...configured].map((channel) => [channel.url, channel]))
+    return [...unique.values()]
   }
 
   try {
-    const playlistChannels = await fetchPlaylist(playlistUrl)
-    const unique = new Map()
-    for (const channel of [...playlistChannels, ...configured]) unique.set(channel.url, channel)
-    playlistCache = { expiresAt: Date.now() + CACHE_TTL_MS, channels: [...unique.values()] }
-    return [...playlistCache.channels]
+    const playlistChannels = await getPlaylistChannels()
+    const unique = new Map([...playlistChannels, ...configured].map((channel) => [channel.url, channel]))
+    return [...unique.values()]
   } catch (error) {
     console.error('IPTV playlist error:', error.message)
     if (configured.length) return configured

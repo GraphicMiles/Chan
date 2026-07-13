@@ -439,6 +439,72 @@ Remaining operational tasks include:
 
 ---
 
+## 10. IPTV cron refresh and Firestore catalog
+
+A new authenticated endpoint is available:
+
+```text
+POST /api/refreshCatalog
+```
+
+Files:
+
+```text
+api/refreshCatalog.js
+api/lib/iptv.js
+firestore.rules
+.env.example
+```
+
+The endpoint:
+
+1. Reads the approved HTTPS M3U playlist.
+2. Parses and deduplicates channel metadata.
+3. Checks a bounded batch of stream URLs using `HEAD` or a one-byte ranged `GET`.
+4. Stores healthy/unhealthy status in `mediaCatalog/iptv/channels`.
+5. Returns `nextOffset` so an external cron service can process the catalog in batches.
+
+Call it from cron-job.org with:
+
+```text
+POST https://your-app.vercel.app/api/refreshCatalog
+x-cron-secret: your-random-secret
+Content-Type: application/json
+
+{"action":"iptv","offset":0,"limit":50}
+```
+
+Configure:
+
+```text
+CRON_SECRET=replace-with-random-cron-secret
+IPTV_HEALTH_CHECK_LIMIT=50
+IPTV_USE_FIRESTORE_CATALOG=false
+```
+
+Set `IPTV_USE_FIRESTORE_CATALOG=true` after enough batches have populated the Firestore catalog. Never place `CRON_SECRET` in a URL or client-side variable.
+
+## 11. Sports-to-IPTV mapping
+
+Sports matching now uses the same IPTV catalog and supports:
+
+```text
+SPORTS_CHANNEL_MAP_JSON
+```
+
+Example:
+
+```json
+[
+  {
+    "competition": "Premier League",
+    "channels": ["SuperSport", "Sky Sports"]
+  }
+]
+```
+
+A fixture becomes playable only when a configured channel name matches an HTTPS channel in the IPTV playlist. This prevents the app from claiming that an arbitrary sports channel carries a specific fixture.
+
 # Definition of done
 
 The app should not be considered fully ready until all of the following are true:
