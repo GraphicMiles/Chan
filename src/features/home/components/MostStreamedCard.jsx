@@ -112,11 +112,40 @@ export default function MostStreamedCard({ room }) {
 
   const hoursWatched = useMemo(() => {
     try {
-      const createdMs = room?.createdAt?.toMillis?.() || (typeof room?.createdAtMs === 'number' ? room.createdAtMs : Date.now())
-      const diffHours = (Date.now() - createdMs) / 3600000
-      return `${Math.max(1, Math.round(diffHours))}h`
+      let createdMs = null
+      const created = room?.createdAt
+      if (created) {
+        // Firestore Timestamp — use toMillis() directly (UTC epoch ms)
+        if (typeof created.toMillis === 'function') {
+          createdMs = created.toMillis()
+        }
+        // Firestore Timestamp serialized as {seconds, nanoseconds}
+        else if (typeof created.seconds === 'number') {
+          createdMs = created.seconds * 1000 + Math.floor((created.nanoseconds || 0) / 1e6)
+        }
+        // JavaScript Date object
+        else if (created instanceof Date) {
+          createdMs = created.getTime()
+        }
+      }
+      // Fallback to createdAtMs if available
+      if (createdMs == null && typeof room?.createdAtMs === 'number') {
+        createdMs = room.createdAtMs
+      }
+      // Last resort: can't determine creation time
+      if (createdMs == null) return '—'
+
+      const diffMs = Date.now() - createdMs
+      const diffMins = Math.floor(diffMs / 60000)
+      if (diffMins < 1) return '<1m'
+      if (diffMins < 60) return `${diffMins}m`
+      const diffHours = Math.floor(diffMins / 60)
+      const remainingMins = diffMins % 60
+      if (diffHours < 24) return remainingMins > 0 ? `${diffHours}h ${remainingMins}m` : `${diffHours}h`
+      const diffDays = Math.floor(diffHours / 24)
+      return `${diffDays}d`
     } catch {
-      return '1h'
+      return '—'
     }
   }, [room?.createdAt, room?.createdAtMs])
 

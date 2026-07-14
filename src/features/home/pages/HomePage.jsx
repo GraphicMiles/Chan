@@ -48,8 +48,11 @@ export default function HomePage() {
   const filteredRooms = useMemo(() => {
     const term = search.trim().toLowerCase()
     let list = rooms
+    // Filter out stale rooms that have 0 participants but are still "live"
+    // These are ghosts where the host disconnected before the room was cleaned up
+    list = list.filter((r) => (r.participantCount || 0) > 0)
     if (term) {
-      list = rooms.filter(
+      list = list.filter(
         (r) => r.title?.toLowerCase().includes(term) || r.hostName?.toLowerCase().includes(term)
       )
     }
@@ -104,7 +107,10 @@ export default function HomePage() {
 
   const mostWatchedRoom = useMemo(() => {
     if (!rooms || !rooms.length) return null
-    return [...rooms].sort((a, b) => (b.participantCount || 0) - (a.participantCount || 0))[0]
+    // Only consider rooms with actual participants (exclude stale ghosts)
+    const activeRooms = rooms.filter((r) => (r.participantCount || 0) > 0)
+    if (!activeRooms.length) return null
+    return [...activeRooms].sort((a, b) => (b.participantCount || 0) - (a.participantCount || 0))[0]
   }, [rooms])
 
   return (
