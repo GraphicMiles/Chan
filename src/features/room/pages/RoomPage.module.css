@@ -182,18 +182,22 @@
 }
 
 .controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
   align-items: center;
+  gap: 10px;
+  width: 100%;
 }
 
 .controls > button {
-  width: 100% !important;
+  flex: 1 1 auto;
+  min-width: 140px;
+  max-width: 220px;
   height: 38px !important;
   padding: 0 16px !important;
   border-radius: 100px !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 8px !important;
