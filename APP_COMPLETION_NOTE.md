@@ -1,6 +1,6 @@
 # Chan App — Completion Note
 
-## Current status
+## Current stat
 
 The app now builds locally and the main boot, routing, player-contract, media-authentication, and mixed-content handling issues have been addressed in the local branch.
 
