@@ -95,17 +95,9 @@ export default function HomePage() {
   const totalViewers = rooms.reduce((sum, r) => sum + (r.participantCount || 0), 0)
 
   const headerActions = user ? (
-    <>
-      <Button as={Link} to="/media" variant="secondary" size="md">
-        <Film size={16} /> Browse Media
-      </Button>
-      <Button as={Link} to="/create" variant="primary" size="md">
-        <Plus size={16} /> Start a Room
-      </Button>
-      <Button variant="ghost" size="md" onClick={logout} aria-label="Sign out" title="Sign out">
-        <LogOut size={16} />
-      </Button>
-    </>
+    <Button variant="ghost" size="md" onClick={logout} aria-label="Sign out" title="Sign out">
+      <LogOut size={16} />
+    </Button>
   ) : (
     <Button as={Link} to="/auth" variant="primary" size="md">Sign In</Button>
   )
@@ -243,13 +235,7 @@ export default function HomePage() {
         <EmptyState
           title={search ? 'No rooms match your search' : 'No live rooms right now'}
           description={search ? 'Try a different term or start your own.' : 'Start one and invite people to watch together.'}
-          action={
-            user ? (
-              <Button as={Link} to="/create" variant="primary"><Plus size={16} /> Start a Room</Button>
-            ) : (
-              <Button as={Link} to="/auth" variant="primary">Sign In to Start</Button>
-            )
-          }
+          action={null}
         />
       ) : (
         <div className={styles.grid}>
