@@ -57,12 +57,18 @@
   color: var(--text-black);
 }
 
-.active {
-  background: var(--pill-black);
-  color: #fff;
-  border-color: var(--pill-black);
-  font-weight: 600;
-  box-shadow: var(--shadow-pill);
+.tab.active,
+.tab.active:hover,
+.tab.active:focus,
+.tab.active * {
+  background: var(--pill-black) !important;
+  color: #fff !important;
+  border-color: var(--pill-black) !important;
+}
+
+.tab.active .adultBadge {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #fff !important;
 }
 
 .adult {
@@ -552,11 +558,14 @@
   color: var(--text-black);
 }
 
-.categoryPillActive {
-  background: var(--pill-black);
-  color: #fff;
-  border-color: var(--pill-black);
-  font-weight: 600;
+.categoryPillActive,
+.categoryPillActive:hover,
+.categoryPillActive:focus,
+.categoryPillActive * {
+  background: var(--pill-black) !important;
+  color: #fff !important;
+  border-color: var(--pill-black) !important;
+  font-weight: 600 !important;
 }
 
 /* === RESULT CARDS === */

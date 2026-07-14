@@ -406,12 +406,19 @@ export default function UnifiedSearch() {
                 >
                   <div className={styles.thumbnail}>
                     {thumb ? (
-                      <img src={thumb} alt={result.title} loading="lazy" />
-                    ) : (
-                      <div className={styles.noThumbnail}>
-                        <CurrentLayerIcon size={32} />
-                      </div>
-                    )}
+                      <img
+                        src={thumb}
+                        alt={result.title}
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none'
+                          if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'flex'
+                        }}
+                      />
+                    ) : null}
+                    <div className={styles.noThumbnail} style={{ display: thumb ? 'none' : 'flex' }}>
+                      <CurrentLayerIcon size={32} />
+                    </div>
                     
                     {result.duration && (
                       <span className={styles.duration}>
