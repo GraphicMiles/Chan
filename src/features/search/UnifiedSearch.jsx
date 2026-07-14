@@ -406,15 +406,23 @@ export default function UnifiedSearch() {
                 >
                   <div className={styles.thumbnail}>
                     {thumb ? (
-                      <img
-                        src={thumb}
-                        alt={result.title}
-                        loading="lazy"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none'
-                          if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'flex'
-                        }}
-                      />
+                      <>
+                        <div
+                          className={styles.thumbnailBg}
+                          style={{ backgroundImage: `url(${thumb})` }}
+                        />
+                        <img
+                          src={thumb}
+                          alt={result.title}
+                          loading="lazy"
+                          className={styles.thumbnailImg}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                            if (e.currentTarget.previousSibling) e.currentTarget.previousSibling.style.display = 'none'
+                            if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'flex'
+                          }}
+                        />
+                      </>
                     ) : null}
                     <div className={styles.noThumbnail} style={{ display: thumb ? 'none' : 'flex' }}>
                       <CurrentLayerIcon size={32} />

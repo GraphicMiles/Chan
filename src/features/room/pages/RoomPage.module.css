@@ -462,7 +462,13 @@
   }
 
   .playerWrap {
-    max-height: 45vh;
+    width: 100% !important;
+    height: 50vh !important;
+    height: 50dvh !important;
+    max-height: 50vh !important;
+    min-height: 50vh !important;
+    aspect-ratio: auto !important;
+    flex: 0 0 auto !important;
     border-radius: var(--radius-sm);
   }
 
