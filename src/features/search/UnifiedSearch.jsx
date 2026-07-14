@@ -143,7 +143,7 @@ export default function UnifiedSearch() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  const handleResultSelect = useCallback((result) => {
+  const handleResultSelect = useCallback(async (result) => {
     if ((result.type || activeLayer) === 'youtube' && result.id) {
       const params = new URLSearchParams({
         video: result.id,
@@ -160,18 +160,48 @@ export default function UnifiedSearch() {
       toast.info('The provider requires a normal download step. Complete it there, then paste the final HTTPS URL into Chan if needed.')
       return
     }
-    const playable = result.isDirect || isDirectVideoUrl(resultUrl)
-    if (!resultUrl || !playable) {
-      toast.error('This result is not a playable video stream')
+    let playable = result.isDirect || isDirectVideoUrl(resultUrl)
+    let finalUrl = resultUrl
+    let finalThumb = result.thumbnail || result.image || ''
+    let finalTitle = result.title || 'Untitled'
+
+    if (!playable && resultUrl) {
+      toast.info(`Resolving direct video from ${result.source || 'provider'}...`)
+      try {
+        const token = user ? await user.getIdToken() : ''
+        const res = await fetch('/api/media', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ action: 'scrape', url: resultUrl, site: result.source || 'custom', options: { resolve: true } }),
+        })
+        const data = await res.json()
+        if (res.ok && data.success && data.results?.length > 0) {
+          const directItem = data.results.find((it) => it.isDirect || isDirectVideoUrl(it.url || it.link)) || data.results[0]
+          if (directItem) {
+            playable = Boolean(directItem.isDirect || isDirectVideoUrl(directItem.url || directItem.link))
+            finalUrl = directItem.url || directItem.link || finalUrl
+            if (directItem.thumbnail || directItem.image) finalThumb = directItem.thumbnail || directItem.image
+            if (directItem.title && directItem.title !== 'Untitled') finalTitle = directItem.title
+          }
+        }
+      } catch {
+        /* ignore resolution check error */
+      }
+    }
+
+    if (!finalUrl || (!playable && !resultUrl.includes('fzmovies') && !resultUrl.includes('netnaija') && !resultUrl.includes('9jarocks'))) {
+      toast.error('Could not extract direct media from this link. Try another option.')
       return
     }
-    const playbackUrl = normalizePlaybackUrl(resultUrl)
-    const thumb = result.thumbnail || result.image || ''
+    const playbackUrl = normalizePlaybackUrl(finalUrl)
     const params = new URLSearchParams({
       videoUrl: playbackUrl,
-      title: result.title || 'Untitled',
+      title: finalTitle,
       type: ['iptv', 'sports', 'nsfw'].includes(result.type) ? result.type : 'direct',
-      thumbnail: thumb,
+      thumbnail: finalThumb,
     })
     
     if (result.matchInfo) params.set('matchInfo', JSON.stringify(result.matchInfo))
