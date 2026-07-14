@@ -174,36 +174,37 @@
   background: var(--room-surface) !important;
   border: 1px solid var(--room-divider) !important;
   border-radius: var(--radius-card) !important;
-  padding: 14px 16px !important;
+  padding: 12px 14px !important;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   box-shadow: none !important;
 }
 
 .controls {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-evenly;
+  justify-content: flex-start;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
 }
 
 .controls > button {
-  flex: 1 1 auto;
-  min-width: 140px;
-  max-width: 220px;
+  flex: 0 0 auto !important;
+  width: fit-content !important;
+  min-width: 0 !important;
+  max-width: none !important;
   height: 38px !important;
-  padding: 0 16px !important;
-  border-radius: 100px !important;
+  padding: 0 20px !important;
+  border-radius: 20px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 8px !important;
   font-size: 13px !important;
   font-weight: 500 !important;
-  white-space: nowrap;
+  white-space: nowrap !important;
   box-shadow: none !important;
 }
 
