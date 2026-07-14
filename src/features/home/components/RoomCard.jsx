@@ -7,12 +7,13 @@ export default function RoomCard({ room }) {
   if (!room || !room.id) return null
 
   const isDirectVideo = room.videoType === 'direct' || (!room.videoId && Boolean(room.videoUrl))
-  const thumb = isDirectVideo ? null : getThumbnail(room.videoId)
+  const thumb = room?.thumbnail || room?.image || room?.poster || (isDirectVideo ? null : getThumbnail(room.videoId)) || null
   const source = isDirectVideo ? 'Direct' : 'YouTube'
   const safeTitle = room.title || 'Untitled Room'
   const safeHostName = room.hostName || 'Host'
   const startedAt = room.createdAt?.toDate?.()
   const timeAgo = startedAt ? getRelativeTime(startedAt) : null
+  const watchers = typeof room?.participantCount === 'number' && Number.isFinite(room.participantCount) ? Math.max(0, room.participantCount) : 0
 
   return (
     <Link to={`/room/${room.id}`} className={styles.card}>
@@ -52,7 +53,7 @@ export default function RoomCard({ room }) {
         <div className={styles.cardFooter}>
           <div className={styles.viewers}>
             <Users size={14} />
-            <span>{Number(room.participantCount) || 1}/{Number(room.capacity) || 12} watching</span>
+            <span>{watchers}/{Number(room.capacity) || 12} watching</span>
           </div>
           <span className={styles.joinBtn}>
             <Play size={12} />

@@ -30,6 +30,7 @@ export default function MostStreamedCard({ room }) {
   const safeTitle = room?.title || 'Untitled Stream'
   const safeHostName = room?.hostName || 'Host'
   const isDirect = room?.videoType === 'direct' || (!room?.videoId && Boolean(room?.videoUrl))
+  const fallbackThumb = room?.thumbnail || room?.image || room?.poster || (isDirect ? null : getThumbnail(room?.videoId)) || null
 
   const streamUrl = useMemo(() => {
     if (!room) return ''
@@ -119,7 +120,8 @@ export default function MostStreamedCard({ room }) {
     }
   }, [room?.createdAt, room?.createdAtMs])
 
-  const watchersCount = `${Number(room?.participantCount) || 1} watching`
+  const watchers = typeof room?.participantCount === 'number' && Number.isFinite(room.participantCount) ? Math.max(0, room.participantCount) : 0
+  const watchersCount = `${watchers} watching`
 
   if (!room || !safeRoomId) return null
 
@@ -249,6 +251,12 @@ export default function MostStreamedCard({ room }) {
                 />
               </div>
             )
+          ) : fallbackThumb ? (
+            <img
+              src={fallbackThumb}
+              alt={safeTitle}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           ) : (
             <div style={{
               width: '100%',
