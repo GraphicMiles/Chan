@@ -428,6 +428,7 @@ export default function RoomPage() {
                 onEnded={handleVideoEnded}
                 roomId={roomId}
                 isLive={Boolean(room.isLive || room.videoType === 'iptv' || room.source === 'iptv')}
+                subtitleVtt={room.subtitleVtt}
               />
             ) : (
               <ScreenShare roomId={roomId} isHost={isHost} user={user} />
