@@ -491,6 +491,27 @@
     transform: translateY(0);
   }
 
+  .header {
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    gap: 10px;
+    min-height: 56px;
+  }
+
+  .roomTitle {
+    width: 100%;
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .headerActions {
+    width: 100%;
+    flex: 1 1 100%;
+    justify-content: space-between;
+    padding-top: 6px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  }
+
   .titleSep { display: none; }
 
   .stage {
@@ -507,7 +528,8 @@
 
 @media (max-width: 400px) {
   .header {
-    padding: var(--s-1) var(--s-2);
+    padding: 8px 10px;
+    gap: 8px;
   }
 
   .brand {
@@ -516,6 +538,10 @@
 
   .titleText {
     font-size: 13px;
+  }
+
+  .headerActions {
+    gap: 6px;
   }
 }
 
