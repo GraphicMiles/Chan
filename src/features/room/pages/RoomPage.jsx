@@ -11,6 +11,7 @@ import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import { useRoom } from '../hooks/useRoom.js'
 import { usePlayerSync } from '../hooks/usePlayerSync.js'
 import VideoPlayer from '../components/VideoPlayer.jsx'
+import { ErrorBoundary } from '../../../shared/components/ErrorBoundary.jsx'
 import ScreenShare from '../components/ScreenShare.jsx'
 import Chat from '../components/Chat.jsx'
 import QueuePanel from '../components/QueuePanel.jsx'
@@ -448,18 +449,32 @@ export default function RoomPage() {
         <div className={styles.stage}>
           <div className={styles.playerWrap} style={{ boxShadow: vibeGlowStyle, transition: 'box-shadow 0.4s ease' }}>
             {isYoutube || isDirectVideo ? (
-              <VideoPlayer
-                videoId={room.videoId}
-                videoUrl={room.videoUrl}
-                videoType={room.videoType || 'youtube'}
-                canControl={canControl}
-                onReady={onPlayerReady}
-                onPlayerEvent={onPlayerEvent}
-                onEnded={handleVideoEnded}
-                roomId={roomId}
-                isLive={Boolean(room.isLive || room.videoType === 'iptv' || room.source === 'iptv')}
-                subtitleVtt={room.subtitleVtt}
-              />
+              <ErrorBoundary fallback={(error, resetError) => (
+                <div className={styles.errorContainer}>
+                  <h3>Video Player Error</h3>
+                  <p>{error?.message || 'The video failed to load. This could be due to network issues, unsupported format, or the stream being unavailable.'}</p>
+                  <button type="button" onClick={() => { resetError(); window.location.reload(); }}>
+                    Retry
+                  </button>
+                </div>
+              )}>
+                <VideoPlayer
+                  videoId={room.videoId}
+                  videoUrl={room.videoUrl}
+                  videoType={room.videoType || 'youtube'}
+                  canControl={canControl}
+                  onReady={onPlayerReady}
+                  onPlayerEvent={onPlayerEvent}
+                  onEnded={handleVideoEnded}
+                  onError={(err) => {
+                    console.error('VideoPlayer error:', err)
+                    toast?.(err?.message || 'Video playback failed. Try another source.', { variant: 'error', duration: 5000 })
+                  }}
+                  roomId={roomId}
+                  isLive={Boolean(room.isLive || room.videoType === 'iptv' || room.source === 'iptv')}
+                  subtitleVtt={room.subtitleVtt}
+                />
+              </ErrorBoundary>
             ) : (
               <ScreenShare roomId={roomId} isHost={isHost} user={user} />
             )}
