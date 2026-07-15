@@ -191,7 +191,7 @@ export default function UnifiedSearch() {
           },
           body: JSON.stringify({ action: 'scrape', url: resultUrl, site: result.source || 'custom', options: { resolve: true } }),
         })
-        const data = await res.json()
+        const data = await res.json().catch(() => ({ success: false }))
         if (res.ok && data.success && data.results?.length > 0) {
           const directItem = data.results.find((it) => it.isDirect || isDirectVideoUrl(it.url || it.link)) || data.results[0]
           if (directItem) {
