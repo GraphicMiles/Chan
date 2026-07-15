@@ -620,12 +620,6 @@ export default function UnifiedSearch() {
                     </h3>
                     
                     <div className={styles.meta}>
-                      {result.duration && (
-                        <span className={styles.duration}>
-                          <Clock size={10} />
-                          {result.duration}
-                        </span>
-                      )}
                       {result.views && (
                         <span className={styles.views}>
                           <Eye size={10} />

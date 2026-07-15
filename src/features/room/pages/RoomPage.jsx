@@ -239,7 +239,7 @@ export default function RoomPage() {
   if (!room) return <div className={styles.loading}>Loading room...</div>
   if (!joined) return <div className={styles.joining}>Joining room...</div>
 
-  const isDirectVideo = room?.videoType === 'direct'
+  const isDirectVideo = room?.videoType === 'direct' || room?.videoType === 'iptv' || room?.videoType === 'sports' || room?.videoType === 'nsfw'
   const isYoutube = !isDirectVideo && (activityType === 'youtube' || activityType === 'direct')
   const canShareScreen = isDisplayMediaSupported()
 
@@ -566,7 +566,7 @@ export default function RoomPage() {
                 </span>
                 <span className={styles.metaSep}>·</span>
                 <span className={styles.metaInfo}>
-                  {isDirectVideo ? 'Direct Video' : isYoutube ? 'YouTube' : 'Screen Share'}
+                  {room?.videoType === 'iptv' ? 'Live TV' : isDirectVideo ? 'Direct Video' : isYoutube ? 'YouTube' : 'Screen Share'}
                 </span>
                 {queueItems.length > 0 && (
                   <>
@@ -615,7 +615,7 @@ export default function RoomPage() {
                   <h3 className={styles.infoTitle}>Room Info</h3>
                   <p className="mono">Host: {room.hostName}</p>
                   <p className="mono">Capacity: {participants.length}/{room.capacity}</p>
-                  <p className="mono">Mode: {isDirectVideo ? 'Direct Video' : isYoutube ? 'YouTube' : 'Screen Share'}</p>
+                  <p className="mono">Mode: {room?.videoType === 'iptv' ? 'Live TV' : isDirectVideo ? 'Direct Video' : isYoutube ? 'YouTube' : 'Screen Share'}</p>
                   {room.isPrivate && <p className="mono">Invite: {room.inviteCode}</p>}
                   {room.locked && <p className="mono">Joins locked</p>}
                 </Card>

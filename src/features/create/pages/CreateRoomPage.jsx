@@ -67,8 +67,10 @@ export default function CreateRoomPage() {
     }
 
     if (presetIsStream || isDirectVideoUrl(presetVideoUrl) || presetVideoUrl) {
-      setVideoUrl(normalizePlaybackUrl(presetVideoUrl))
-      setVideoType('direct')
+      const normalized = normalizePlaybackUrl(presetVideoUrl)
+      const isM3u8 = /\.m3u8(\?|#|$)/i.test(presetVideoUrl)
+      setVideoUrl(normalized)
+      setVideoType(isM3u8 ? 'iptv' : 'direct')
       setVideoId('')
     }
   }, [presetIsStream, presetVideoUrl])
