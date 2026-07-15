@@ -322,35 +322,40 @@ async function resolveServerUrl(serverUrl) {
         }
 
         // Quick format probe (optional — don't block resolution on it)
+        // NOTE: Some Koyeb tokens are single-use; probing may invalidate the link.
+        // We skip the probe by default and let /api/proxy detect the format at playback time.
         let detectedFormat = null
-        try {
-          const cdnController = new AbortController()
-          const cdnTimer = setTimeout(() => cdnController.abort(), 2500)
-          const cdnRes = await fetch(location, {
-            method: 'GET',
-            signal: cdnController.signal,
-            headers: {
-              'User-Agent': UA,
-              Range: 'bytes=0-3',
-              Referer: BASE_URL + '/',
-            },
-          })
-          clearTimeout(cdnTimer)
-          const contentType = cdnRes.headers.get('content-type') || ''
-          const contentDisposition = cdnRes.headers.get('content-disposition') || ''
-          if (contentType.includes('matroska') || contentDisposition.includes('.mkv')) {
-            detectedFormat = 'mkv'
-          } else if (contentType.includes('mp4') || contentDisposition.includes('.mp4')) {
-            detectedFormat = 'mp4'
-          } else {
-            // Peek magic bytes: 0x1A = EBML/MKV, 'ftyp' = MP4
-            try {
-              const buf = Buffer.from(await cdnRes.arrayBuffer())
-              if (buf[0] === 0x1A) detectedFormat = 'mkv'
-              else if (buf.toString('ascii', 4, 8) === 'ftyp') detectedFormat = 'mp4'
-            } catch { /* */ }
-          }
-        } catch { /* ignore */ }
+        const SHOULD_PROBE_KOYEB = false
+        if (SHOULD_PROBE_KOYEB) {
+          try {
+            const cdnController = new AbortController()
+            const cdnTimer = setTimeout(() => cdnController.abort(), 2500)
+            const cdnRes = await fetch(location, {
+              method: 'GET',
+              signal: cdnController.signal,
+              headers: {
+                'User-Agent': UA,
+                Range: 'bytes=0-3',
+                Referer: BASE_URL + '/',
+              },
+            })
+            clearTimeout(cdnTimer)
+            const contentType = cdnRes.headers.get('content-type') || ''
+            const contentDisposition = cdnRes.headers.get('content-disposition') || ''
+            if (contentType.includes('matroska') || contentDisposition.includes('.mkv')) {
+              detectedFormat = 'mkv'
+            } else if (contentType.includes('mp4') || contentDisposition.includes('.mp4')) {
+              detectedFormat = 'mp4'
+            } else {
+              // Peek magic bytes: 0x1A = EBML/MKV, 'ftyp' = MP4
+              try {
+                const buf = Buffer.from(await cdnRes.arrayBuffer())
+                if (buf[0] === 0x1A) detectedFormat = 'mkv'
+                else if (buf.toString('ascii', 4, 8) === 'ftyp') detectedFormat = 'mp4'
+              } catch { /* */ }
+            }
+          } catch { /* ignore */ }
+        }
 
         const looksMkv = detectedFormat === 'mkv'
           || /\.mkv/i.test(nameParam)
