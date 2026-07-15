@@ -192,7 +192,7 @@ export default function UnifiedSearch() {
       }
     }
 
-    if (!finalUrl || (!playable && !resultUrl.includes('fzmovies') && !resultUrl.includes('netnaija') && !resultUrl.includes('9jarocks'))) {
+    if (!finalUrl || (!playable && !resultUrl.includes('fzmovies') && !resultUrl.includes('netnaija') && !resultUrl.includes('9jarocks') && !resultUrl.includes('maxcinema'))) {
       toast.error('Could not extract direct media from this link. Try another option.')
       return
     }
