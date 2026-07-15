@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import {
   PlayCircle, Link2, Tv, Trophy, ShieldAlert, Search, X, Play,
@@ -32,8 +32,10 @@ const TRENDING_SUGGESTIONS = {
 
 export default function UnifiedSearch() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, loading: authLoading } = useAuth()
-  const [activeLayer, setActiveLayer] = useState('all')
+  const isMediaRoute = location.pathname === '/media'
+  const [activeLayer, setActiveLayer] = useState(isMediaRoute ? 'direct' : 'all')
   const [query, setQuery] = useState('')
   const [adultVerified, setAdultVerified] = useState(false)
   const [showNsfwModal, setShowNsfwModal] = useState(false)

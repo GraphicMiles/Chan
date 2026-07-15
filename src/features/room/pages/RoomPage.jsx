@@ -263,6 +263,7 @@ export default function RoomPage() {
     const trimmedUrl = newVideoUrl.trim()
     const id = extractVideoId(trimmedUrl)
     const isDirect = isDirectVideoUrl(trimmedUrl) || /\.(mp4|m3u8|mkv|avi|mov|webm|flv|ts)(\?|#|$)/i.test(trimmedUrl)
+    const isM3u8 = /\.m3u8(\?|#|$)/i.test(trimmedUrl)
     const playbackUrl = normalizePlaybackUrl(trimmedUrl)
     
     try {
@@ -273,15 +274,18 @@ export default function RoomPage() {
           videoId: id, 
           videoUrl: null,
           videoType: 'youtube',
-          activityType: 'youtube' 
+          activityType: 'youtube',
+          isLive: false,
         })
         await writePlayerState({ videoId: id, videoUrl: null, isPlaying: false, currentTime: 0 })
       } else if (isDirect || trimmedUrl) {
+        const nextType = isM3u8 ? 'iptv' : 'direct'
         await updateRoom({ 
           videoId: null, 
           videoUrl: playbackUrl,
-          videoType: 'direct',
-          activityType: 'direct' 
+          videoType: nextType,
+          activityType: nextType,
+          isLive: isM3u8,
         })
         await writePlayerState({ videoId: null, videoUrl: playbackUrl, isPlaying: false, currentTime: 0 })
       } else {

@@ -33,6 +33,7 @@ export default function CreateRoomPage() {
   const presetTitle = searchParams.get('title') || ''
   const presetType = searchParams.get('type') || 'youtube'
   const presetIsStream = ['direct', 'iptv', 'sports', 'nsfw'].includes(presetType)
+  const presetIsLive = searchParams.get('isLive') === 'true' || presetType === 'iptv' || presetType === 'sports'
 
   const [title, setTitle] = useState(presetTitle)
   const [url, setUrl] = useState(
@@ -92,9 +93,10 @@ export default function CreateRoomPage() {
     }
     if (isDirectVideoUrl(value) || /\.(mp4|m3u8|mkv|avi|mov|webm|flv|ts)(\?|#|$)/i.test(value)) {
       const playbackUrl = normalizePlaybackUrl(value.trim())
+      const isM3u8 = /\.m3u8(\?|#|$)/i.test(value)
       setVideoUrl(playbackUrl)
       setVideoId('')
-      setVideoType('direct')
+      setVideoType(isM3u8 ? 'iptv' : 'direct')
       clear()
       setYtResults([])
     }
@@ -103,25 +105,53 @@ export default function CreateRoomPage() {
   const onYtSearch = async (e) => {
     e?.preventDefault?.()
     if (!searchQuery.trim()) return
-    if (!hasYouTubeApiKey()) {
-      toast('Add VITE_YOUTUBE_API_KEY for YouTube search, or paste a video URL', {
-        variant: 'warning',
-      })
-      return
-    }
     setYtLoading(true)
     setError(null)
     try {
-      const items = await searchYouTube(searchQuery.trim(), 12)
+      let items = []
+      if (hasYouTubeApiKey()) {
+        items = await searchYouTube(searchQuery.trim(), 12)
+      } else {
+        // No client-side key — use the server-side search instead.
+        // This works as long as YOUTUBE_API_KEY (or VITE_YOUTUBE_API_KEY)
+        // is configured on the Vercel server.
+        const token = await user.getIdToken()
+        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/media`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action: 'search',
+            layer: 'youtube',
+            query: searchQuery.trim(),
+            options: { limit: 12 },
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || `YouTube search failed (HTTP ${res.status})`)
+        }
+        items = (data.results || []).map((it) => ({
+          id: it.id,
+          title: it.title,
+          thumbnail: it.thumbnail,
+          channel: it.channel,
+          source: 'youtube',
+          url: `https://www.youtube.com/watch?v=${it.id}`,
+          embeddable: it.embeddable !== false,
+        }))
+      }
       setYtResults(
         items.map((it) => ({
           id: it.id,
           title: it.title,
           thumbnail: it.thumbnail,
-          channel: it.channelTitle,
+          channel: it.channel,
           source: 'youtube',
           url: `https://www.youtube.com/watch?v=${it.id}`,
-          embeddable: true,
+          embeddable: it.embeddable !== false,
         }))
       )
       if (!items.length) toast('No YouTube results', { variant: 'warning' })
@@ -258,10 +288,12 @@ export default function CreateRoomPage() {
       if (videoType === 'youtube' && videoId) {
         roomData.videoId = videoId
         roomData.videoType = 'youtube'
-      } else if (videoType === 'direct' && finalDirectUrl) {
+      } else if (finalDirectUrl) {
         roomData.videoUrl = finalDirectUrl
-        roomData.videoType = 'direct'
-        roomData.activityType = 'direct'
+        // Preserve IPTV / sports / NSFW type so the player treats live streams correctly
+        roomData.videoType = ['iptv', 'sports', 'nsfw'].includes(presetType) ? presetType : 'direct'
+        roomData.activityType = roomData.videoType === 'direct' ? 'direct' : roomData.videoType
+        if (presetIsLive) roomData.isLive = true
       }
 
       await setDoc(doc(db, 'rooms', roomId), roomData)
