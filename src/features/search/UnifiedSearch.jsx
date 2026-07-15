@@ -156,8 +156,22 @@ export default function UnifiedSearch() {
 
     const resultUrl = result.url || result.link
     if (result.requiresUserAction && resultUrl) {
-      window.open(resultUrl, '_blank', 'noopener,noreferrer')
-      toast.info('The provider requires a normal download step. Complete it there, then paste the final HTTPS URL into Chan if needed.')
+      // Some providers genuinely need the user to visit the site (e.g., download pages).
+      // But NSFW results should go to the room instead.
+      if (result.type !== 'nsfw') {
+        window.open(resultUrl, '_blank', 'noopener,noreferrer')
+        toast.info('The provider requires a normal download step. Complete it there, then paste the final HTTPS URL into Chan if needed.')
+        return
+      }
+      // For NSFW: navigate to create room with the provider URL as videoUrl
+      // The room will attempt to play it via iframe or redirect
+      const params = new URLSearchParams({
+        videoUrl: normalizePlaybackUrl(resultUrl),
+        title: result.title || 'Untitled',
+        type: 'nsfw',
+        thumbnail: result.thumbnail || result.image || '',
+      })
+      navigate(`/create?${params.toString()}`)
       return
     }
     let playable = result.isDirect || isDirectVideoUrl(resultUrl)
@@ -192,7 +206,7 @@ export default function UnifiedSearch() {
       }
     }
 
-    if (!finalUrl || (!playable && !resultUrl.includes('fzmovies') && !resultUrl.includes('netnaija') && !resultUrl.includes('9jarocks') && !resultUrl.includes('maxcinema'))) {
+    if (!finalUrl || (!playable && !resultUrl.includes('fzmovies') && !resultUrl.includes('netnaija') && !resultUrl.includes('9jarocks') && !resultUrl.includes('maxcinema') && result.type !== 'nsfw')) {
       toast.error('Could not extract direct media from this link. Try another option.')
       return
     }
