@@ -22,6 +22,7 @@
  */
 
 import * as cheerio from 'cheerio'
+import { resolveDoodUrl, isDoodUrl } from './doodResolver.js'
 
 const BASE_URL = 'https://www.maxcinema.name.ng'
 
@@ -216,7 +217,7 @@ export async function resolveMaxCinemaChain(infoPageUrl) {
 async function resolveServerUrl(serverUrl) {
   try {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 10000)
+    const timer = setTimeout(() => controller.abort(), 5000)
 
     const res = await fetch(serverUrl, {
       method: 'HEAD',
@@ -240,9 +241,34 @@ async function resolveServerUrl(serverUrl) {
         const isKoyeb = parsed.hostname.includes('koyeb.app')
 
         // For Koyeb CDN: decode the name parameter
-        // For other CDNs (dood.li, etc.): the URL is the direct download
+        // For other CDNs (dood.li, etc.): try to resolve the actual video URL
         if (!isKoyeb) {
-          // External CDN (dood.li, etc.) — return as a direct link needing proxy
+          // Try DoodStream resolution first
+          if (isDoodUrl(location)) {
+            try {
+              const doodResolved = await resolveDoodUrl(location)
+              if (doodResolved && doodResolved.videoUrl) {
+                // Route through proxy for HTTPS + reliability
+                const videoUrl = `/api/proxy?url=${encodeURIComponent(doodResolved.videoUrl)}`
+                return [{
+                  title: '', // Will be filled by page title fallback
+                  url: videoUrl,
+                  link: videoUrl,
+                  source: 'maxcinema',
+                  type: 'direct',
+                  isDirect: true,
+                  playableInRoom: true,
+                  quality: 'HD',
+                  meta: 'DoodStream — auto-resolved for playback',
+                  resolvedFrom: serverUrl,
+                }]
+              }
+            } catch (err) {
+              console.error('MaxCinema→DoodStream resolve error:', err.message)
+            }
+          }
+
+          // External CDN (not resolvable) — return as a direct link needing proxy
           const isMkv = location.toLowerCase().includes('.mkv')
           const isMp4 = location.toLowerCase().includes('.mp4')
           return [{
@@ -369,7 +395,7 @@ async function fetchHtml(url, retries = 1) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 8000)
+      const timeout = setTimeout(() => controller.abort(), 5000)
       const res = await fetch(url, {
         signal: controller.signal,
         redirect: 'follow',

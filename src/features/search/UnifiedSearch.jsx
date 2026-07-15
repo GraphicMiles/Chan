@@ -157,14 +157,42 @@ export default function UnifiedSearch() {
     const resultUrl = result.url || result.link
     if (result.requiresUserAction && resultUrl) {
       // Some providers genuinely need the user to visit the site (e.g., download pages).
-      // But NSFW results should go to the room instead.
+      // But NSFW results should try auto-resolving to a direct video URL.
       if (result.type !== 'nsfw') {
         window.open(resultUrl, '_blank', 'noopener,noreferrer')
         toast.info('The provider requires a normal download step. Complete it there, then paste the final HTTPS URL into Chan if needed.')
         return
       }
-      // For NSFW: navigate to create room with the provider URL as videoUrl
-      // The room will attempt to play it via iframe or redirect
+      // For NSFW: try to resolve the page to a direct video URL via the server
+      try {
+        toast.info('Resolving video from provider...')
+        const token = user ? await user.getIdToken() : ''
+        const res = await fetch('/api/media', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ action: 'scrape', url: resultUrl, site: result.source || 'nsfw', options: { resolve: true } }),
+        })
+        const data = await res.json().catch(() => ({ success: false }))
+        if (res.ok && data.success && data.results?.length > 0) {
+          const directItem = data.results.find(it => it.isDirect)
+          if (directItem) {
+            const params = new URLSearchParams({
+              videoUrl: normalizePlaybackUrl(directItem.url || directItem.link),
+              title: result.title || directItem.title || 'Untitled',
+              type: 'direct',
+              thumbnail: result.thumbnail || result.image || '',
+            })
+            navigate(`/create?${params.toString()}`)
+            return
+          }
+        }
+      } catch {
+        // Resolution failed — fall through to direct navigation
+      }
+      // Fallback: navigate to create room with the provider URL (may not play in-room)
       const params = new URLSearchParams({
         videoUrl: normalizePlaybackUrl(resultUrl),
         title: result.title || 'Untitled',

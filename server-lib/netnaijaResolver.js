@@ -421,7 +421,7 @@ async function fetchHtml(url, { accept404 = false } = {}, retries = 2) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 8000)
+      const timeout = setTimeout(() => controller.abort(), 5000)
       const res = await fetch(url, {
         signal: controller.signal,
         redirect: 'follow',

@@ -139,7 +139,7 @@ function extractIdentifier(url) {
  */
 async function fetchMetadata(identifier) {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 8000)
+  const timer = setTimeout(() => controller.abort(), 5000)
 
   try {
     const url = `https://archive.org/metadata/${encodeURIComponent(identifier)}`
