@@ -59,8 +59,8 @@ export default function CreateRoomPage() {
   const [nkiriLoading, setNkiriLoading] = useState(false)
   const [selectedEpisode, setSelectedEpisode] = useState(null)
 
-useEffect(() => {
-    if (!presetVideoUrl) return
+  useEffect(() => {
+    if (!presetVideoUrl || !user) return
 
     const id = extractVideoId(presetVideoUrl)
     if (id) {
