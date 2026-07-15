@@ -112,42 +112,44 @@ export default function MostStreamedCard({ room }) {
 
   const hoursWatched = useMemo(() => {
     try {
-      let createdMs = null
-      const created = room?.createdAt
-      if (created) {
-        // Firestore Timestamp — use toMillis() directly (UTC epoch ms)
-        if (typeof created.toMillis === 'function') {
-          createdMs = created.toMillis()
-        }
-        // Firestore Timestamp serialized as {seconds, nanoseconds}
-        else if (typeof created.seconds === 'number') {
-          createdMs = created.seconds * 1000 + Math.floor((created.nanoseconds || 0) / 1e6)
-        }
-        // JavaScript Date object
-        else if (created instanceof Date) {
-          createdMs = created.getTime()
-        }
+      // Calculate actual stream time from playerState, not room creation time
+      // playerState tracks the current playback position — that's how far viewers have watched
+      let watchedSeconds = 0
+      if (playerState && typeof playerState.currentTime === 'number') {
+        watchedSeconds = playerState.currentTime
       }
-      // Fallback to createdAtMs if available
-      if (createdMs == null && typeof room?.createdAtMs === 'number') {
-        createdMs = room.createdAtMs
-      }
-      // Last resort: can't determine creation time
-      if (createdMs == null) return '—'
 
-      const diffMs = Date.now() - createdMs
-      const diffMins = Math.floor(diffMs / 60000)
-      if (diffMins < 1) return '<1m'
-      if (diffMins < 60) return `${diffMins}m`
-      const diffHours = Math.floor(diffMins / 60)
-      const remainingMins = diffMins % 60
-      if (diffHours < 24) return remainingMins > 0 ? `${diffHours}h ${remainingMins}m` : `${diffHours}h`
-      const diffDays = Math.floor(diffHours / 24)
-      return `${diffDays}d`
+      // Fallback: if no playerState, estimate from room creation + participant count
+      // This is less accurate but better than showing raw room age
+      if (watchedSeconds < 1 && room?.createdAt) {
+        let createdMs = null
+        const created = room.createdAt
+        if (typeof created.toMillis === 'function') createdMs = created.toMillis()
+        else if (typeof created.seconds === 'number') createdMs = created.seconds * 1000 + Math.floor((created.nanoseconds || 0) / 1e6)
+        else if (created instanceof Date) createdMs = created.getTime()
+        if (createdMs == null && typeof room.createdAtMs === 'number') createdMs = room.createdAtMs
+        if (createdMs == null) return '—'
+
+        // Only show elapsed time if room actually has participants
+        const participants = typeof room.participantCount === 'number' ? room.participantCount : 0
+        if (participants <= 0) return '—'
+
+        const diffMs = Date.now() - createdMs
+        watchedSeconds = diffMs / 1000
+      }
+
+      if (watchedSeconds < 60) return '<1m'
+      const watchedMins = Math.floor(watchedSeconds / 60)
+      if (watchedMins < 60) return `${watchedMins}m`
+      const hours = Math.floor(watchedMins / 60)
+      const remainingMins = watchedMins % 60
+      if (hours < 24) return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`
+      const days = Math.floor(hours / 24)
+      return `${days}d`
     } catch {
       return '—'
     }
-  }, [room?.createdAt, room?.createdAtMs])
+  }, [room?.createdAt, room?.createdAtMs, room?.participantCount, playerState])
 
   const watchers = typeof room?.participantCount === 'number' && Number.isFinite(room.participantCount) ? Math.max(0, room.participantCount) : 0
   const watchersCount = `${watchers} watching`

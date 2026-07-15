@@ -47,10 +47,9 @@ export default function HomePage() {
 
   const filteredRooms = useMemo(() => {
     const term = search.trim().toLowerCase()
-    let list = rooms
     // Filter out stale rooms that have 0 participants but are still "live"
     // These are ghosts where the host disconnected before the room was cleaned up
-    list = list.filter((r) => (r.participantCount || 0) > 0)
+    let list = rooms.filter((r) => (r.participantCount || 0) > 0)
     if (term) {
       list = list.filter(
         (r) => r.title?.toLowerCase().includes(term) || r.hostName?.toLowerCase().includes(term)
@@ -61,6 +60,10 @@ export default function HomePage() {
       return (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)
     })
   }, [rooms, search, sortBy])
+
+  // Only count rooms with actual participants for all stats
+  const activeRooms = useMemo(() => rooms.filter((r) => (r.participantCount || 0) > 0), [rooms])
+  const totalViewers = activeRooms.reduce((sum, r) => sum + (r.participantCount || 0), 0)
 
   useEffect(() => {
     if (!lastRoom?.roomId || !user) { setContinueRoom(null); return }
@@ -95,8 +98,6 @@ export default function HomePage() {
     finally { setJoining(false) }
   }
 
-  const totalViewers = rooms.reduce((sum, r) => sum + (r.participantCount || 0), 0)
-
   const headerActions = user ? (
     <Button variant="ghost" size="md" onClick={logout} aria-label="Sign out" title="Sign out">
       <LogOut size={16} />
@@ -106,12 +107,9 @@ export default function HomePage() {
   )
 
   const mostWatchedRoom = useMemo(() => {
-    if (!rooms || !rooms.length) return null
-    // Only consider rooms with actual participants (exclude stale ghosts)
-    const activeRooms = rooms.filter((r) => (r.participantCount || 0) > 0)
     if (!activeRooms.length) return null
     return [...activeRooms].sort((a, b) => (b.participantCount || 0) - (a.participantCount || 0))[0]
-  }, [rooms])
+  }, [activeRooms])
 
   return (
     <Layout header={<Header user={user} actions={headerActions} />}>
@@ -119,7 +117,7 @@ export default function HomePage() {
         <div className={styles.badgeRow}>
           <span className={styles.badgePill}>
             <span className={styles.dotRed} />
-            {rooms.length} room{rooms.length !== 1 ? 's' : ''} live right now
+            {activeRooms.length} room{activeRooms.length !== 1 ? 's' : ''} live right now
           </span>
         </div>
         <h1 className={styles.heroTitle}>
@@ -215,10 +213,10 @@ export default function HomePage() {
         </form>
       </div>
 
-      {rooms.length > 0 && (
+      {activeRooms.length > 0 && (
         <div className={styles.statPill}>
           <span className={styles.dotRed} />
-          <strong>{rooms.length} live</strong>
+          <strong>{activeRooms.length} live</strong>
           <span className={styles.statSep}>&middot;</span>
           <span>{totalViewers} watching</span>
         </div>
