@@ -284,7 +284,7 @@ export default function UnifiedSearch() {
     const needsResolve = !playable
       || result.requiresUserAction === true
       || result.requiresResolve === true
-      || ['naijaprey', 'netnaija', 'maxcinema', 'nkiri', 'thenkiri', 'fzmovies', '9jarocks', 'fztvseries', 'meetdownload', 'waploaded', 'downloadwella'].includes(sourceKey)
+      || ['nkiri', 'thenkiri', 'downloadwella', 'maxcinema'].includes(sourceKey)
 
     if (needsResolve) {
       const isNsfwResult = result.type === 'nsfw' || result.isNSFW === true
@@ -320,9 +320,8 @@ export default function UnifiedSearch() {
     // Known multi-hop providers: allow navigation even if isDirect flag is missing
     // after a partial resolve (CreateRoom / player will re-normalize).
     const knownProviders = [
-      'fzmovies', 'netnaija', '9jarocks', 'maxcinema', 'naijaprey', 'o2tv',
-      'archive.org', 'meetdownload', 'waploaded', 'downloadwella', 'dood',
-      'nkiri', 'thenkiri', 'fztvseries', 'animedrive',
+      'nkiri', 'thenkiri', 'downloadwella', 'maxcinema', 'archive.org',
+      'archiveorg',
     ]
     const isKnownProvider = knownProviders.some((p) =>
       String(resultUrl).toLowerCase().includes(p) || String(result.source || '').toLowerCase().includes(p)
@@ -621,11 +620,11 @@ export default function UnifiedSearch() {
                     </h3>
                     
                     <div className={styles.meta}>
-                      {result.channel && (
-                        <span className={styles.channel}>{result.channel}</span>
-                      )}
-                      {result.source && (
-                        <span className={styles.source}>{result.source}</span>
+                      {result.duration && (
+                        <span className={styles.duration}>
+                          <Clock size={10} />
+                          {result.duration}
+                        </span>
                       )}
                       {result.views && (
                         <span className={styles.views}>
@@ -635,6 +634,11 @@ export default function UnifiedSearch() {
                       )}
                       {result.year && (
                         <span className={styles.year}>{result.year}</span>
+                      )}
+                      {result.isLive && (
+                        <span className={styles.liveBadge}>
+                          <Radio size={10} /> LIVE
+                        </span>
                       )}
                     </div>
 
