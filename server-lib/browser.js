@@ -4,24 +4,40 @@
  * Uses @sparticuz/chromium + puppeteer-core on Vercel (production),
  * full puppeteer for local development.
  *
- * Provides:
- *   - getBrowser(): launches or reuses a browser instance
- *   - resolveWithBrowser(url, options): opens a page, waits for JS, extracts content
- *   - closeBrowser(): clean shutdown
+ * IMPORTANT: @sparticuz/chromium and puppeteer-core are in devDependencies
+ * to avoid bundling 66MB into every Vercel function. On Vercel, these packages
+ * are NOT available in the function runtime. Browser-based resolution is
+ * therefore DISABLED on Vercel unless the packages are manually added to
+ * the function's node_modules via a layer or build step.
  *
- * Designed for Vercel serverless — minimizes cold starts by reusing
- * the browser across warm invocations within the same function instance.
+ * All callers should handle the case where getBrowser() throws —
+ * the search will simply skip browser-dependent providers.
  */
 
 let _browser = null
 let _launchPromise = null
+let _browserAvailable = null // null = unknown, true/false = tested
 
 const IS_PRODUCTION = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
 
 /**
+ * Check if browser-based resolution is available.
+ * On Vercel, returns false unless @sparticuz/chromium is in the function bundle.
+ * On local dev, returns true if puppeteer is installed.
+ */
+export function isBrowserAvailable() {
+  return _browserAvailable !== false
+}
+
+/**
  * Get a Puppeteer browser instance (launches if needed, reuses if warm)
+ * Throws if browser packages are not available.
  */
 export async function getBrowser() {
+  if (_browserAvailable === false) {
+    throw new Error('Browser is not available — @sparticuz/chromium not installed in this environment')
+  }
+
   if (_browser && _browser.connected) {
     return _browser
   }
@@ -33,8 +49,15 @@ export async function getBrowser() {
     try {
       if (IS_PRODUCTION) {
         // Production: @sparticuz/chromium (serverless-friendly)
-        const chromium = (await import('@sparticuz/chromium')).default
-        const puppeteer = (await import('puppeteer-core')).default
+        // This will throw if the package isn't in the function bundle
+        let chromium, puppeteer
+        try {
+          chromium = (await import('@sparticuz/chromium')).default
+          puppeteer = (await import('puppeteer-core')).default
+        } catch (importErr) {
+          _browserAvailable = false
+          throw new Error('Browser packages not available — MeetDownload/Waploaded resolution disabled on this deployment')
+        }
 
         _browser = await puppeteer.launch({
           args: [
@@ -51,9 +74,17 @@ export async function getBrowser() {
           headless: chromium.headless,
           ignoreHTTPSErrors: true,
         })
+        _browserAvailable = true
       } else {
         // Local dev: full puppeteer with bundled Chromium
-        const puppeteer = (await import('puppeteer')).default
+        let puppeteer
+        try {
+          puppeteer = (await import('puppeteer')).default
+        } catch (importErr) {
+          _browserAvailable = false
+          throw new Error('Puppeteer not installed — run `npm install` to enable browser-based resolution')
+        }
+
         _browser = await puppeteer.launch({
           headless: true,
           args: [
@@ -63,6 +94,7 @@ export async function getBrowser() {
             '--disable-gpu',
           ],
         })
+        _browserAvailable = true
       }
 
       // Auto-cleanup when browser disconnects
@@ -94,13 +126,7 @@ export async function closeBrowser() {
  * Resolve a page using Puppeteer — navigates, waits for JS/countdowns,
  * and extracts download links or direct media URLs.
  *
- * @param {string} url - The page URL to resolve
- * @param {object} options
- * @param {number} options.timeout - Max wait time in ms (default 15000)
- * @param {string} options.waitForSelector - CSS selector to wait for before extracting
- * @param {number} options.countdownSeconds - Seconds to wait for JS countdowns (default 6)
- * @param {Function} options.extractFn - Custom extraction function: (page, url) => results[]
- * @returns {Promise<Array<{title, url, source, isDirect, playableInRoom}>>}
+ * Returns empty array if browser is not available (graceful degradation).
  */
 export async function resolveWithBrowser(url, options = {}) {
   const {
@@ -162,8 +188,6 @@ export async function resolveWithBrowser(url, options = {}) {
     if (page) {
       try { await page.close() } catch { /* ignore */ }
     }
-    // Don't close browser — reuse for warm invocations
-    // Vercel will clean up when the function instance is recycled
   }
 }
 
@@ -236,6 +260,7 @@ async function extractMediaLinks(page, pageUrl) {
 
 /**
  * Extract page HTML after JS execution (for sites that render content dynamically)
+ * Returns null if browser is not available.
  */
 export async function getRenderedHtml(url, options = {}) {
   const { timeout = 10000, waitForSelector = null } = options
@@ -273,12 +298,10 @@ export async function getRenderedHtml(url, options = {}) {
 
 /**
  * MeetDownload resolver — handles JS countdown and token extraction
- *
- * MeetDownload URLs follow the pattern:
- *   meetdownload.com/HASH/filename
- * After JS execution + countdown, a direct download link appears.
+ * Returns empty array if browser is not available.
  */
 export async function resolveMeetDownload(url) {
+  if (!isBrowserAvailable()) return []
   return await resolveWithBrowser(url, {
     countdownSeconds: 8,
     waitForSelector: 'a[href*=".mp4"], a[href*=".mkv"], a[href*="download"], .download-btn, #download',
@@ -292,7 +315,6 @@ export async function resolveMeetDownload(url) {
             return true
           }
         }
-        // Also check for download buttons that may have been created
         const btns = document.querySelectorAll('button, .btn, [class*="download"]')
         return btns.length > 0
       }, { timeout: 10000 }).catch(() => {})
@@ -314,11 +336,10 @@ export async function resolveMeetDownload(url) {
 
 /**
  * Waploaded resolver — handles JS-rendered search results
- *
- * Waploaded's search results are rendered client-side.
- * We load the page in Puppeteer and extract the results.
+ * Returns empty array if browser is not available.
  */
 export async function resolveWaploaded(url) {
+  if (!isBrowserAvailable()) return []
   return await resolveWithBrowser(url, {
     timeout: 10000,
     countdownSeconds: 2,
@@ -360,8 +381,10 @@ export async function resolveWaploaded(url) {
 
 /**
  * Generic browser-based resolver for any site that needs JS execution
+ * Returns empty array if browser is not available.
  */
 export async function resolveGenericBrowser(url, { countdown = 5, waitFor = null } = {}) {
+  if (!isBrowserAvailable()) return []
   return await resolveWithBrowser(url, {
     countdownSeconds: countdown,
     waitForSelector: waitFor,
