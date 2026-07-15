@@ -5,7 +5,7 @@ import { VolumeX, Volume2, MoreVertical, Bookmark, Share2, Play, Clock, Users, C
 import { doc, onSnapshot, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../../shared/lib/firebase.js'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
-import { normalizePlaybackUrl } from '../../../shared/lib/youtube.js'
+import { normalizePlaybackUrl, getThumbnail } from '../../../shared/lib/youtube.js'
 import { useToast } from '../../../shared/ui/index.js'
 import styles from './MostStreamedCard.module.scss'
 
@@ -13,16 +13,28 @@ function youtubeUrl(videoId) {
   return videoId ? `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}` : ''
 }
 
+function formatWatched(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 1) return '—'
+  if (seconds < 60) return '<1m'
+  const mins = Math.floor(seconds / 60)
+  if (mins < 60) return `${mins}m`
+  const hours = Math.floor(mins / 60)
+  const remainingMins = mins % 60
+  if (hours < 24) return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`
+  const days = Math.floor(hours / 24)
+  return `${days}d`
+}
+
 export default function MostStreamedCard({ room }) {
   const { user } = useAuth()
   const { toast } = useToast()
-  
+
   const [isMuted, setIsMuted] = useState(true) // Off by default
   const [showMenu, setShowMenu] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [playerState, setPlayerState] = useState(null)
   const [playbackError, setPlaybackError] = useState(false)
-  
+
   const videoRef = useRef(null)
   const playerRef = useRef(null)
 
@@ -31,6 +43,9 @@ export default function MostStreamedCard({ room }) {
   const safeHostName = room?.hostName || 'Host'
   const isDirect = room?.videoType === 'direct' || (!room?.videoId && Boolean(room?.videoUrl))
   const fallbackThumb = room?.thumbnail || room?.image || room?.poster || (isDirect ? null : getThumbnail(room?.videoId)) || null
+  const watchers = typeof room?.participantCount === 'number' && Number.isFinite(room.participantCount)
+    ? Math.max(0, room.participantCount)
+    : 0
 
   const streamUrl = useMemo(() => {
     if (!room) return ''
@@ -62,6 +77,8 @@ export default function MostStreamedCard({ room }) {
       (snap) => {
         if (snap.exists()) {
           setPlayerState(snap.data())
+        } else {
+          setPlayerState(null)
         }
       },
       () => {
@@ -71,9 +88,13 @@ export default function MostStreamedCard({ room }) {
     return unsub
   }, [safeRoomId])
 
-  // Sync direct <video> playback
+  // Sync direct <video> playback — only when someone is actually watching
   useEffect(() => {
     if (!isDirect || !videoRef.current || !playerState || playbackError) return
+    if (watchers <= 0) {
+      try { videoRef.current.pause() } catch { /* ignore */ }
+      return
+    }
     try {
       const baseMs = playerState.clientTimeMs || (playerState.updatedAt?.toMillis ? playerState.updatedAt.toMillis() : Date.now())
       const elapsedSec = playerState.isPlaying ? Math.max(0, (Date.now() - baseMs) / 1000) : 0
@@ -91,11 +112,12 @@ export default function MostStreamedCard({ room }) {
     } catch {
       /* ignore video sync error */
     }
-  }, [isDirect, playerState, playbackError])
+  }, [isDirect, playerState, playbackError, watchers])
 
   // Sync ReactPlayer (YouTube)
   useEffect(() => {
     if (isDirect || !playerRef.current || !playerState || playbackError) return
+    if (watchers <= 0) return
     try {
       const baseMs = playerState.clientTimeMs || (playerState.updatedAt?.toMillis ? playerState.updatedAt.toMillis() : Date.now())
       const elapsedSec = playerState.isPlaying ? Math.max(0, (Date.now() - baseMs) / 1000) : 0
@@ -108,53 +130,33 @@ export default function MostStreamedCard({ room }) {
     } catch {
       /* ignore reactplayer sync error */
     }
-  }, [isDirect, playerState, playbackError])
+  }, [isDirect, playerState, playbackError, watchers])
 
+  // Stream time = actual playback position from playerState.
+  // NEVER fall back to room age — that was the "wrong hours watched" bug.
+  // If nobody is watching or there is no player state, show "—".
   const hoursWatched = useMemo(() => {
     try {
-      // Calculate actual stream time from playerState, not room creation time
-      // playerState tracks the current playback position — that's how far viewers have watched
-      let watchedSeconds = 0
-      if (playerState && typeof playerState.currentTime === 'number') {
-        watchedSeconds = playerState.currentTime
+      if (watchers <= 0) return '—'
+      if (!playerState || typeof playerState.currentTime !== 'number') return '—'
+      let watchedSeconds = Math.max(0, Number(playerState.currentTime) || 0)
+      // If currently playing, include elapsed since last heartbeat write
+      if (playerState.isPlaying) {
+        const baseMs = playerState.clientTimeMs
+          || (playerState.updatedAt?.toMillis ? playerState.updatedAt.toMillis() : 0)
+        if (baseMs > 0) {
+          watchedSeconds += Math.max(0, (Date.now() - baseMs) / 1000)
+        }
       }
-
-      // Fallback: if no playerState, estimate from room creation + participant count
-      // This is less accurate but better than showing raw room age
-      if (watchedSeconds < 1 && room?.createdAt) {
-        let createdMs = null
-        const created = room.createdAt
-        if (typeof created.toMillis === 'function') createdMs = created.toMillis()
-        else if (typeof created.seconds === 'number') createdMs = created.seconds * 1000 + Math.floor((created.nanoseconds || 0) / 1e6)
-        else if (created instanceof Date) createdMs = created.getTime()
-        if (createdMs == null && typeof room.createdAtMs === 'number') createdMs = room.createdAtMs
-        if (createdMs == null) return '—'
-
-        // Only show elapsed time if room actually has participants
-        const participants = typeof room.participantCount === 'number' ? room.participantCount : 0
-        if (participants <= 0) return '—'
-
-        const diffMs = Date.now() - createdMs
-        watchedSeconds = diffMs / 1000
-      }
-
-      if (watchedSeconds < 60) return '<1m'
-      const watchedMins = Math.floor(watchedSeconds / 60)
-      if (watchedMins < 60) return `${watchedMins}m`
-      const hours = Math.floor(watchedMins / 60)
-      const remainingMins = watchedMins % 60
-      if (hours < 24) return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`
-      const days = Math.floor(hours / 24)
-      return `${days}d`
+      return formatWatched(watchedSeconds)
     } catch {
       return '—'
     }
-  }, [room?.createdAt, room?.createdAtMs, room?.participantCount, playerState])
+  }, [playerState, watchers])
 
-  const watchers = typeof room?.participantCount === 'number' && Number.isFinite(room.participantCount) ? Math.max(0, room.participantCount) : 0
   const watchersCount = `${watchers} watching`
 
-  if (!room || !safeRoomId) return null
+  if (!room || !safeRoomId || watchers <= 0) return null
 
   const handleWatchLater = async (e) => {
     e.stopPropagation()
@@ -197,6 +199,7 @@ export default function MostStreamedCard({ room }) {
   }
 
   const formattedTitle = safeTitle.length > 45 ? `${safeTitle.slice(0, 45)}...` : safeTitle
+  const previewPlaying = watchers > 0 && Boolean(playerState?.isPlaying)
 
   return (
     <div className={styles.cardContainer} onClick={() => setShowMenu(false)}>
@@ -256,7 +259,7 @@ export default function MostStreamedCard({ room }) {
               <video
                 ref={videoRef}
                 src={streamUrl}
-                autoPlay
+                autoPlay={previewPlaying}
                 playsInline
                 muted={isMuted}
                 controls={false}
@@ -268,7 +271,7 @@ export default function MostStreamedCard({ room }) {
                 <ReactPlayer
                   ref={playerRef}
                   url={streamUrl}
-                  playing={Boolean(playerState?.isPlaying ?? true)}
+                  playing={previewPlaying}
                   muted={isMuted}
                   width="100%"
                   height="100%"
@@ -276,7 +279,7 @@ export default function MostStreamedCard({ room }) {
                   onError={() => setPlaybackError(true)}
                   config={{
                     youtube: {
-                      playerVars: { rel: 0, modestbranding: 1, playsInline: 1, controls: 0, disablekb: 1, autoplay: 1 },
+                      playerVars: { rel: 0, modestbranding: 1, playsInline: 1, controls: 0, disablekb: 1, autoplay: previewPlaying ? 1 : 0 },
                     },
                   }}
                 />

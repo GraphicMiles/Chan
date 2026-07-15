@@ -143,6 +143,60 @@ export default function UnifiedSearch() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  const resolveMediaUrl = useCallback(async (resultUrl, site, label) => {
+    if (!resultUrl) return null
+    toast.info(`Resolving ${label || site || 'provider'} video...`)
+    try {
+      const token = user ? await user.getIdToken() : ''
+      const res = await fetch('/api/media', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          action: 'scrape',
+          url: resultUrl,
+          site: site || 'custom',
+          options: { resolve: true },
+        }),
+      })
+      // Vercel sometimes returns HTML error pages (504/500) — never crash on JSON parse
+      const text = await res.text()
+      let data = null
+      try {
+        data = JSON.parse(text)
+      } catch {
+        const isTimeout = res.status === 504 || /timeout|504/i.test(text)
+        throw new Error(
+          isTimeout
+            ? 'Resolution timed out — the provider is slow. Try again or pick another result.'
+            : `Resolution failed (HTTP ${res.status}). Try another result.`
+        )
+      }
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.error || `Resolution failed (HTTP ${res.status})`)
+      }
+      const results = data?.results || []
+      const directItem = results.find((it) => it.isDirect || isDirectVideoUrl(it.url || it.link))
+        || results.find((it) => it.playableInRoom)
+        || null
+      if (directItem) {
+        return {
+          url: directItem.url || directItem.link,
+          title: directItem.title,
+          thumbnail: directItem.thumbnail || directItem.image || null,
+          isDirect: true,
+          source: directItem.source || site,
+        }
+      }
+      return null
+    } catch (err) {
+      toast.error(err.message || 'Could not resolve this link')
+      return null
+    }
+  }, [user])
+
   const handleResultSelect = useCallback(async (result) => {
     if ((result.type || activeLayer) === 'youtube' && result.id) {
       const params = new URLSearchParams({
@@ -154,90 +208,58 @@ export default function UnifiedSearch() {
       return
     }
 
-    const resultUrl = result.url || result.link
-    if (result.requiresUserAction && resultUrl) {
-      // Some providers genuinely need the user to visit the site (e.g., download pages).
-      // But NSFW results should try auto-resolving to a direct video URL.
-      if (result.type !== 'nsfw') {
-        window.open(resultUrl, '_blank', 'noopener,noreferrer')
-        toast.info('The provider requires a normal download step. Complete it there, then paste the final HTTPS URL into Chan if needed.')
-        return
-      }
-      // For NSFW: try to resolve the page to a direct video URL via the server
-      try {
-        toast.info('Resolving video from provider...')
-        const token = user ? await user.getIdToken() : ''
-        const res = await fetch('/api/media', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ action: 'scrape', url: resultUrl, site: result.source || 'nsfw', options: { resolve: true } }),
-        })
-        const data = await res.json().catch(() => ({ success: false }))
-        if (res.ok && data.success && data.results?.length > 0) {
-          const directItem = data.results.find(it => it.isDirect)
-          if (directItem) {
-            const params = new URLSearchParams({
-              videoUrl: normalizePlaybackUrl(directItem.url || directItem.link),
-              title: result.title || directItem.title || 'Untitled',
-              type: 'direct',
-              thumbnail: result.thumbnail || result.image || '',
-            })
-            navigate(`/create?${params.toString()}`)
-            return
-          }
-        }
-      } catch {
-        // Resolution failed — fall through to direct navigation
-      }
-      // Fallback: navigate to create room with the provider URL (may not play in-room)
+    // IPTV / live streams are already direct m3u8/mp4 URLs
+    if ((result.type === 'iptv' || result.isLive) && (result.url || result.link)) {
+      const liveUrl = result.url || result.link
       const params = new URLSearchParams({
-        videoUrl: normalizePlaybackUrl(resultUrl),
-        title: result.title || 'Untitled',
-        type: 'nsfw',
+        videoUrl: normalizePlaybackUrl(liveUrl),
+        title: result.title || 'Live Stream',
+        type: result.type === 'sports' ? 'sports' : 'iptv',
         thumbnail: result.thumbnail || result.image || '',
+        isLive: 'true',
       })
+      if (result.matchInfo) params.set('matchInfo', JSON.stringify(result.matchInfo))
       navigate(`/create?${params.toString()}`)
       return
     }
-    let playable = result.isDirect || isDirectVideoUrl(resultUrl)
+
+    const resultUrl = result.url || result.link
+    if (!resultUrl) {
+      toast.error('This result has no playable URL')
+      return
+    }
+
+    let playable = result.isDirect === true || result.playableInRoom === true || isDirectVideoUrl(resultUrl)
     let finalUrl = resultUrl
     let finalThumb = result.thumbnail || result.image || ''
     let finalTitle = result.title || 'Untitled'
 
-    if (!playable && resultUrl) {
-      toast.info(`Resolving direct video from ${result.source || 'provider'}...`)
-      try {
-        const token = user ? await user.getIdToken() : ''
-        const res = await fetch('/api/media', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ action: 'scrape', url: resultUrl, site: result.source || 'custom', options: { resolve: true } }),
-        })
-        const data = await res.json().catch(() => ({ success: false }))
-        if (res.ok && data.success && data.results?.length > 0) {
-          const directItem = data.results.find((it) => it.isDirect || isDirectVideoUrl(it.url || it.link)) || data.results[0]
-          if (directItem) {
-            playable = Boolean(directItem.isDirect || isDirectVideoUrl(directItem.url || directItem.link))
-            finalUrl = directItem.url || directItem.link || finalUrl
-            if (directItem.thumbnail || directItem.image) finalThumb = directItem.thumbnail || directItem.image
-            if (directItem.title && directItem.title !== 'Untitled') finalTitle = directItem.title
-          }
-        }
-      } catch {
-        /* ignore resolution check error */
+    // Always attempt server-side resolution for non-direct page links across ALL media types
+    // (direct, nsfw, netnaija, naijaprey, maxcinema, o2tv, archive, doodstream, etc.)
+    const needsResolve = !playable || result.requiresUserAction === true
+    if (needsResolve) {
+      const resolved = await resolveMediaUrl(
+        resultUrl,
+        result.source || result.provider || (result.type === 'nsfw' ? 'nsfw' : 'custom'),
+        result.source || result.type || 'provider'
+      )
+      if (resolved?.url) {
+        playable = true
+        finalUrl = resolved.url
+        if (resolved.thumbnail) finalThumb = resolved.thumbnail
+        if (resolved.title && resolved.title !== 'Untitled') finalTitle = resolved.title
+      } else if (result.requiresUserAction && result.type !== 'nsfw' && result.type !== 'direct') {
+        // Genuine download-gate providers: open externally as last resort
+        window.open(resultUrl, '_blank', 'noopener,noreferrer')
+        toast.info('Could not auto-extract a stream. Complete the download step on the provider page, then paste the final HTTPS URL into Chan.')
+        return
       }
     }
 
-    // NSFW results: provider pages can't be resolved server-side, but users
-    // still want to watch them. Navigate to create room with the provider URL.
-    // The room will open it in an iframe for playback.
+    // NSFW fallback: if resolution failed, still try create room with provider URL
+    // (proxy path may still work for some hosts; better than hard-failing)
     if (result.type === 'nsfw' && !playable && finalUrl) {
+      toast.warning('Could not extract a direct stream — room may not play this source in-browser.')
       const params = new URLSearchParams({
         videoUrl: normalizePlaybackUrl(finalUrl),
         title: finalTitle,
@@ -248,10 +270,22 @@ export default function UnifiedSearch() {
       return
     }
 
-    if (!finalUrl || (!playable && !resultUrl.includes('fzmovies') && !resultUrl.includes('netnaija') && !resultUrl.includes('9jarocks') && !resultUrl.includes('maxcinema'))) {
+    // Known multi-hop providers: allow navigation even if isDirect flag is missing
+    // after a partial resolve (CreateRoom / player will re-normalize).
+    const knownProviders = [
+      'fzmovies', 'netnaija', '9jarocks', 'maxcinema', 'naijaprey', 'o2tv',
+      'archive.org', 'meetdownload', 'waploaded', 'downloadwella', 'dood',
+      'nkiri', 'thenkiri', 'fztvseries', 'animedrive',
+    ]
+    const isKnownProvider = knownProviders.some((p) =>
+      String(resultUrl).toLowerCase().includes(p) || String(result.source || '').toLowerCase().includes(p)
+    )
+
+    if (!finalUrl || (!playable && !isKnownProvider)) {
       toast.error('Could not extract direct media from this link. Try another option.')
       return
     }
+
     const playbackUrl = normalizePlaybackUrl(finalUrl)
     const params = new URLSearchParams({
       videoUrl: playbackUrl,
@@ -259,12 +293,12 @@ export default function UnifiedSearch() {
       type: ['iptv', 'sports', 'nsfw'].includes(result.type) ? result.type : 'direct',
       thumbnail: finalThumb,
     })
-    
+
     if (result.matchInfo) params.set('matchInfo', JSON.stringify(result.matchInfo))
     if (result.isLive) params.set('isLive', 'true')
-    
+
     navigate(`/create?${params.toString()}`)
-  }, [navigate, activeLayer])
+  }, [navigate, activeLayer, resolveMediaUrl, user])
 
   const handleDirectUrlSubmit = useCallback(() => {
     if (isDirectVideoUrl(query)) {

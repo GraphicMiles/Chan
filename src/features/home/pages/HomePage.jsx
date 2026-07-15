@@ -13,6 +13,32 @@ import { ErrorBoundary } from '../../../shared/components/ErrorBoundary.jsx'
 import { getLastRoom } from '../../room/hooks/useRoom.js'
 import styles from './HomePage.module.css'
 
+/**
+ * A room is "truly live" only when:
+ *  - status is live (already filtered by query)
+ *  - participantCount > 0
+ *  - lastHeartbeat is fresh (< 3 minutes) OR created recently (< 3 minutes)
+ * This prevents ghost rooms (host left, count stuck, no cleanup yet) from
+ * inflating the "N rooms live" badge and Most Streamed card.
+ */
+function isTrulyLive(room, nowMs = Date.now()) {
+  if (!room) return false
+  const count = typeof room.participantCount === 'number' ? room.participantCount : 0
+  if (count <= 0) return false
+
+  const heartbeatMs = room.lastHeartbeat?.toMillis?.()
+    ?? (typeof room.lastHeartbeat?.seconds === 'number' ? room.lastHeartbeat.seconds * 1000 : 0)
+  const createdMs = room.createdAt?.toMillis?.()
+    ?? (typeof room.createdAt?.seconds === 'number' ? room.createdAt.seconds * 1000 : 0)
+    ?? (typeof room.createdAtMs === 'number' ? room.createdAtMs : 0)
+
+  const FRESH_MS = 3 * 60 * 1000
+  if (heartbeatMs > 0) return (nowMs - heartbeatMs) < FRESH_MS
+  if (createdMs > 0) return (nowMs - createdMs) < FRESH_MS
+  // No timestamps at all — treat as ghost
+  return false
+}
+
 export default function HomePage() {
   const { user, loading, logout } = useAuth()
   const navigate = useNavigate()
@@ -25,8 +51,15 @@ export default function HomePage() {
   const [joining, setJoining] = useState(false)
   const [lastRoom, setLastRoom] = useState(null)
   const [continueRoom, setContinueRoom] = useState(null)
+  const [nowTick, setNowTick] = useState(Date.now())
 
   useEffect(() => { setLastRoom(getLastRoom()) }, [])
+
+  // Re-evaluate "freshness" every 30s so ghost rooms drop off without a full reload
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 30000)
+    return () => clearInterval(t)
+  }, [])
 
   useEffect(() => {
     if (!user) { setRoomsLoading(false); return undefined }
@@ -45,11 +78,15 @@ export default function HomePage() {
     return unsub
   }, [user, toast])
 
+  // Only rooms with real live participants + fresh heartbeat
+  const activeRooms = useMemo(
+    () => rooms.filter((r) => isTrulyLive(r, nowTick)),
+    [rooms, nowTick]
+  )
+
   const filteredRooms = useMemo(() => {
     const term = search.trim().toLowerCase()
-    // Filter out stale rooms that have 0 participants but are still "live"
-    // These are ghosts where the host disconnected before the room was cleaned up
-    let list = rooms.filter((r) => (r.participantCount || 0) > 0)
+    let list = activeRooms
     if (term) {
       list = list.filter(
         (r) => r.title?.toLowerCase().includes(term) || r.hostName?.toLowerCase().includes(term)
@@ -59,24 +96,25 @@ export default function HomePage() {
       if (sortBy === 'popular') return (b.participantCount || 0) - (a.participantCount || 0)
       return (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)
     })
-  }, [rooms, search, sortBy])
+  }, [activeRooms, search, sortBy])
 
-  // Only count rooms with actual participants for all stats
-  const activeRooms = useMemo(() => rooms.filter((r) => (r.participantCount || 0) > 0), [rooms])
   const totalViewers = activeRooms.reduce((sum, r) => sum + (r.participantCount || 0), 0)
 
   useEffect(() => {
     if (!lastRoom?.roomId || !user) { setContinueRoom(null); return }
     const found = rooms.find((r) => r.id === lastRoom.roomId)
-    if (found) { setContinueRoom(found); return }
+    // Only offer continue if the room is still truly live
+    if (found && isTrulyLive(found, nowTick)) { setContinueRoom(found); return }
     getDoc(doc(db, 'rooms', lastRoom.roomId))
       .then((snap) => {
         if (snap.exists() && snap.data().status === 'live') {
-          setContinueRoom({ id: snap.id, ...snap.data() })
+          const data = { id: snap.id, ...snap.data() }
+          if (isTrulyLive(data, Date.now())) setContinueRoom(data)
+          else setContinueRoom(null)
         } else { setContinueRoom(null) }
       })
       .catch(() => setContinueRoom(null))
-  }, [rooms, lastRoom, user])
+  }, [rooms, lastRoom, user, nowTick])
 
   const joinByInvite = async (e) => {
     e.preventDefault()

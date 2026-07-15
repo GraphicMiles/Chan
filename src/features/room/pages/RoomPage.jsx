@@ -91,9 +91,25 @@ export default function RoomPage() {
     kickParticipant,
     promoteParticipant,
     muteParticipant,
+    reportPlayerPosition,
   } = useRoom(roomId, inviteCode)
 
   const { isHost, writePlayerState, canControl } = usePlayerSync(roomId, room, playerRef)
+
+  // Continuously report player position so leave/beforeunload can freeze the exact timestamp
+  useEffect(() => {
+    if (!reportPlayerPosition) return undefined
+    const tick = () => {
+      const player = playerRef.current
+      if (!player || typeof player.getCurrentTime !== 'function') return
+      const t = player.getCurrentTime?.() || 0
+      const playing = player.getPlayerState?.() === 1
+      reportPlayerPosition(t, playing)
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [reportPlayerPosition, joined, roomId])
 
   useEffect(() => () => {
     if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current)
@@ -338,9 +354,19 @@ export default function RoomPage() {
 
   const onPlayerReady = (player) => {
     playerRef.current = player || null
+    if (player && reportPlayerPosition) {
+      try {
+        reportPlayerPosition(player.getCurrentTime?.() || 0, player.getPlayerState?.() === 1)
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
   const onPlayerEvent = (patch) => {
+    if (patch && typeof patch.currentTime === 'number' && reportPlayerPosition) {
+      reportPlayerPosition(patch.currentTime, patch.isPlaying)
+    }
     if (canControl) writePlayerState(patch)
   }
 
