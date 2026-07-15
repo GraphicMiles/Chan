@@ -10,7 +10,7 @@
 
 Every single frontend component (`src/features/`, `src/shared/`), React hook (`src/hooks/`), serverless API endpoint (`api/`), and utility helper was inspected at a deep level to ensure **zero race conditions, zero memory leaks, zero reference errors, zero stale endpoints, and strict adherence to a 3-serverless-function Vercel architecture**.
 
-### 1. Backend Serverless Architecture (`api/`) — Consolidated into exactly 3 Functions
+### 1. Backend Serverless Architecture (`api/`) Consolidated into exactly 3 Functions
 To permanently avoid Vercel Hobby plan limitations (`"12 Serverless Functions limit exceeded"`), the backend has been strictly consolidated:
 *   **`api/media.js` (`POST /api/media`) — [Serverless Function 1]**:
     *   **Capabilities:** Multi-layer unified media search, single-page extraction, and background IPTV catalog checks (`action: 'search' | 'scrape' | 'refreshCatalog'`).
