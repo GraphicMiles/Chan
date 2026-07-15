@@ -55,8 +55,11 @@ export default function CreateRoomPage() {
   const [embedWarning, setEmbedWarning] = useState(null)
   const [ytResults, setYtResults] = useState([])
   const [ytLoading, setYtLoading] = useState(false)
+  const [nkiriEpisodes, setNkiriEpisodes] = useState([])
+  const [nkiriLoading, setNkiriLoading] = useState(false)
+  const [selectedEpisode, setSelectedEpisode] = useState(null)
 
-  useEffect(() => {
+useEffect(() => {
     if (!presetVideoUrl) return
 
     const id = extractVideoId(presetVideoUrl)
@@ -67,9 +70,33 @@ export default function CreateRoomPage() {
       return
     }
 
+    // Detect Nkiri URLs
+    if (/thenkiri\.com|nkiri\.com/i.test(presetVideoUrl)) {
+      setNkiriLoading(true)
+      user.getIdToken().then((token) => {
+        return fetch('/api/media', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ action: 'scrape', url: presetVideoUrl }),
+        })
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.results && data.results.length > 0) {
+            setNkiriEpisodes(data.results)
+          }
+        })
+        .catch((err) => console.error('Nkiri fetch failed:', err))
+        .finally(() => setNkiriLoading(false))
+      return
+    }
+
     if (presetIsStream || isDirectVideoUrl(presetVideoUrl) || presetVideoUrl) {
       const normalized = normalizePlaybackUrl(presetVideoUrl)
-      const isM3u8 = /\.m3u8(\?|#|$)/i.test(presetVideoUrl)
+      const isM3u8 = /\\.m3u8(\\?|#|$)/i.test(presetVideoUrl)
       setVideoUrl(normalized)
       setVideoType(isM3u8 ? 'iptv' : 'direct')
       setVideoId('')
@@ -251,7 +278,29 @@ export default function CreateRoomPage() {
         throw new Error('Pick a valid YouTube video')
       }
       
-      const finalDirectUrl = normalizePlaybackUrl(videoUrl || url || '')
+      // Resolve Nkiri/downloadwella URLs via Puppeteer
+      let resolvedUrl = videoUrl || url || ''
+      if (/downloadwella\.com/i.test(resolvedUrl)) {
+        try {
+          const token = await user.getIdToken()
+          const res = await fetch('/api/media', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ action: 'scrape', url: resolvedUrl }),
+          })
+          const data = await res.json()
+          if (data.results && data.results.length > 0 && data.results[0].url) {
+            resolvedUrl = data.results[0].url
+          }
+        } catch (err) {
+          console.error('Downloadwella resolution failed:', err)
+        }
+      }
+      
+      const finalDirectUrl = normalizePlaybackUrl(resolvedUrl)
       const isActualUrl = typeof finalDirectUrl === 'string' && (/^https?:\/\//i.test(finalDirectUrl) || finalDirectUrl.startsWith('/api/proxy'))
       if (videoType === 'direct') {
         if (!isActualUrl && !presetIsStream) {
@@ -352,6 +401,37 @@ export default function CreateRoomPage() {
         <p className={styles.subtitle}>
           Pick an embeddable YouTube video, or a direct video file URL (.mp4 / .m3u8).
         </p>
+
+
+        {/* Nkiri Episode Grid */}
+        {nkiriEpisodes.length > 0 && (
+          <div className={styles.nkiriSection}>
+            <h2 className={styles.nkiriTitle}>{presetTitle || 'Select Episode'}</h2>
+            {nkiriLoading ? (
+              <p>Loading episodes...</p>
+            ) : (
+              <div className={styles.episodeGrid}>
+                {nkiriEpisodes.map((ep, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className={`${styles.episodeCard} ${selectedEpisode === idx ? styles.episodeSelected : ''}`}
+                    onClick={() => {
+                      setSelectedEpisode(idx)
+                      setVideoUrl(ep.url)
+                      setTitle(ep.title || `Episode ${idx + 1}`)
+                    }}
+                  >
+                    {ep.thumbnail && (
+                      <img src={ep.thumbnail} alt="" className={styles.episodeThumb} />
+                    )}
+                    <span className={styles.episodeTitle}>{ep.title || `Episode ${idx + 1}`}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <form onSubmit={create} className={styles.form}>
           <Input
