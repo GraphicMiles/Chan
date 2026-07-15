@@ -376,3 +376,32 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+
+.nkiriError {
+  padding: 1rem;
+  background: var(--bg-error, rgba(239, 68, 68, 0.1));
+  border: 1px solid var(--border-error, #ef4444);
+  border-radius: var(--radius, 8px);
+  color: var(--text-error, #ef4444);
+  text-align: center;
+}
+
+.nkiriError p {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.875rem;
+}
+
+.retryButton {
+  padding: 0.5rem 1rem;
+  background: var(--accent, #6366f1);
+  color: white;
+  border: none;
+  border-radius: var(--radius, 8px);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.retryButton:hover {
+  background: var(--accent-hover, #4f46e5);
+}

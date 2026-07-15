@@ -57,6 +57,7 @@ export default function CreateRoomPage() {
   const [ytLoading, setYtLoading] = useState(false)
   const [nkiriEpisodes, setNkiriEpisodes] = useState([])
   const [nkiriLoading, setNkiriLoading] = useState(false)
+  const [nkiriError, setNkiriError] = useState(null)
   const [selectedEpisode, setSelectedEpisode] = useState(null)
 
   useEffect(() => {
@@ -73,6 +74,7 @@ export default function CreateRoomPage() {
     // Detect Nkiri URLs
     if (/thenkiri\.com|nkiri\.com/i.test(presetVideoUrl)) {
       setNkiriLoading(true)
+      setNkiriError(null)
       user.getIdToken().then((token) => {
         return fetch('/api/media', {
           method: 'POST',
@@ -83,13 +85,26 @@ export default function CreateRoomPage() {
           body: JSON.stringify({ action: 'scrape', url: presetVideoUrl }),
         })
       })
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          return res.json()
+        })
         .then((data) => {
           if (data.results && data.results.length > 0) {
-            setNkiriEpisodes(data.results)
+            // Check if it's the "no episodes" message
+            if (data.results[0].meta === 'This page has no downloadable episodes.') {
+              setNkiriError('No episodes found on this page. It may be a movie page or the content structure changed.')
+            } else {
+              setNkiriEpisodes(data.results)
+            }
+          } else {
+            setNkiriError('No content found. The page may not exist or may have invalid structure.')
           }
         })
-        .catch((err) => console.error('Nkiri fetch failed:', err))
+        .catch((err) => {
+          console.error('Nkiri fetch failed:', err)
+          setNkiriError(`Failed to load content: ${err.message}. The URL may be invalid or the site may be temporarily unavailable.`)
+        })
         .finally(() => setNkiriLoading(false))
       return
     }
@@ -404,11 +419,28 @@ export default function CreateRoomPage() {
 
 
         {/* Nkiri Episode Grid */}
-        {nkiriEpisodes.length > 0 && (
+        {(nkiriEpisodes.length > 0 || nkiriError) && (
           <div className={styles.nkiriSection}>
             <h2 className={styles.nkiriTitle}>{presetTitle || 'Select Episode'}</h2>
             {nkiriLoading ? (
               <p>Loading episodes...</p>
+            ) : nkiriError ? (
+              <div className={styles.nkiriError}>
+                <p>{nkiriError}</p>
+                <button
+                  type="button"
+                  className={styles.retryButton}
+                  onClick={() => {
+                    setNkiriEpisodes([])
+                    setNkiriError(null)
+                    // Re-trigger the fetch
+                    const event = new CustomEvent('nkiri-retry', { detail: presetVideoUrl })
+                    window.dispatchEvent(event)
+                  }}
+                >
+                  Retry
+                </button>
+              </div>
             ) : (
               <div className={styles.episodeGrid}>
                 {nkiriEpisodes.map((ep, idx) => (
