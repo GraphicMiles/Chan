@@ -278,13 +278,27 @@ export default function UnifiedSearch() {
     let finalThumb = result.thumbnail || result.image || ''
     let finalTitle = result.title || 'Untitled'
 
+    const sourceKey = String(result.source || result.provider || '').toLowerCase()
+
+    // Nkiri: navigate directly to Create Room with the Nkiri page URL
+    // Create Room will scrape for episodes and show the episode grid
+    if (sourceKey === 'nkiri' || sourceKey === 'thenkiri') {
+      const params = new URLSearchParams({
+        videoUrl: resultUrl,
+        title: finalTitle,
+        type: 'direct',
+        thumbnail: finalThumb || '',
+      })
+      navigate(`/create?${params.toString()}`)
+      return
+    }
+
     // Always attempt server-side resolution for non-direct page links across ALL media types
     // (direct, nsfw, netnaija, naijaprey, maxcinema, o2tv, archive, doodstream, etc.)
-    const sourceKey = String(result.source || result.provider || '').toLowerCase()
     const needsResolve = !playable
       || result.requiresUserAction === true
       || result.requiresResolve === true
-      || ['nkiri', 'thenkiri', 'downloadwella', 'maxcinema'].includes(sourceKey)
+      || ['downloadwella', 'maxcinema'].includes(sourceKey)
 
     if (needsResolve) {
       const isNsfwResult = result.type === 'nsfw' || result.isNSFW === true
