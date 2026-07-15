@@ -206,7 +206,21 @@ export default function UnifiedSearch() {
       }
     }
 
-    if (!finalUrl || (!playable && !resultUrl.includes('fzmovies') && !resultUrl.includes('netnaija') && !resultUrl.includes('9jarocks') && !resultUrl.includes('maxcinema') && result.type !== 'nsfw')) {
+    // NSFW results: provider pages can't be resolved server-side, but users
+    // still want to watch them. Navigate to create room with the provider URL.
+    // The room will open it in an iframe for playback.
+    if (result.type === 'nsfw' && !playable && finalUrl) {
+      const params = new URLSearchParams({
+        videoUrl: normalizePlaybackUrl(finalUrl),
+        title: finalTitle,
+        type: 'nsfw',
+        thumbnail: finalThumb,
+      })
+      navigate(`/create?${params.toString()}`)
+      return
+    }
+
+    if (!finalUrl || (!playable && !resultUrl.includes('fzmovies') && !resultUrl.includes('netnaija') && !resultUrl.includes('9jarocks') && !resultUrl.includes('maxcinema'))) {
       toast.error('Could not extract direct media from this link. Try another option.')
       return
     }
