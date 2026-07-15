@@ -326,7 +326,8 @@ async function resolveMeetDownloadUrl(meetdownloadUrl) {
     // Also check the page title for extension hints
     const titleExt = pageTitle.match(/\.(mp4|mkv|avi|webm)/i)?.[1]?.toLowerCase()
     const fileFormat = titleExt || (isMp4 ? 'mp4' : (isMkv ? 'mkv' : null))
-    const canPlayInBrowser = fileFormat === 'mp4' || fileFormat === 'webm' || isMp4
+    // MKV files are now playable — proxy remuxes them to MP4 on-the-fly
+    const canPlayInBrowser = true
 
     let cleanTitle = pageTitle
     if (sizeInfo && !cleanTitle.includes(sizeInfo)) {
@@ -342,7 +343,7 @@ async function resolveMeetDownloadUrl(meetdownloadUrl) {
       isDirect: true,
       playableInRoom: canPlayInBrowser,
       quality: isMkv || fileFormat === 'mkv' ? 'MKV' : (isMp4 || fileFormat === 'mp4' ? 'HD' : null),
-      meta: !canPlayInBrowser ? `${(fileFormat || 'MKV').toUpperCase()} format — may not play in browser` : null,
+      meta: isMkv || fileFormat === 'mkv' ? 'MKV — auto-converted to MP4 for playback' : null,
       resolvedFrom: meetdownloadUrl,
     })
 

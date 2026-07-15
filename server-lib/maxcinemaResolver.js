@@ -154,9 +154,9 @@ export async function resolveMaxCinemaChain(infoPageUrl) {
       source: 'maxcinema',
       type: 'direct',
       isDirect: true,
-      playableInRoom: !isMkv,
+      playableInRoom: true, // MKV is remuxed to MP4 by proxy
       quality: isMkv ? 'MKV' : 'HD',
-      meta: isMkv ? 'MKV format — may not play in browser' : null,
+      meta: isMkv ? 'MKV — auto-converted to MP4 for playback' : null,
     }]
   }
 
@@ -337,9 +337,9 @@ async function resolveServerUrl(serverUrl) {
           source: 'maxcinema',
           type: 'direct',
           isDirect: true,
-          playableInRoom: isMp4,
+          playableInRoom: true, // MKV is remuxed to MP4 by proxy
           quality: isMkv ? 'MKV' : (isMp4 ? 'HD' : 'HD'),
-          meta: isMkv ? 'MKV format — may not play in browser' : null,
+          meta: isMkv ? 'MKV — auto-converted to MP4 for playback' : null,
           resolvedFrom: serverUrl,
         }]
       }
