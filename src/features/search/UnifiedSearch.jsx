@@ -145,10 +145,11 @@ export default function UnifiedSearch() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  const resolveMediaUrl = useCallback(async (resultUrl, site, label) => {
+  const resolveMediaUrl = useCallback(async (resultUrl, site, label, isNsfw = false) => {
     if (!resultUrl) return null
     toast.info(`Resolving ${label || site || 'provider'} video...`)
-    try {
+    
+    const attemptResolve = async () => {
       const token = user ? await user.getIdToken() : ''
       const res = await fetch('/api/media', {
         method: 'POST',
@@ -179,10 +180,30 @@ export default function UnifiedSearch() {
       if (!res.ok || data?.success === false) {
         throw new Error(data?.error || `Resolution failed (HTTP ${res.status})`)
       }
-      const results = data?.results || []
-      const directItem = results.find((it) => it.isDirect || isDirectVideoUrl(it.url || it.link))
+      return data
+    }
+
+    try {
+      let data = await attemptResolve()
+      let results = data?.results || []
+      let directItem = results.find((it) => it.isDirect || isDirectVideoUrl(it.url || it.link))
         || results.find((it) => it.playableInRoom)
         || null
+
+      // For NSFW sources, retry once if first attempt didn't find a direct URL
+      // (some providers are flaky — PornHub especially)
+      if (!directItem && isNsfw) {
+        try {
+          data = await attemptResolve()
+          results = data?.results || []
+          directItem = results.find((it) => it.isDirect || isDirectVideoUrl(it.url || it.link))
+            || results.find((it) => it.playableInRoom)
+            || null
+        } catch {
+          // retry failed, use original result
+        }
+      }
+
       if (directItem) {
         return {
           url: directItem.url || directItem.link,
@@ -213,6 +234,27 @@ export default function UnifiedSearch() {
     // IPTV / live streams are already direct m3u8/mp4 URLs
     if ((result.type === 'iptv' || result.isLive) && (result.url || result.link)) {
       const liveUrl = result.url || result.link
+      // Quick health probe for IPTV channels — warns if the channel appears dead
+      if (result.type === 'iptv' && user) {
+        try {
+          const token = await user.getIdToken()
+          const probeRes = await fetch('/api/media', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ action: 'probeIptv', url: liveUrl }),
+            signal: AbortSignal.timeout(5000),
+          })
+          const probeData = await probeRes.json().catch(() => null)
+          if (probeData && probeData.healthy === false) {
+            toast.warning(`"${result.title}" may be offline (${probeData.error || 'unreachable'}). Creating room anyway — try another channel if it doesn't play.`)
+          }
+        } catch {
+          // Probe failed — proceed anyway, the player will show its own error
+        }
+      }
       const params = new URLSearchParams({
         videoUrl: normalizePlaybackUrl(liveUrl),
         title: result.title || 'Live Stream',
@@ -245,10 +287,12 @@ export default function UnifiedSearch() {
       || ['naijaprey', 'netnaija', 'maxcinema', 'nkiri', 'thenkiri', 'fzmovies', '9jarocks', 'fztvseries', 'meetdownload', 'waploaded', 'downloadwella'].includes(sourceKey)
 
     if (needsResolve) {
+      const isNsfwResult = result.type === 'nsfw' || result.isNSFW === true
       const resolved = await resolveMediaUrl(
         resultUrl,
-        result.source || result.provider || (result.type === 'nsfw' ? 'nsfw' : 'custom'),
-        result.source || result.type || 'provider'
+        result.source || result.provider || (isNsfwResult ? 'nsfw' : 'custom'),
+        result.source || result.type || 'provider',
+        isNsfwResult
       )
       if (resolved?.url) {
         playable = true
@@ -266,17 +310,10 @@ export default function UnifiedSearch() {
       }
     }
 
-    // NSFW fallback: if resolution failed, still try create room with provider URL
-    // (proxy path may still work for some hosts; better than hard-failing)
+    // NSFW fallback: if resolution failed, don't create a room with a page URL
+    // (it won't play). Instead, offer to open the page externally or try another result.
     if (result.type === 'nsfw' && !playable && finalUrl) {
-      toast.warning('Could not extract a direct stream — room may not play this source in-browser.')
-      const params = new URLSearchParams({
-        videoUrl: normalizePlaybackUrl(finalUrl),
-        title: finalTitle,
-        type: 'nsfw',
-        thumbnail: finalThumb,
-      })
-      navigate(`/create?${params.toString()}`)
+      toast.error('Could not extract a playable stream from this result. The provider may have changed its page structure. Try another result from a different provider.')
       return
     }
 
