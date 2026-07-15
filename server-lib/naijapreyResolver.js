@@ -3,7 +3,7 @@ import { isSuitableThumbnail, resolveUrl } from './sources.js'
 
 const SEARCH_TIMEOUT_MS = 9000
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-const MAX_PT_HOPS = 6
+const MAX_PT_HOPS = 10
 
 // ---------- naijaprey.tv search ----------
 
@@ -453,9 +453,12 @@ export async function resolveNaijapreyChain(contentUrl) {
               // Proxy wildshare/silversurfer direct URLs so the browser can play them
               // (CORS + Referer + mixed content). Remux if MKV.
               const isMkv = /\.mkv(\?|#|$)/i.test(directUrl)
+              // The wildshare landing page is the best Referer for the CDN;
+              // fall back to the np-downloader page or naijaprey content page.
+              const bestReferer = wsEntry.url || link.url || contentUrl
               const proxied = isMkv
-                ? `/api/proxy?url=${encodeURIComponent(directUrl)}&remux=1&referer=${encodeURIComponent('https://www.naijaprey.tv/')}`
-                : `/api/proxy?url=${encodeURIComponent(directUrl)}&referer=${encodeURIComponent('https://www.naijaprey.tv/')}`
+                ? `/api/proxy?url=${encodeURIComponent(directUrl)}&remux=1&referer=${encodeURIComponent(bestReferer)}`
+                : `/api/proxy?url=${encodeURIComponent(directUrl)}&referer=${encodeURIComponent(bestReferer)}`
               results.push({
                 title,
                 url: proxied,
@@ -468,6 +471,7 @@ export async function resolveNaijapreyChain(contentUrl) {
                 playableInRoom: true,
                 videoType: 'direct',
                 resolvedFrom: contentUrl,
+                referer: bestReferer,
               })
             }
           }

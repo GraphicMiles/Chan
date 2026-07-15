@@ -29,6 +29,25 @@ const BASE_URL = 'https://www.maxcinema.name.ng'
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 /**
+ * Convert a raw URL path segment into a MaxCinema info-page slug.
+ * The site uses lowercase, hyphen-separated slugs and strips punctuation
+ * (e.g. "Avengers: Endgame" → "avengers-endgame").
+ */
+function slugifySegment(raw) {
+  try {
+    return decodeURIComponent(raw)
+      .toLowerCase()
+      .replace(/[:?#&=+/\\|<>"'{}\[\]()*!@$%^,;]+/g, ' ')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .trim()
+  } catch {
+    return raw.replace(/%20/g, '-').toLowerCase()
+  }
+}
+
+/**
  * Search maxcinema.name.ng
  * @param {string} query - Search term
  * @param {number} limit - Max results
@@ -87,8 +106,8 @@ export async function searchMaxCinema(query, limit = 15) {
       // /movie/{Title}/{id} → extract slug for info page
       const movieMatch = href.match(/\/movie\/([^/]+)\/(\d+)/)
       if (movieMatch) {
-        const slug = movieMatch[1].replace(/%20/g, '-').toLowerCase()
-        infoUrl = `${BASE_URL}/download/${slug}`
+        const slug = slugifySegment(movieMatch[1])
+        infoUrl = slug ? `${BASE_URL}/download/${slug}` : `${BASE_URL}${href}`
       } else {
         infoUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`
       }
@@ -96,10 +115,12 @@ export async function searchMaxCinema(query, limit = 15) {
       // /series/{Title}/{id}/{season}/{episode} → extract slug
       const seriesMatch = href.match(/\/series\/([^/]+)\/(\d+)\/(\d+)\/(\d+)/)
       if (seriesMatch) {
-        const slug = seriesMatch[1].replace(/%20/g, '-').toLowerCase()
+        const slug = slugifySegment(seriesMatch[1])
         const season = seriesMatch[3]
         const episode = seriesMatch[4]
-        infoUrl = `${BASE_URL}/download/${slug}?season=${season}&episode=${episode}`
+        infoUrl = slug
+          ? `${BASE_URL}/download/${slug}?season=${season}&episode=${episode}`
+          : `${BASE_URL}${href}`
       } else {
         infoUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`
       }
