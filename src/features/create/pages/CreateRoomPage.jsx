@@ -33,7 +33,7 @@ export default function CreateRoomPage() {
   const presetTitle = searchParams.get('title') || ''
   const presetType = searchParams.get('type') || 'youtube'
   const presetIsStream = ['direct', 'iptv', 'sports', 'nsfw'].includes(presetType)
-  const presetIsLive = searchParams.get('isLive') === 'true' || presetType === 'iptv' || presetType === 'sports'
+  const presetIsLive = searchParams.get('isLive') === 'true' || presetType === 'iptv' || presetType === 'sports' || /youtube\.com\/live\//i.test(presetVideoUrl || '')
 
   const [title, setTitle] = useState(presetTitle)
   const [url, setUrl] = useState(
@@ -49,6 +49,7 @@ export default function CreateRoomPage() {
   const [videoId, setVideoId] = useState(presetVideo)
   const [videoUrl, setVideoUrl] = useState(presetVideoUrl ? normalizePlaybackUrl(presetVideoUrl) : '')
   const [videoType, setVideoType] = useState(presetIsStream || presetVideoUrl ? 'direct' : 'youtube')
+  const [isLiveStream, setIsLiveStream] = useState(presetIsLive)
   const [error, setError] = useState(null)
   const [creating, setCreating] = useState(false)
   const [embedWarning, setEmbedWarning] = useState(null)
@@ -85,6 +86,9 @@ export default function CreateRoomPage() {
       setVideoId(id)
       setVideoUrl('')
       setVideoType('youtube')
+      // Detect YouTube live streams
+      const isYtLive = /youtube\.com\/live\//i.test(value)
+      setIsLiveStream(isYtLive)
       clear()
       setYtResults([])
       checkEmbeddable(id).then((r) => {
@@ -295,7 +299,7 @@ export default function CreateRoomPage() {
         // Preserve IPTV / sports / NSFW type so the player treats live streams correctly
         roomData.videoType = ['iptv', 'sports', 'nsfw'].includes(presetType) ? presetType : 'direct'
         roomData.activityType = roomData.videoType === 'direct' ? 'direct' : roomData.videoType
-        if (presetIsLive) roomData.isLive = true
+        if (presetIsLive || isLiveStream) roomData.isLive = true
       }
 
       await setDoc(doc(db, 'rooms', roomId), roomData)
