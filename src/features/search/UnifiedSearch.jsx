@@ -236,7 +236,12 @@ export default function UnifiedSearch() {
 
     // Always attempt server-side resolution for non-direct page links across ALL media types
     // (direct, nsfw, netnaija, naijaprey, maxcinema, o2tv, archive, doodstream, etc.)
-    const needsResolve = !playable || result.requiresUserAction === true
+    const sourceKey = String(result.source || result.provider || '').toLowerCase()
+    const needsResolve = !playable
+      || result.requiresUserAction === true
+      || result.requiresResolve === true
+      || ['naijaprey', 'netnaija', 'maxcinema', 'nkiri', 'thenkiri', 'fzmovies', '9jarocks', 'fztvseries', 'meetdownload', 'waploaded', 'downloadwella'].includes(sourceKey)
+
     if (needsResolve) {
       const resolved = await resolveMediaUrl(
         resultUrl,
@@ -248,10 +253,13 @@ export default function UnifiedSearch() {
         finalUrl = resolved.url
         if (resolved.thumbnail) finalThumb = resolved.thumbnail
         if (resolved.title && resolved.title !== 'Untitled') finalTitle = resolved.title
-      } else if (result.requiresUserAction && result.type !== 'nsfw' && result.type !== 'direct') {
+      } else if (result.requiresUserAction && result.type !== 'nsfw' && result.type !== 'direct' && sourceKey !== 'naijaprey') {
         // Genuine download-gate providers: open externally as last resort
         window.open(resultUrl, '_blank', 'noopener,noreferrer')
         toast.info('Could not auto-extract a stream. Complete the download step on the provider page, then paste the final HTTPS URL into Chan.')
+        return
+      } else if (!playable) {
+        toast.error('Could not resolve a playable stream from this result. Try another provider or episode.')
         return
       }
     }

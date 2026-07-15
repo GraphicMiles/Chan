@@ -450,15 +450,23 @@ export async function resolveNaijapreyChain(contentUrl) {
                 /* use default title */
               }
 
+              // Proxy wildshare/silversurfer direct URLs so the browser can play them
+              // (CORS + Referer + mixed content). Remux if MKV.
+              const isMkv = /\.mkv(\?|#|$)/i.test(directUrl)
+              const proxied = isMkv
+                ? `/api/proxy?url=${encodeURIComponent(directUrl)}&remux=1&referer=${encodeURIComponent('https://www.naijaprey.tv/')}`
+                : `/api/proxy?url=${encodeURIComponent(directUrl)}&referer=${encodeURIComponent('https://www.naijaprey.tv/')}`
               results.push({
                 title,
-                url: directUrl,
-                link: directUrl,
+                url: proxied,
+                link: proxied,
                 thumbnail: link.thumbnail || pageResult.thumbnail || null,
                 image: link.thumbnail || pageResult.thumbnail || null,
                 source: 'naijaprey',
+                type: 'direct',
                 isDirect: true,
                 playableInRoom: true,
+                videoType: 'direct',
                 resolvedFrom: contentUrl,
               })
             }

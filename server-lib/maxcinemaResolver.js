@@ -144,20 +144,32 @@ export async function resolveMaxCinemaChain(infoPageUrl) {
     return resolveServerUrl(infoPageUrl)
   }
 
-  // If it's a Koyeb CDN URL, it's already direct
+  // If it's a Koyeb CDN URL, it's already a stream — wrap via proxy with remux.
+  // These URLs often have NO file extension (e.g. /watch/TOKEN?name=Title_S01E01)
+  // but the body is MKV/MP4. Browser <video> cannot play them without proxy remux.
   if (hostname.includes('koyeb.app')) {
-    const filename = decodeURIComponent(new URL(infoPageUrl).searchParams.get('name') || infoPageUrl.split('/').pop() || 'Video')
-    const isMkv = filename.endsWith('.mkv') || infoPageUrl.includes('.mkv')
+    const parsed = new URL(infoPageUrl)
+    const nameParam = parsed.searchParams.get('name') || parsed.pathname.split('/').pop() || 'Video'
+    let filename = nameParam
+    try { filename = decodeURIComponent(nameParam) } catch { /* */ }
+    let cleanTitle = filename
+      .replace(/^\[.*?\]\s*_?/i, '')
+      .replace(/_/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    const isMkv = /\.mkv/i.test(filename) || /\.mkv/i.test(infoPageUrl) || true // assume MKV without extension
+    const proxied = `/api/proxy?url=${encodeURIComponent(infoPageUrl)}&remux=1&referer=${encodeURIComponent(BASE_URL + '/')}`
     return [{
-      title: filename.replace(/[\[\]_]/g, ' ').replace(/\s+/g, ' ').trim(),
-      url: infoPageUrl,
-      link: infoPageUrl,
+      title: cleanTitle || 'MaxCinema Video',
+      url: proxied,
+      link: proxied,
       source: 'maxcinema',
       type: 'direct',
       isDirect: true,
-      playableInRoom: true, // MKV is remuxed to MP4 by proxy
+      playableInRoom: true,
+      videoType: 'direct',
       quality: isMkv ? 'MKV' : 'HD',
-      meta: isMkv ? 'MKV — auto-converted to MP4 for playback' : null,
+      meta: 'Koyeb CDN — proxied + remuxed for browser playback',
     }]
   }
 
@@ -288,84 +300,80 @@ async function resolveServerUrl(serverUrl) {
         // Decode name — it may be base64-encoded or URL-encoded
         let decodedName = nameParam
         if (nameParam && !nameParam.includes('_') && !nameParam.includes('.') && nameParam.length > 10) {
-          // Likely base64 — try decoding
           try {
             const decoded = Buffer.from(nameParam, 'base64').toString('utf-8')
             if (decoded && /[a-zA-Z]/.test(decoded) && decoded.length < 500) {
               decodedName = decoded
             }
-          } catch { /* not base64, use as-is */ }
+          } catch { /* not base64 */ }
         }
 
-        const filename = decodeURIComponent(decodedName || parsed.pathname.split('/').pop() || 'Video')
+        let filename = decodedName || parsed.pathname.split('/').pop() || 'Video'
+        try { filename = decodeURIComponent(filename) } catch { /* */ }
 
-        // Clean up the filename: [MaxCinema.name.ng]_michael → Michael
         let cleanTitle = filename
-          .replace(/^\[.*?\]\s*_?/i, '') // Remove [MaxCinema.name.ng]_ prefix
+          .replace(/^\[.*?\]\s*_?/i, '')
           .replace(/_/g, ' ')
           .replace(/\s+/g, ' ')
           .trim()
-
-        // Capitalize words
-        cleanTitle = cleanTitle.replace(/\b\w/g, c => c.toUpperCase())
-
-        // If the cleanTitle is garbled (looks like a hash with no spaces), use a fallback
+        cleanTitle = cleanTitle.replace(/\b\w/g, (c) => c.toUpperCase())
         if (cleanTitle.length < 2 || (/^[a-z0-9+/=]+$/i.test(cleanTitle) && cleanTitle.length > 15 && !cleanTitle.includes(' '))) {
-          cleanTitle = ''  // Will be replaced by page title from caller
+          cleanTitle = ''
         }
 
-        // Try to get file size and format from the CDN (quick HEAD request)
-        let fileSize = null
+        // Quick format probe (optional — don't block resolution on it)
         let detectedFormat = null
         try {
           const cdnController = new AbortController()
-          const cdnTimer = setTimeout(() => cdnController.abort(), 5000)
+          const cdnTimer = setTimeout(() => cdnController.abort(), 2500)
           const cdnRes = await fetch(location, {
-            method: 'HEAD',
+            method: 'GET',
             signal: cdnController.signal,
-            headers: { 'User-Agent': UA, 'Range': 'bytes=0-0' },
+            headers: {
+              'User-Agent': UA,
+              Range: 'bytes=0-3',
+              Referer: BASE_URL + '/',
+            },
           })
           clearTimeout(cdnTimer)
-
-          // Detect format from Content-Type or Content-Disposition
           const contentType = cdnRes.headers.get('content-type') || ''
           const contentDisposition = cdnRes.headers.get('content-disposition') || ''
           if (contentType.includes('matroska') || contentDisposition.includes('.mkv')) {
             detectedFormat = 'mkv'
           } else if (contentType.includes('mp4') || contentDisposition.includes('.mp4')) {
             detectedFormat = 'mp4'
+          } else {
+            // Peek magic bytes: 0x1A = EBML/MKV, 'ftyp' = MP4
+            try {
+              const buf = Buffer.from(await cdnRes.arrayBuffer())
+              if (buf[0] === 0x1A) detectedFormat = 'mkv'
+              else if (buf.toString('ascii', 4, 8) === 'ftyp') detectedFormat = 'mp4'
+            } catch { /* */ }
           }
+        } catch { /* ignore */ }
 
-          const contentLength = cdnRes.headers.get('content-range')?.split('/')?.[1] ||
-                               cdnRes.headers.get('content-length')
-          if (contentLength) {
-            const bytes = parseInt(contentLength, 10)
-            if (bytes > 0) {
-              fileSize = bytes >= 1_073_741_824
-                ? `${(bytes / 1_073_741_824).toFixed(1)} GB`
-                : `${(bytes / 1_048_576).toFixed(0)} MB`
-            }
-          }
-        } catch { /* ignore size check failure */ }
+        const looksMkv = detectedFormat === 'mkv'
+          || /\.mkv/i.test(nameParam)
+          || /\.mkv/i.test(location)
+          || parsed.hostname.includes('koyeb.app') // Koyeb MaxCinema files are almost always MKV
+        const looksMp4 = detectedFormat === 'mp4' || /\.mp4/i.test(nameParam) || /\.mp4/i.test(location)
 
-        // Detect format from CDN probe or filename clues
-        const isMkv = detectedFormat === 'mkv' || nameParam.toLowerCase().includes('.mkv') || location.toLowerCase().includes('.mkv')
-        const isMp4 = detectedFormat === 'mp4' || nameParam.toLowerCase().includes('.mp4') || location.toLowerCase().includes('.mp4')
-
-        if (fileSize && !cleanTitle.includes(fileSize)) {
-          cleanTitle = `${cleanTitle} (${fileSize})`
-        }
+        // ALWAYS route through proxy so browser gets HTTPS + correct Referer + remux
+        const proxied = looksMkv
+          ? `/api/proxy?url=${encodeURIComponent(location)}&remux=1&referer=${encodeURIComponent(BASE_URL + '/')}`
+          : `/api/proxy?url=${encodeURIComponent(location)}&referer=${encodeURIComponent(BASE_URL + '/')}`
 
         return [{
           title: cleanTitle,
-          url: location,
-          link: location,
+          url: proxied,
+          link: proxied,
           source: 'maxcinema',
           type: 'direct',
           isDirect: true,
-          playableInRoom: true, // MKV is remuxed to MP4 by proxy
-          quality: isMkv ? 'MKV' : (isMp4 ? 'HD' : 'HD'),
-          meta: isMkv ? 'MKV — auto-converted to MP4 for playback' : null,
+          playableInRoom: true,
+          videoType: 'direct',
+          quality: looksMkv ? 'MKV' : (looksMp4 ? 'HD' : 'HD'),
+          meta: looksMkv ? 'MKV — auto-converted to MP4 for playback' : null,
           resolvedFrom: serverUrl,
         }]
       }
