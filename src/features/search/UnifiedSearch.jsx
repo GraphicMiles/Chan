@@ -720,7 +720,7 @@ export default function UnifiedSearch() {
             <div className={styles.multiLayerAlert}>
               <h4>Multi Layer Direct Search Completed</h4>
               <p>
-                We checked across Nkiri, MaxCinema, and Internet Archive using multiple query formats and found 0 direct links for &quot;{query}&quot;.
+                We searched Nkiri using multiple query formats and found 0 direct links for &quot;{query}&quot;.
               </p>
               <div className={styles.alertTips}>
                 <span>• Try simplifying your keywords (e.g. search &quot;Silo&quot; instead of exact episode name)</span>
