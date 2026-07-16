@@ -231,10 +231,11 @@ export default function UnifiedSearch() {
       return
     }
 
-    // IPTV / live streams are already direct m3u8/mp4 URLs
+    // IPTV / live streams are already m3u8/mp4 URLs — always normalize through proxy
+    // so mixed-content http:// streams and CORS-hostile CDNs work in the browser.
     if ((result.type === 'iptv' || result.isLive) && (result.url || result.link)) {
       const liveUrl = result.url || result.link
-      // Quick health probe for IPTV channels — warns if the channel appears dead
+      // Soft health probe — never block create; free IPTV lists have many dead links
       if (result.type === 'iptv' && user) {
         try {
           const token = await user.getIdToken()
@@ -245,18 +246,19 @@ export default function UnifiedSearch() {
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({ action: 'probeIptv', url: liveUrl }),
-            signal: AbortSignal.timeout(5000),
+            signal: AbortSignal.timeout(4500),
           })
           const probeData = await probeRes.json().catch(() => null)
           if (probeData && probeData.healthy === false) {
             toast.warning(`"${result.title}" may be offline (${probeData.error || 'unreachable'}). Creating room anyway — try another channel if it doesn't play.`)
           }
         } catch {
-          // Probe failed — proceed anyway, the player will show its own error
+          // Probe failed — proceed; player will surface errors
         }
       }
+      const playback = normalizePlaybackUrl(liveUrl, { forceProxy: true })
       const params = new URLSearchParams({
-        videoUrl: normalizePlaybackUrl(liveUrl),
+        videoUrl: playback,
         title: result.title || 'Live Stream',
         type: result.type === 'sports' ? 'sports' : 'iptv',
         thumbnail: result.thumbnail || result.image || '',

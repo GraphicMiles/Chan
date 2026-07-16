@@ -82,7 +82,14 @@ export default function CreateRoomPage() {
     }
     return normalizePlaybackUrl(presetVideoUrl)
   })
-  const [videoType, setVideoType] = useState(presetIsStream || presetVideoUrl ? 'direct' : 'youtube')
+  // Preserve iptv/sports/nsfw from /media navigation — don't collapse everything to 'direct'
+  const [videoType, setVideoType] = useState(() => {
+    if (presetType === 'youtube' && !presetVideoUrl) return 'youtube'
+    if (['iptv', 'sports', 'nsfw', 'direct'].includes(presetType)) return presetType
+    if (presetVideoUrl && /\.m3u8(\?|#|$)/i.test(presetVideoUrl)) return 'iptv'
+    if (presetIsStream || presetVideoUrl) return 'direct'
+    return 'youtube'
+  })
   const [isLiveStream, setIsLiveStream] = useState(presetIsLive)
   const [error, setError] = useState(null)
   const [creating, setCreating] = useState(false)
@@ -626,7 +633,7 @@ export default function CreateRoomPage() {
 
       const finalDirectUrl = normalizePlaybackUrl(resolvedUrl)
       const isActualUrl = typeof finalDirectUrl === 'string' && (/^https?:\/\//i.test(finalDirectUrl) || finalDirectUrl.startsWith('/api/proxy'))
-      if (videoType === 'direct') {
+      if (videoType === 'direct' || videoType === 'iptv' || videoType === 'sports' || videoType === 'nsfw') {
         if (!isActualUrl && !presetIsStream) {
           throw new Error(
             o2Stage && o2Stage !== 'ready'
@@ -673,9 +680,15 @@ export default function CreateRoomPage() {
         roomData.videoType = 'youtube'
       } else if (finalDirectUrl) {
         roomData.videoUrl = finalDirectUrl
-        roomData.videoType = ['iptv', 'sports', 'nsfw'].includes(presetType) ? presetType : 'direct'
-        roomData.activityType = roomData.videoType === 'direct' ? 'direct' : roomData.videoType
-        if (presetIsLive || isLiveStream) roomData.isLive = true
+        // Prefer explicit state (iptv/nsfw/sports), then query preset, then direct
+        const streamType = ['iptv', 'sports', 'nsfw'].includes(videoType)
+          ? videoType
+          : (['iptv', 'sports', 'nsfw'].includes(presetType) ? presetType : 'direct')
+        roomData.videoType = streamType
+        roomData.activityType = streamType === 'direct' ? 'direct' : streamType
+        if (presetIsLive || isLiveStream || streamType === 'iptv' || streamType === 'sports') {
+          roomData.isLive = true
+        }
         if (o2Thumbnail) roomData.thumbnail = o2Thumbnail
       }
 
