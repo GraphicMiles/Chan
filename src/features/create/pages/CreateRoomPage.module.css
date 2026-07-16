@@ -405,3 +405,15 @@
 .retryButton:hover {
   background: var(--accent-hover, #4f46e5);
 }
+
+.cancelLink {
+  background: none;
+  border: none;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  opacity: 0.85;
+}
+.cancelLink:hover { opacity: 1; }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Link, useSearchParams } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom'
 import { doc, setDoc, deleteDoc, serverTimestamp, collection } from 'firebase/firestore'
 import { db } from '../../../shared/lib/firebase.js'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
@@ -24,6 +24,7 @@ function makeInviteCode() {
 export default function CreateRoomPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const { toast } = useToast()
   const { scrape, results, loading: scraperLoading, error: scraperError, clear } = useScraper()
@@ -255,7 +256,7 @@ export default function CreateRoomPage() {
     const candidate = item.link || item.url || ''
     if (item.requiresUserAction && candidate && !item.isDirect && !isDirectVideoUrl(candidate)) {
       window.open(candidate, '_blank', 'noopener,noreferrer')
-      toast('Opened the provider page. Complete its download step there, then paste the final HTTPS video URL into Chan.', {
+      toast('Opened the page. Complete any download step there, then paste the final HTTPS video URL into Chan.', {
         variant: 'info',
         duration: 8000,
       })
@@ -597,7 +598,7 @@ export default function CreateRoomPage() {
           ) : (
             <>
               <p className={styles.note}>
-                Paste a direct .mp4/.m3u8 link, or type movie/show keywords (e.g. Silo) to search automatically across all providers!
+                Paste a direct .mp4/.m3u8 link, or type a movie/show title (e.g. Silo) to search.
               </p>
               <div className={styles.row}>
                 <Input
@@ -648,8 +649,7 @@ export default function CreateRoomPage() {
                     )}
                     <p className={styles.resultTitle}>{item.title}</p>
                     <span className={styles.resultSource}>
-                      Provider: <strong>{item.source || item.provider || 'Direct'}</strong>
-                      {playable ? ' · playable' : ' · page only'}
+                      {playable ? 'Ready to play' : 'Select to continue'}
                     </span>
                   </button>
                 )
@@ -700,7 +700,19 @@ export default function CreateRoomPage() {
         {scraperError && <p className={styles.error}>{scraperError}</p>}
 
         <p className={styles.footer}>
-          <Link to="/">Cancel</Link>
+          <button
+            type="button"
+            className={styles.cancelLink}
+            onClick={() => {
+              // Prefer explicit return path (from /media or /search), else browser history, else /media
+              const from = location.state?.from
+              if (from) navigate(from)
+              else if (window.history.length > 1) navigate(-1)
+              else navigate('/media')
+            }}
+          >
+            Cancel
+          </button>
         </p>
       </Card>
     </div>

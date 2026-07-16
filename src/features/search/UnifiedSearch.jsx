@@ -13,9 +13,9 @@ import { isDirectVideoUrl, normalizePlaybackUrl } from '../../shared/lib/youtube
 import { Modal, Button } from '../../shared/ui/index.js'
 
 const SEARCH_LAYERS = [
-  { id: 'all', label: 'All Media', icon: Compass, placeholder: 'Search movies, live TV, YouTube, sports, anime...', description: 'Search across all providers and media layers simultaneously' },
+  { id: 'all', label: 'All Media', icon: Compass, placeholder: 'Search movies, live TV, YouTube, sports, anime...', description: 'Search movies, shows, live TV, YouTube, sports, and more' },
   { id: 'youtube', label: 'YouTube', icon: PlayCircle, placeholder: 'Search YouTube videos...', description: 'Search millions of YouTube videos with instant playback' },
-  { id: 'direct', label: 'Direct Links', icon: Link2, placeholder: 'Search movies/shows or paste direct URL (.mp4/.m3u8)...', description: 'Find direct MP4/M3U8 links from top movie and series sites' },
+  { id: 'direct', label: 'Direct Links', icon: Link2, placeholder: 'Search movies/shows or paste direct URL (.mp4/.m3u8)...', description: 'Find movies and shows ready to watch together' },
   { id: 'iptv', label: 'Live TV', icon: Tv, placeholder: 'Search channels (CNN, ESPN, HBO)...', description: 'Watch live TV channels and 24/7 streaming networks' },
   { id: 'sports', label: 'Sports', icon: Trophy, placeholder: 'Search team, league, or match...', description: 'Find live sports matches, scores, and streaming fixtures' },
   { id: 'nsfw', label: 'NSFW', icon: ShieldAlert, placeholder: 'Search adult content (18+ only)...', description: 'Adult content - legal age verification required', adult: true },
@@ -147,7 +147,7 @@ export default function UnifiedSearch() {
 
   const resolveMediaUrl = useCallback(async (resultUrl, site, label, isNsfw = false) => {
     if (!resultUrl) return null
-    toast.info(`Resolving ${label || site || 'provider'} video...`)
+    toast.info('Resolving stream...')
     
     const attemptResolve = async () => {
       const token = user ? await user.getIdToken() : ''
@@ -173,7 +173,7 @@ export default function UnifiedSearch() {
         const isTimeout = res.status === 504 || /timeout|504/i.test(text)
         throw new Error(
           isTimeout
-            ? 'Resolution timed out — the provider is slow. Try again or pick another result.'
+            ? 'Resolution timed out — try again or pick another result.'
             : `Resolution failed (HTTP ${res.status}). Try another result.`
         )
       }
@@ -227,7 +227,7 @@ export default function UnifiedSearch() {
         title: result.title || 'Untitled',
         type: 'youtube',
       })
-      navigate(`/create?${params.toString()}`)
+      navigate(`/create?${params.toString()}`, { state: { from: `${location.pathname}${location.search || ''}` } })
       return
     }
 
@@ -263,7 +263,7 @@ export default function UnifiedSearch() {
         isLive: 'true',
       })
       if (result.matchInfo) params.set('matchInfo', JSON.stringify(result.matchInfo))
-      navigate(`/create?${params.toString()}`)
+      navigate(`/create?${params.toString()}`, { state: { from: `${location.pathname}${location.search || ''}` } })
       return
     }
 
@@ -289,7 +289,7 @@ export default function UnifiedSearch() {
         type: 'direct',
         thumbnail: finalThumb || '',
       })
-      navigate(`/create?${params.toString()}`)
+      navigate(`/create?${params.toString()}`, { state: { from: `${location.pathname}${location.search || ''}` } })
       return
     }
 
@@ -316,10 +316,10 @@ export default function UnifiedSearch() {
       } else if (result.requiresUserAction && result.type !== 'nsfw' && result.type !== 'direct' && sourceKey !== 'naijaprey') {
         // Genuine download-gate providers: open externally as last resort
         window.open(resultUrl, '_blank', 'noopener,noreferrer')
-        toast.info('Could not auto-extract a stream. Complete the download step on the provider page, then paste the final HTTPS URL into Chan.')
+        toast.info('Could not auto-extract a stream. Open the link, finish any download step, then paste the final HTTPS video URL into Chan.')
         return
       } else if (!playable) {
-        toast.error('Could not resolve a playable stream from this result. Try another provider or episode.')
+        toast.error('Could not resolve a playable stream. Try another result or episode.')
         return
       }
     }
@@ -327,7 +327,7 @@ export default function UnifiedSearch() {
     // NSFW fallback: if resolution failed, don't create a room with a page URL
     // (it won't play). Instead, offer to open the page externally or try another result.
     if (result.type === 'nsfw' && !playable && finalUrl) {
-      toast.error('Could not extract a playable stream from this result. The provider may have changed its page structure. Try another result from a different provider.')
+      toast.error('Could not extract a playable stream from this result. Try another one.')
       return
     }
 
@@ -357,16 +357,16 @@ export default function UnifiedSearch() {
     if (result.matchInfo) params.set('matchInfo', JSON.stringify(result.matchInfo))
     if (result.isLive) params.set('isLive', 'true')
 
-    navigate(`/create?${params.toString()}`)
-  }, [navigate, activeLayer, resolveMediaUrl, user])
+    navigate(`/create?${params.toString()}`, { state: { from: `${location.pathname}${location.search || ''}` } })
+  }, [navigate, location.pathname, location.search, activeLayer, resolveMediaUrl, user])
 
   const handleDirectUrlSubmit = useCallback(() => {
     if (isDirectVideoUrl(query)) {
       const normalized = normalizePlaybackUrl(query.trim())
       const title = normalized.split('/').pop()?.replace(/\.(mp4|m3u8|mkv|avi|mov|webm|ogg|flv|ts)$/i, '') || 'Direct Video'
-      navigate(`/create?videoUrl=${encodeURIComponent(normalized)}&title=${encodeURIComponent(title)}&type=direct`)
+      navigate(`/create?videoUrl=${encodeURIComponent(normalized)}&title=${encodeURIComponent(title)}&type=direct`, { state: { from: `${location.pathname}${location.search || ''}` } })
     }
-  }, [query, navigate])
+  }, [query, navigate, location.pathname, location.search])
 
   const clearSearch = useCallback(() => {
     setQuery('')
