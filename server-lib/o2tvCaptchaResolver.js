@@ -274,15 +274,95 @@ export async function resolveO2TvCaptcha(fileId) {
 }
 
 /**
+ * Classify an O2TV episode download option by quality.
+ * Prefer basic progressive MP4 — HD is too large for proxy/Hobby, 3gp is too low.
+ *
+ * Rank (lower = try first):
+ *   0 = basic Mp4 ("Basic Quality, Small Size")  ← preferred
+ *   1 = other/unknown mp4-like
+ *   2 = HD Mp4 ("Highest Quality, Largest Size") ← fallback only
+ *   3 = 3gp / low ("Lowest Quality")             ← last resort
+ */
+function classifyO2TvDownload(label, context = '') {
+  const text = `${label || ''} ${context || ''}`.toLowerCase()
+  if (/\b3gp\b/.test(text) || /lowest quality|smallest size/.test(text)) {
+    return { tier: '3gp', rank: 3, quality: '3gp' }
+  }
+  if (/\bhd\b/.test(text) || /highest quality|largest size/.test(text)) {
+    return { tier: 'hd', rank: 2, quality: 'HD' }
+  }
+  // Explicit basic / standard mp4
+  if (
+    /\bmp4\b/.test(text)
+    || /basic quality|small size/.test(text)
+    || /in mp4 format/.test(text)
+  ) {
+    // "in Mp4 Format" without HD/3gp nearby → basic
+    if (!/\bhd\b/.test(text) && !/\b3gp\b/.test(text)) {
+      return { tier: 'basic', rank: 0, quality: 'MP4' }
+    }
+  }
+  return { tier: 'unknown', rank: 1, quality: 'MP4' }
+}
+
+/**
+ * Parse episode HTML into ranked download options (id + quality label).
+ */
+function parseO2TvDownloadOptions(epHtml) {
+  const options = []
+  const seen = new Set()
+
+  // Anchor text is the best signal: "… in Mp4 Format" / "… in HD Mp4 Format" / "… in 3gp Format"
+  const anchorRe = /href=["'](?:https?:\/\/(?:www\.)?tvshows4mobile\.org)?\/download\/(\d+)["'][^>]*>([\s\S]*?)<\/a>/gi
+  let m
+  while ((m = anchorRe.exec(epHtml)) !== null) {
+    const id = parseInt(m[1], 10)
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    const label = String(m[2] || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    const context = epHtml.slice(Math.max(0, m.index - 280), Math.min(epHtml.length, m.index + 120))
+    const classified = classifyO2TvDownload(label, context)
+    options.push({
+      fileId: id,
+      label: label || `Download ${id}`,
+      ...classified,
+    })
+  }
+
+  // Fallback: bare /download/IDs without parseable anchors
+  if (!options.length) {
+    const idRe = /\/download\/(\d+)/g
+    let im
+    while ((im = idRe.exec(epHtml)) !== null) {
+      const id = parseInt(im[1], 10)
+      if (!id || seen.has(id)) continue
+      seen.add(id)
+      options.push({
+        fileId: id,
+        label: `Download ${id}`,
+        tier: 'unknown',
+        rank: 1,
+        quality: 'MP4',
+      })
+    }
+  }
+
+  // Prefer basic MP4 → unknown → HD → 3gp
+  options.sort((a, b) => a.rank - b.rank || a.fileId - b.fileId)
+  return options
+}
+
+/**
  * Resolve an o2tv episode by:
- * 1. Getting the download file IDs from the episode page
- * 2. Solving the captcha for each download ID
- * 3. Following redirects to get the CDN URL
+ * 1. Getting download options from the episode page (ranked by quality)
+ * 2. Prefer basic Mp4 (not HD, not 3gp)
+ * 3. Solving captcha for the best option, falling back down the list
+ * 4. Following redirects to get the CDN URL
  *
  * @param {string} showSlug - e.g., "House-of-the-Dragon-otviao8f"
  * @param {number} seasonNum - Season number (1-based)
  * @param {number} epNum - Episode number (1-based)
- * @returns {Promise<Array<{title, url, source, isDirect, playableInRoom}>>}
+ * @returns {Promise<Array<{title, url, source, isDirect, playableInRoom, quality}>>}
  */
 export async function resolveO2TvEpisodeViaCaptcha(showSlug, seasonNum, epNum) {
   const BASE = 'https://tvshows4mobile.org'
@@ -299,16 +379,9 @@ export async function resolveO2TvEpisodeViaCaptcha(showSlug, seasonNum, epNum) {
 
   const epHtml = await epRes.text()
 
-  // Step 2: Extract download file IDs
-  const downloadIds = []
-  const idRegex = /\/download\/(\d+)/g
-  let match
-  while ((match = idRegex.exec(epHtml)) !== null) {
-    const id = parseInt(match[1], 10)
-    if (!downloadIds.includes(id)) downloadIds.push(id)
-  }
-
-  if (!downloadIds.length) return []
+  // Step 2: Ranked download options — basic Mp4 first, never prefer HD/3gp
+  const options = parseO2TvDownloadOptions(epHtml)
+  if (!options.length) return []
 
   // Derive the show name from slug for the title
   const showName = showSlug
@@ -320,13 +393,15 @@ export async function resolveO2TvEpisodeViaCaptcha(showSlug, seasonNum, epNum) {
   const e = String(epNum).padStart(2, '0')
   const title = `${showName} - S${s}E${e}`
 
-  // Step 3: Try to resolve each download ID (HD first, then basic, then 3gp)
-  // Sort by ID descending (higher IDs are usually the HD versions for newer episodes)
-  downloadIds.sort((a, b) => b - a)
+  console.log(
+    `O2TV quality order for ${showSlug} S${s}E${e}:`,
+    options.map((o) => `${o.fileId}:${o.tier}`).join(' → '),
+  )
 
-  for (const fileId of downloadIds) {
+  // Step 3: Try best quality first (basic), then fallbacks
+  for (const opt of options) {
     try {
-      const cdnUrl = await resolveO2TvCaptcha(fileId)
+      const cdnUrl = await resolveO2TvCaptcha(opt.fileId)
       if (cdnUrl) {
         // Cache the suffix for future use
         const suffixMatch = cdnUrl.match(/otv-([a-z0-9]+)/i)
@@ -343,11 +418,13 @@ export async function resolveO2TvEpisodeViaCaptcha(showSlug, seasonNum, epNum) {
           source: 'o2tv',
           isDirect: true,
           playableInRoom: /\.(mp4|webm|m3u8)/i.test(cdnUrl),
-          quality: /\.(mp4|webm)/i.test(cdnUrl) ? 'HD' : null,
+          quality: opt.quality || 'MP4',
+          qualityTier: opt.tier,
+          resolvedFileId: opt.fileId,
         }]
       }
     } catch (err) {
-      console.error(`Captcha resolution failed for file ${fileId}:`, err.message)
+      console.error(`Captcha resolution failed for file ${opt.fileId} (${opt.tier}):`, err.message)
     }
   }
 
