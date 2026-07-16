@@ -74,7 +74,14 @@ export default function CreateRoomPage() {
   )
   const [scraperSite, setScraperSite] = useState('o2tv')
   const [videoId, setVideoId] = useState(presetVideo)
-  const [videoUrl, setVideoUrl] = useState(presetVideoUrl ? normalizePlaybackUrl(presetVideoUrl) : '')
+  // Never seed videoUrl with an O2TV *page* link — that is not playable until episode resolve
+  const [videoUrl, setVideoUrl] = useState(() => {
+    if (!presetVideoUrl) return ''
+    if (isO2TvUrl(presetVideoUrl) && !isDirectVideoUrl(presetVideoUrl) && !/\/api\/proxy\?/i.test(presetVideoUrl)) {
+      return ''
+    }
+    return normalizePlaybackUrl(presetVideoUrl)
+  })
   const [videoType, setVideoType] = useState(presetIsStream || presetVideoUrl ? 'direct' : 'youtube')
   const [isLiveStream, setIsLiveStream] = useState(presetIsLive)
   const [error, setError] = useState(null)
@@ -472,43 +479,22 @@ export default function CreateRoomPage() {
       return
     }
 
-    // O2TV show result from in-page search → seasons
-    if (
-      item.o2tvKind === 'show'
-      || item.source === 'o2tv'
-      || isO2TvUrl(item.url || item.link)
-    ) {
-      const slug = item.showSlug || parseShowSlugFromUrl(item.url || item.link)
-      const name = item.showName || item.title || 'TV Show'
-      const thumb = safeThumb(item.thumbnail || item.image)
-      if (slug) {
-        setO2ShowSlug(slug)
-        setO2ShowName(name)
-        if (thumb) setO2Thumbnail(thumb)
-        if (item.title) setTitle((t) => t || name)
-        clear()
-        loadO2Seasons({ showSlug: slug, showName: name, thumbnail: thumb })
+    const candidate = item.link || item.url || ''
+    const candidateStr = typeof candidate === 'string' ? candidate : ''
+    const itemTitle = typeof item.title === 'string' ? item.title : (item.title != null ? String(item.title) : '')
+
+    // Already playable (proxy / mp4) — never force into season browser
+    if (item.isDirect || item.playableInRoom || isDirectVideoUrl(candidateStr) || /\/api\/proxy\?/i.test(candidateStr)) {
+      if (!candidateStr) {
+        toast('That result has no usable URL.', { variant: 'warning' })
         return
       }
-    }
-
-    const candidate = item.link || item.url || ''
-    if (item.requiresUserAction && candidate && !item.isDirect && !isDirectVideoUrl(candidate)) {
-      window.open(candidate, '_blank', 'noopener,noreferrer')
-      toast('Opened the page. Complete any download step there, then paste the final HTTPS video URL into Chan.', {
-        variant: 'info',
-        duration: 8000,
-      })
-      return
-    }
-
-    if (item.isDirect || isDirectVideoUrl(candidate) || candidate) {
-      const normalizedCandidate = normalizePlaybackUrl(candidate)
+      const normalizedCandidate = normalizePlaybackUrl(candidateStr)
       setVideoUrl(normalizedCandidate)
       setVideoId('')
       setVideoType('direct')
-      setUrl(candidate)
-      if (item.title) setTitle((t) => t || item.title)
+      setUrl(candidateStr)
+      if (itemTitle) setTitle((t) => t || itemTitle)
       if (item.thumbnail || item.image) setO2Thumbnail(safeThumb(item.thumbnail || item.image))
       clear()
       setO2Stage(null)
@@ -516,10 +502,58 @@ export default function CreateRoomPage() {
       return
     }
 
-    if (candidate) {
+    // O2TV show listing → seasons browser (page URLs only)
+    const isO2ShowBrowse =
+      item.o2tvKind === 'show'
+      || (
+        (item.source === 'o2tv' || isO2TvUrl(candidateStr))
+        && !item.isDirect
+        && !isDirectVideoUrl(candidateStr)
+        && !/\/api\/proxy\?/i.test(candidateStr)
+      )
+
+    if (isO2ShowBrowse) {
+      const slug = item.showSlug || parseShowSlugFromUrl(candidateStr)
+      const name = (typeof item.showName === 'string' && item.showName) || itemTitle || 'TV Show'
+      const thumb = safeThumb(item.thumbnail || item.image)
+      if (slug) {
+        setO2ShowSlug(slug)
+        setO2ShowName(name)
+        if (thumb) setO2Thumbnail(thumb)
+        if (itemTitle) setTitle((t) => t || name)
+        clear()
+        loadO2Seasons({ showSlug: slug, showName: name, thumbnail: thumb })
+        return
+      }
+    }
+
+    if (item.requiresUserAction && candidateStr && !item.isDirect && !isDirectVideoUrl(candidateStr)) {
+      window.open(candidateStr, '_blank', 'noopener,noreferrer')
+      toast('Opened the page. Complete any download step there, then paste the final HTTPS video URL into Chan.', {
+        variant: 'info',
+        duration: 8000,
+      })
+      return
+    }
+
+    if (candidateStr && (item.isDirect || isDirectVideoUrl(candidateStr) || /\/api\/proxy\?/i.test(candidateStr))) {
+      const normalizedCandidate = normalizePlaybackUrl(candidateStr)
+      setVideoUrl(normalizedCandidate)
+      setVideoId('')
+      setVideoType('direct')
+      setUrl(candidateStr)
+      if (itemTitle) setTitle((t) => t || itemTitle)
+      if (item.thumbnail || item.image) setO2Thumbnail(safeThumb(item.thumbnail || item.image))
+      clear()
+      setO2Stage(null)
+      toast('Direct video link selected', { variant: 'success' })
+      return
+    }
+
+    if (candidateStr) {
       setSearchMode('scraper')
       setScraperSite('custom')
-      setUrl(candidate)
+      setUrl(candidateStr)
       setYtResults([])
       toast('Page link loaded. Click Extract links to look for a playable file.', {
         variant: 'info',
@@ -535,12 +569,16 @@ export default function CreateRoomPage() {
     setError(null)
     setCreating(true)
     try {
-      if (!title.trim()) throw new Error('Give the room a title')
+      const roomTitle = typeof title === 'string' ? title.trim() : ''
+      if (!roomTitle) throw new Error('Give the room a title')
       if (videoType === 'youtube' && !videoId) {
         throw new Error('Pick a valid YouTube video')
       }
 
-      let resolvedUrl = videoUrl || url || ''
+      let resolvedUrl = (typeof videoUrl === 'string' && videoUrl) || (typeof url === 'string' && url) || ''
+      if (resolvedUrl && typeof resolvedUrl !== 'string') {
+        throw new Error('Invalid video URL — pick an episode again')
+      }
 
       // Only re-resolve page URLs that are not already proxied / direct files
       if (
@@ -617,7 +655,7 @@ export default function CreateRoomPage() {
       const roomData = {
         hostId: user.uid,
         hostName: user.displayName || 'Host',
-        title: title.trim(),
+        title: roomTitle,
         activityType: videoType === 'direct' ? 'direct' : 'youtube',
         isPrivate,
         inviteCode,
