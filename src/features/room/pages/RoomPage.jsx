@@ -575,7 +575,13 @@ export default function RoomPage() {
                     toast?.(err?.message || 'Video playback failed. Try another source.', { variant: 'error', duration: 5000 })
                   }}
                   roomId={roomId}
-                  isLive={Boolean(room.isLive || room.videoType === 'iptv' || room.source === 'iptv')}
+                  isLive={Boolean(
+                    room.videoType === 'iptv'
+                    || room.videoType === 'sports'
+                    || room.source === 'iptv'
+                    // VOD (nsfw/direct/youtube) must stay seekable even if isLive was set by mistake
+                    || (room.isLive && room.videoType !== 'nsfw' && room.videoType !== 'direct' && room.videoType !== 'youtube')
+                  )}
                   subtitleVtt={room.subtitleVtt}
                 />
               </ErrorBoundary>

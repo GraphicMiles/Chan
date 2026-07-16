@@ -663,7 +663,8 @@ export default function CreateRoomPage() {
         hostId: user.uid,
         hostName: user.displayName || 'Host',
         title: roomTitle,
-        activityType: videoType === 'direct' ? 'direct' : 'youtube',
+        // Placeholder — overwritten below once video type is known
+        activityType: 'youtube',
         isPrivate,
         inviteCode,
         coHosts: [],
@@ -686,8 +687,13 @@ export default function CreateRoomPage() {
           : (['iptv', 'sports', 'nsfw'].includes(presetType) ? presetType : 'direct')
         roomData.videoType = streamType
         roomData.activityType = streamType === 'direct' ? 'direct' : streamType
-        if (presetIsLive || isLiveStream || streamType === 'iptv' || streamType === 'sports') {
+        // Only linear TV is live — never mark nsfw/direct VOD as live (breaks seeking)
+        if (streamType === 'iptv' || streamType === 'sports') {
           roomData.isLive = true
+        } else if ((presetIsLive || isLiveStream) && streamType !== 'nsfw' && streamType !== 'direct') {
+          roomData.isLive = true
+        } else {
+          roomData.isLive = false
         }
         if (o2Thumbnail) roomData.thumbnail = o2Thumbnail
       }

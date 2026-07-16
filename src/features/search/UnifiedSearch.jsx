@@ -234,8 +234,8 @@ export default function UnifiedSearch() {
     // IPTV / live streams are already m3u8/mp4 URLs — always normalize through proxy
     // so mixed-content http:// streams and CORS-hostile CDNs work in the browser.
     if ((result.type === 'iptv' || result.isLive) && (result.url || result.link)) {
-      const liveUrl = result.url || result.link
-      // Soft health probe — never block create; free IPTV lists have many dead links
+      // Prefer raw upstream URL for health probe; playable URL may already be proxied
+      const liveUrl = result.rawUrl || result.url || result.link
       if (result.type === 'iptv' && user) {
         try {
           const token = await user.getIdToken()
@@ -256,7 +256,10 @@ export default function UnifiedSearch() {
           // Probe failed — proceed; player will surface errors
         }
       }
-      const playback = normalizePlaybackUrl(liveUrl, { forceProxy: true })
+      // If server already wrapped /api/proxy, keep it; else force proxy for http/CORS
+      const playback = /\/api\/proxy\?/i.test(String(result.url || ''))
+        ? String(result.url)
+        : normalizePlaybackUrl(liveUrl, { forceProxy: true })
       const params = new URLSearchParams({
         videoUrl: playback,
         title: result.title || 'Live Stream',
