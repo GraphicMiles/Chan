@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom'
 import { doc, setDoc, deleteDoc, serverTimestamp, collection } from 'firebase/firestore'
 import { db } from '../../../shared/lib/firebase.js'
@@ -14,11 +14,33 @@ import {
 } from '../../../shared/lib/youtube.js'
 import { useScraper } from '../../../hooks/useScraper.js'
 import { parseJsonResponse } from '../../../shared/lib/api.js'
+import { isSuitableThumbnail } from '../../../shared/lib/mediaHelper.js'
 import { Button, Input, Card, useToast } from '../../../shared/ui/index.js'
 import styles from './CreateRoomPage.module.css'
 
 function makeInviteCode() {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
+}
+
+function isO2TvUrl(value) {
+  return /tvshows4mobile\.org|o2tvseries|o2tv\.org/i.test(String(value || ''))
+}
+
+function parseShowSlugFromUrl(value) {
+  try {
+    const u = new URL(value)
+    if (!isO2TvUrl(u.href)) return null
+    // CDN paths are /Show Name/... — not a tvshows4mobile slug
+    if (/o2tv\.org/i.test(u.hostname)) return null
+    const parts = u.pathname.split('/').filter(Boolean)
+    return parts[0] || null
+  } catch {
+    return null
+  }
+}
+
+function safeThumb(url) {
+  return isSuitableThumbnail(url) ? url : null
 }
 
 export default function CreateRoomPage() {
@@ -28,11 +50,15 @@ export default function CreateRoomPage() {
   const [searchParams] = useSearchParams()
   const { toast } = useToast()
   const { scrape, results, loading: scraperLoading, error: scraperError, clear } = useScraper()
+  const o2AbortRef = useRef(0)
 
   const presetVideo = searchParams.get('video') || ''
   const presetVideoUrl = searchParams.get('videoUrl') || ''
   const presetTitle = searchParams.get('title') || ''
   const presetType = searchParams.get('type') || 'youtube'
+  const presetThumb = safeThumb(searchParams.get('thumbnail') || '')
+  const presetShowSlug = searchParams.get('showSlug') || parseShowSlugFromUrl(presetVideoUrl) || ''
+  const presetShowName = searchParams.get('showName') || presetTitle || ''
   const presetIsStream = ['direct', 'iptv', 'sports', 'nsfw'].includes(presetType)
   const presetIsLive = searchParams.get('isLive') === 'true' || presetType === 'iptv' || presetType === 'sports' || /youtube\.com\/live\//i.test(presetVideoUrl || '')
 
@@ -56,12 +82,170 @@ export default function CreateRoomPage() {
   const [embedWarning, setEmbedWarning] = useState(null)
   const [ytResults, setYtResults] = useState([])
   const [ytLoading, setYtLoading] = useState(false)
-  const [nkiriEpisodes, setNkiriEpisodes] = useState([])
-  const [nkiriLoading, setNkiriLoading] = useState(false)
-  const [nkiriError, setNkiriError] = useState(null)
-  const [selectedEpisode, setSelectedEpisode] = useState(null)
-  const [nkiriDisplayName, setNkiriDisplayName] = useState('')
 
+  // O2TV hierarchical browse state
+  // stage: null | 'seasons' | 'episodes' | 'ready'
+  const [o2Stage, setO2Stage] = useState(null)
+  const [o2Loading, setO2Loading] = useState(false)
+  const [o2Error, setO2Error] = useState(null)
+  const [o2ShowSlug, setO2ShowSlug] = useState(presetShowSlug)
+  const [o2ShowName, setO2ShowName] = useState(presetShowName)
+  const [o2Thumbnail, setO2Thumbnail] = useState(presetThumb)
+  const [o2SeasonNum, setO2SeasonNum] = useState(null)
+  const [o2Seasons, setO2Seasons] = useState([])
+  const [o2Episodes, setO2Episodes] = useState([])
+  const [selectedSeasonIdx, setSelectedSeasonIdx] = useState(null)
+  const [selectedEpisodeIdx, setSelectedEpisodeIdx] = useState(null)
+  const [resolvingEpisode, setResolvingEpisode] = useState(false)
+
+  const mediaPost = useCallback(async (body) => {
+    if (!user) throw new Error('Sign in required')
+    const token = await user.getIdToken()
+    const res = await fetch('/api/media', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    })
+    const text = await res.text()
+    let data = null
+    try {
+      data = JSON.parse(text)
+    } catch {
+      const isTimeout = res.status === 504 || /timeout|504/i.test(text)
+      throw new Error(
+        isTimeout
+          ? 'Request timed out — try again.'
+          : `Request failed (HTTP ${res.status})`
+      )
+    }
+    if (!res.ok || data?.success === false) {
+      throw new Error(data?.error || `Request failed (HTTP ${res.status})`)
+    }
+    return data
+  }, [user])
+
+  const loadO2Seasons = useCallback(async ({ showSlug, showName, thumbnail } = {}) => {
+    const slug = showSlug || o2ShowSlug
+    if (!slug) {
+      setO2Error('Missing show reference. Go back and pick a show from search.')
+      return
+    }
+    const reqId = ++o2AbortRef.current
+    setO2Loading(true)
+    setO2Error(null)
+    setO2Stage('seasons')
+    setO2Seasons([])
+    setO2Episodes([])
+    setSelectedSeasonIdx(null)
+    setSelectedEpisodeIdx(null)
+    setVideoUrl('')
+    try {
+      const data = await mediaPost({
+        action: 'o2tvSeasons',
+        showSlug: slug,
+        showName: showName || o2ShowName || presetTitle,
+        thumbnail: thumbnail || o2Thumbnail || undefined,
+      })
+      if (reqId !== o2AbortRef.current) return
+      const list = Array.isArray(data.results) ? data.results : []
+      setO2Seasons(list)
+      if (data.showName) setO2ShowName(data.showName)
+      if (data.showSlug) setO2ShowSlug(data.showSlug)
+      if (data.thumbnail) setO2Thumbnail(safeThumb(data.thumbnail) || o2Thumbnail)
+      if (!list.length) {
+        setO2Error('No seasons found for this show. Try another result or paste a direct .mp4 link.')
+      }
+    } catch (err) {
+      if (reqId !== o2AbortRef.current) return
+      console.error('O2TV seasons failed:', err)
+      setO2Error(err.message || 'Failed to load seasons')
+    } finally {
+      if (reqId === o2AbortRef.current) setO2Loading(false)
+    }
+  }, [mediaPost, o2ShowSlug, o2ShowName, o2Thumbnail, presetTitle])
+
+  const loadO2Episodes = useCallback(async (seasonNum, seasonIdx = null) => {
+    if (!o2ShowSlug || !seasonNum) return
+    const reqId = ++o2AbortRef.current
+    setO2Loading(true)
+    setO2Error(null)
+    setO2Stage('episodes')
+    setO2Episodes([])
+    setO2SeasonNum(seasonNum)
+    setSelectedSeasonIdx(seasonIdx)
+    setSelectedEpisodeIdx(null)
+    setVideoUrl('')
+    try {
+      const data = await mediaPost({
+        action: 'o2tvEpisodes',
+        showSlug: o2ShowSlug,
+        showName: o2ShowName,
+        seasonNum,
+        thumbnail: o2Thumbnail || undefined,
+      })
+      if (reqId !== o2AbortRef.current) return
+      const list = Array.isArray(data.results) ? data.results : []
+      setO2Episodes(list)
+      if (data.thumbnail) setO2Thumbnail(safeThumb(data.thumbnail) || o2Thumbnail)
+      if (!list.length) {
+        setO2Error(`No episodes found for Season ${seasonNum}. Try another season.`)
+      }
+    } catch (err) {
+      if (reqId !== o2AbortRef.current) return
+      console.error('O2TV episodes failed:', err)
+      setO2Error(err.message || 'Failed to load episodes')
+    } finally {
+      if (reqId === o2AbortRef.current) setO2Loading(false)
+    }
+  }, [mediaPost, o2ShowSlug, o2ShowName, o2Thumbnail])
+
+  const resolveO2Episode = useCallback(async (ep, idx) => {
+    if (!ep) return
+    const seasonNum = ep.seasonNum || o2SeasonNum || 1
+    const episodeNum = ep.episodeNum || ep.number || (idx + 1)
+    const reqId = ++o2AbortRef.current
+    setResolvingEpisode(true)
+    setO2Error(null)
+    setSelectedEpisodeIdx(idx)
+    try {
+      const data = await mediaPost({
+        action: 'o2tvResolve',
+        showSlug: ep.showSlug || o2ShowSlug,
+        showName: ep.showName || o2ShowName,
+        seasonNum,
+        episodeNum,
+        thumbnail: ep.thumbnail || o2Thumbnail || undefined,
+      })
+      if (reqId !== o2AbortRef.current) return
+      const best = (data.results || []).find((r) => r.isDirect || r.playableInRoom || /\/api\/proxy\?/i.test(r.url || ''))
+        || (data.results || [])[0]
+      if (!best?.url) {
+        throw new Error('Could not resolve a playable link for this episode')
+      }
+      const playUrl = normalizePlaybackUrl(best.url)
+      setVideoUrl(playUrl)
+      setVideoType('direct')
+      setVideoId('')
+      setO2Stage('ready')
+      const epTitle = best.title || ep.title || `${o2ShowName} S${String(seasonNum).padStart(2, '0')}E${String(episodeNum).padStart(2, '0')}`
+      setTitle((t) => t || epTitle)
+      if (best.thumbnail) setO2Thumbnail(safeThumb(best.thumbnail) || o2Thumbnail)
+      toast('Episode ready — create the room when you are set', { variant: 'success' })
+    } catch (err) {
+      if (reqId !== o2AbortRef.current) return
+      console.error('O2TV resolve failed:', err)
+      setO2Error(err.message || 'Failed to resolve episode')
+      setVideoUrl('')
+      toast(err.message || 'Failed to resolve episode', { variant: 'error' })
+    } finally {
+      if (reqId === o2AbortRef.current) setResolvingEpisode(false)
+    }
+  }, [mediaPost, o2ShowSlug, o2ShowName, o2SeasonNum, o2Thumbnail, toast])
+
+  // Bootstrap from search navigation / deep link
   useEffect(() => {
     if (!presetVideoUrl || !user) return
 
@@ -73,50 +257,77 @@ export default function CreateRoomPage() {
       return
     }
 
-    // O2TV / tvshows4mobile: load seasons/episodes via server scrape
-    if (/tvshows4mobile\.org|o2tvseries|o2tv\.org/i.test(presetVideoUrl)) {
-      setNkiriDisplayName(presetTitle || 'TV Show')
-      setUrl('')
-      setNkiriLoading(true)
-      setNkiriError(null)
-      user.getIdToken().then((token) => {
-        return fetch('/api/media', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ action: 'scrape', url: presetVideoUrl }),
-        })
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          return res.json()
-        })
-        .then((data) => {
-          if (data.results && data.results.length > 0) {
-            setNkiriEpisodes(data.results)
-          } else {
-            setNkiriError('No episodes found. Try another show or paste a direct .mp4 link.')
-          }
-        })
-        .catch((err) => {
-          console.error('O2TV fetch failed:', err)
-          setNkiriError(`Failed to load episodes: ${err.message}`)
-        })
-        .finally(() => setNkiriLoading(false))
+    // Already a direct playable file / proxy URL
+    if (isDirectVideoUrl(presetVideoUrl) || /\/api\/proxy\?/i.test(presetVideoUrl)) {
+      const normalized = normalizePlaybackUrl(presetVideoUrl)
+      const isM3u8 = /\.m3u8(\?|#|$)/i.test(presetVideoUrl)
+      setVideoUrl(normalized)
+      setVideoType(isM3u8 ? 'iptv' : 'direct')
+      setVideoId('')
+      // CDN o2tv.org mp4 may still need proxy — normalizePlaybackUrl usually wraps it
       return
     }
 
+    // O2TV hierarchical entry
+    if (isO2TvUrl(presetVideoUrl) || presetShowSlug) {
+      const slug = presetShowSlug || parseShowSlugFromUrl(presetVideoUrl)
+      const name = presetShowName || presetTitle || 'TV Show'
+      setO2ShowSlug(slug || '')
+      setO2ShowName(name)
+      setO2Thumbnail(presetThumb)
+      setUrl('')
+      setVideoUrl('')
+      setVideoType('direct')
+      setSearchMode('scraper')
+      if (slug) {
+        loadO2Seasons({ showSlug: slug, showName: name, thumbnail: presetThumb })
+      } else {
+        // Fall back to scrape path which uses resolveO2TvPage hierarchy
+        setO2Loading(true)
+        setO2Error(null)
+        mediaPost({ action: 'scrape', url: presetVideoUrl })
+          .then((data) => {
+            const list = data.results || []
+            if (data.stage === 'seasons' || list.some((r) => r.o2tvKind === 'season')) {
+              setO2Seasons(list)
+              setO2Stage('seasons')
+              if (data.showSlug) setO2ShowSlug(data.showSlug)
+              if (data.showName) setO2ShowName(data.showName)
+              if (data.thumbnail) setO2Thumbnail(safeThumb(data.thumbnail))
+            } else if (data.stage === 'episodes' || list.some((r) => r.o2tvKind === 'episode')) {
+              setO2Episodes(list)
+              setO2Stage('episodes')
+              if (data.showSlug) setO2ShowSlug(data.showSlug)
+              if (data.showName) setO2ShowName(data.showName)
+              if (data.seasonNum) setO2SeasonNum(data.seasonNum)
+              if (data.thumbnail) setO2Thumbnail(safeThumb(data.thumbnail))
+            } else if (list.some((r) => r.isDirect || r.playableInRoom)) {
+              const best = list.find((r) => r.isDirect || r.playableInRoom) || list[0]
+              setVideoUrl(normalizePlaybackUrl(best.url))
+              setTitle((t) => t || best.title || name)
+              setO2Stage('ready')
+            } else {
+              setO2Error('No seasons or episodes found. Try another show.')
+            }
+          })
+          .catch((err) => {
+            console.error('O2TV bootstrap failed:', err)
+            setO2Error(err.message || 'Failed to load show')
+          })
+          .finally(() => setO2Loading(false))
+      }
+      return
+    }
 
-    if (presetIsStream || isDirectVideoUrl(presetVideoUrl) || presetVideoUrl) {
+    if (presetIsStream || presetVideoUrl) {
       const normalized = normalizePlaybackUrl(presetVideoUrl)
-      const isM3u8 = /\\.m3u8(\\?|#|$)/i.test(presetVideoUrl)
+      const isM3u8 = /\.m3u8(\?|#|$)/i.test(presetVideoUrl)
       setVideoUrl(normalized)
       setVideoType(isM3u8 ? 'iptv' : 'direct')
       setVideoId('')
     }
-  }, [presetIsStream, presetVideoUrl])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap once from query params
+  }, [presetVideoUrl, user?.uid])
 
   if (!user) return <Link to="/auth">Sign in to create a room</Link>
 
@@ -128,11 +339,11 @@ export default function CreateRoomPage() {
       setVideoId(id)
       setVideoUrl('')
       setVideoType('youtube')
-      // Detect YouTube live streams
       const isYtLive = /youtube\.com\/live\//i.test(value)
       setIsLiveStream(isYtLive)
       clear()
       setYtResults([])
+      setO2Stage(null)
       checkEmbeddable(id).then((r) => {
         if (!r.embeddable) setEmbedWarning(r.reason)
         else if (r.title && !title) setTitle(r.title)
@@ -147,6 +358,7 @@ export default function CreateRoomPage() {
       setVideoType(isM3u8 ? 'iptv' : 'direct')
       clear()
       setYtResults([])
+      setO2Stage(null)
     }
   }
 
@@ -160,9 +372,6 @@ export default function CreateRoomPage() {
       if (hasYouTubeApiKey()) {
         items = await searchYouTube(searchQuery.trim(), 12)
       } else {
-        // No client-side key — use the server-side search instead.
-        // This works as long as YOUTUBE_API_KEY (or VITE_YOUTUBE_API_KEY)
-        // is configured on the Vercel server.
         const token = await user.getIdToken()
         const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/media`, {
           method: 'POST',
@@ -222,6 +431,21 @@ export default function CreateRoomPage() {
       toast('Direct video link selected', { variant: 'success' })
       return
     }
+    // If user pasted an O2TV show page, enter hierarchical flow
+    if (isO2TvUrl(url.trim())) {
+      const slug = parseShowSlugFromUrl(url.trim())
+      if (slug) {
+        setO2ShowSlug(slug)
+        setO2ShowName(searchQuery.trim() || title || slug.replace(/-/g, ' '))
+        loadO2Seasons({
+          showSlug: slug,
+          showName: searchQuery.trim() || title || slug.replace(/-/g, ' '),
+          thumbnail: o2Thumbnail,
+        })
+        return
+      }
+    }
+    setO2Stage(null)
     await scrape({
       url: url.trim() || undefined,
       query: searchQuery.trim() || undefined,
@@ -241,10 +465,31 @@ export default function CreateRoomPage() {
       if (item.title) setTitle((t) => t || item.title)
       setYtResults([])
       clear()
+      setO2Stage(null)
       checkEmbeddable(item.id).then((r) => {
         if (!r.embeddable) setEmbedWarning(r.reason)
       })
       return
+    }
+
+    // O2TV show result from in-page search → seasons
+    if (
+      item.o2tvKind === 'show'
+      || item.source === 'o2tv'
+      || isO2TvUrl(item.url || item.link)
+    ) {
+      const slug = item.showSlug || parseShowSlugFromUrl(item.url || item.link)
+      const name = item.showName || item.title || 'TV Show'
+      const thumb = safeThumb(item.thumbnail || item.image)
+      if (slug) {
+        setO2ShowSlug(slug)
+        setO2ShowName(name)
+        if (thumb) setO2Thumbnail(thumb)
+        if (item.title) setTitle((t) => t || name)
+        clear()
+        loadO2Seasons({ showSlug: slug, showName: name, thumbnail: thumb })
+        return
+      }
     }
 
     const candidate = item.link || item.url || ''
@@ -264,7 +509,9 @@ export default function CreateRoomPage() {
       setVideoType('direct')
       setUrl(candidate)
       if (item.title) setTitle((t) => t || item.title)
+      if (item.thumbnail || item.image) setO2Thumbnail(safeThumb(item.thumbnail || item.image))
       clear()
+      setO2Stage(null)
       toast('Direct video link selected', { variant: 'success' })
       return
     }
@@ -292,31 +539,36 @@ export default function CreateRoomPage() {
       if (videoType === 'youtube' && !videoId) {
         throw new Error('Pick a valid YouTube video')
       }
-      
-      // Resolve Nkiri page → episodes, or DownloadWella landing → direct/proxy URL.
-      // Server uses form-walk (no Puppeteer required on Vercel Hobby).
+
       let resolvedUrl = videoUrl || url || ''
-      if (/tvshows4mobile\.org|o2tvseries|o2tv\.org|downloadwella\.com|fsmc/i.test(resolvedUrl) && !/\/api\/proxy\?/i.test(resolvedUrl)) {
+
+      // Only re-resolve page URLs that are not already proxied / direct files
+      if (
+        isO2TvUrl(resolvedUrl)
+        && !/\/api\/proxy\?/i.test(resolvedUrl)
+        && !isDirectVideoUrl(resolvedUrl)
+      ) {
+        throw new Error('Pick a season and episode first, then create the room')
+      }
+
+      if (
+        /downloadwella\.com|fsmc/i.test(resolvedUrl)
+        && !/\/api\/proxy\?/i.test(resolvedUrl)
+      ) {
         try {
-          const token = await user.getIdToken()
-          const res = await fetch('/api/media', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ action: 'scrape', url: resolvedUrl, options: { resolve: true } }),
+          const data = await mediaPost({
+            action: 'scrape',
+            url: resolvedUrl,
+            options: { resolve: true },
           })
-          const data = await res.json()
           const list = Array.isArray(data.results) ? data.results : []
-          // Prefer already-playable proxy/direct results; then MP4 over MKV
           const ranked = [...list].sort((a, b) => {
             const score = (it) => {
               let s = 0
               if (it.isDirect || it.playableInRoom) s += 20
               if (/\/api\/proxy\?/i.test(it.url || it.link || '')) s += 15
-              if (it.container === 'mp4' || /\.mp4/i.test(it.url || '') || /\bmp4\b/i.test(it.title || '')) s += 10
-              if (it.container === 'mkv' || /\.mkv/i.test(it.url || '') || /\bmkv\b/i.test(it.title || '')) s -= 5
+              if (it.container === 'mp4' || /\.mp4/i.test(it.url || '')) s += 10
+              if (it.container === 'mkv' || /\.mkv/i.test(it.url || '')) s -= 5
               if (it.requiresUserAction) s -= 20
               return s
             }
@@ -325,39 +577,27 @@ export default function CreateRoomPage() {
           const best = ranked[0]
           if (best?.url && (best.isDirect || best.playableInRoom || /\/api\/proxy\?/i.test(best.url))) {
             resolvedUrl = best.url
-          } else if (best?.url && /downloadwella\.com/i.test(best.url) && !/downloadwella\.com/i.test(resolvedUrl)) {
-            // Nkiri page returned episode list — resolve the best DownloadWella link now
-            const epRes = await fetch('/api/media', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ action: 'scrape', url: best.url }),
-            })
-            const epData = await epRes.json()
-            const playable = (epData.results || []).find((r) => r.isDirect || r.playableInRoom || /\/api\/proxy\?/i.test(r.url || ''))
-            if (playable?.url) resolvedUrl = playable.url
-            else if (data.expired || epData.expired) {
-              throw new Error(epData.results?.[0]?.meta || data.results?.[0]?.meta || 'Download link expired — pick the episode again from Nkiri for a fresh token')
-            }
           } else if (data.expired || best?.requiresUserAction) {
-            throw new Error(best?.meta || data.results?.[0]?.meta || 'Could not resolve DownloadWella link — try another quality (prefer MP4) or re-open Nkiri')
+            throw new Error(best?.meta || 'Could not resolve download link')
           }
         } catch (err) {
-          console.error('Nkiri/Downloadwella resolution failed:', err)
-          if (err.message && /expired|resolve|MP4|Nkiri/i.test(err.message)) throw err
+          console.error('Download resolution failed:', err)
+          if (err.message && /expired|resolve|download/i.test(err.message)) throw err
         }
       }
-      
+
       const finalDirectUrl = normalizePlaybackUrl(resolvedUrl)
       const isActualUrl = typeof finalDirectUrl === 'string' && (/^https?:\/\//i.test(finalDirectUrl) || finalDirectUrl.startsWith('/api/proxy'))
       if (videoType === 'direct') {
         if (!isActualUrl && !presetIsStream) {
-          throw new Error(`Please click 'Search / Extract' to find '${url || searchQuery || 'your movie'}' and select a video from the results below, or paste a full URL starting with http:// or https://`)
+          throw new Error(
+            o2Stage && o2Stage !== 'ready'
+              ? 'Select a season and episode first'
+              : `Please search and select a video, or paste a full URL starting with http:// or https://`
+          )
         }
         if (!finalDirectUrl || (!isDirectVideoUrl(finalDirectUrl) && !presetIsStream && !finalDirectUrl.includes('/api/proxy'))) {
-          throw new Error('Paste a direct video file link (.mp4 / .m3u8 / .mkv)')
+          throw new Error('Paste a direct video file link (.mp4 / .m3u8 / .mkv) or pick an episode')
         }
       }
 
@@ -395,14 +635,12 @@ export default function CreateRoomPage() {
         roomData.videoType = 'youtube'
       } else if (finalDirectUrl) {
         roomData.videoUrl = finalDirectUrl
-        // Preserve IPTV / sports / NSFW type so the player treats live streams correctly
         roomData.videoType = ['iptv', 'sports', 'nsfw'].includes(presetType) ? presetType : 'direct'
         roomData.activityType = roomData.videoType === 'direct' ? 'direct' : roomData.videoType
         if (presetIsLive || isLiveStream) roomData.isLive = true
+        if (o2Thumbnail) roomData.thumbnail = o2Thumbnail
       }
 
-      // Seed participantCount=1 + heartbeat so opportunistic cleanup never treats
-      // this brand-new room as empty while the host is still joining.
       roomData.participantCount = 1
 
       await setDoc(doc(db, 'rooms', roomId), roomData)
@@ -421,7 +659,6 @@ export default function CreateRoomPage() {
       const joinToken = await user.getIdToken()
       let joinOk = false
       let lastJoinError = null
-      // Retry join a few times — cold starts / transient auth can fail once.
       for (let attempt = 0; attempt < 3 && !joinOk; attempt += 1) {
         try {
           const joinRes = await fetch('/api/room', {
@@ -441,7 +678,6 @@ export default function CreateRoomPage() {
           const joinData = await parseJsonResponse(joinRes)
           if (!joinRes.ok) {
             lastJoinError = new Error(joinData.error || 'Could not add host to room')
-            // Brief backoff before retry
             await new Promise((r) => setTimeout(r, 400 * (attempt + 1)))
             continue
           }
@@ -452,8 +688,6 @@ export default function CreateRoomPage() {
         }
       }
       if (!joinOk) {
-        // Don't leave an orphan room doc that cleanup will eventually wipe —
-        // delete the half-created room, then surface the error.
         try {
           await deleteDoc(doc(db, 'rooms', roomId, 'playerState', 'current')).catch(() => {})
           await deleteDoc(doc(db, 'rooms', roomId)).catch(() => {})
@@ -464,8 +698,6 @@ export default function CreateRoomPage() {
       }
 
       toast('Room created', { variant: 'success' })
-      // Keep creating=true until navigation unmounts — prevents double-submit
-      // if the user mashes Create while the router is transitioning.
       navigate(`/room/${roomId}${inviteCode ? `?invite=${inviteCode}` : ''}`)
     } catch (err) {
       console.error('Create room error:', err)
@@ -476,6 +708,8 @@ export default function CreateRoomPage() {
   }
 
   const listResults = searchMode === 'youtube' ? ytResults : results
+  const showO2Browser = o2Stage === 'seasons' || o2Stage === 'episodes' || o2Stage === 'ready' || o2Loading || o2Error
+  const canCreate = Boolean(videoId || videoUrl)
 
   return (
     <div className={styles.page}>
@@ -485,49 +719,149 @@ export default function CreateRoomPage() {
           Pick YouTube, search TV shows (O2TV / progressive MP4), or paste a direct .mp4 / .m3u8 link.
         </p>
 
-
-        {/* Nkiri Episode Grid */}
-        {(nkiriEpisodes.length > 0 || nkiriError) && (
+        {/* O2TV hierarchical browser: show → seasons → episodes → resolve */}
+        {showO2Browser && (
           <div className={styles.nkiriSection}>
-            <h2 className={styles.nkiriTitle}>{presetTitle || 'Select episode'}</h2>
-            {nkiriLoading ? (
-              <p>Loading episodes...</p>
-            ) : nkiriError ? (
+            <div className={styles.o2Header}>
+              {o2Thumbnail && (
+                <img
+                  src={o2Thumbnail}
+                  alt=""
+                  className={styles.o2Poster}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none'
+                  }}
+                />
+              )}
+              <div className={styles.o2HeaderText}>
+                <h2 className={styles.nkiriTitle}>
+                  {o2ShowName || presetTitle || 'Select season / episode'}
+                </h2>
+                <p className={styles.o2Breadcrumb}>
+                  {o2Stage === 'seasons' && 'Choose a season'}
+                  {o2Stage === 'episodes' && (
+                    <>
+                      Season {o2SeasonNum}
+                      {' · '}
+                      <button
+                        type="button"
+                        className={styles.o2BackLink}
+                        onClick={() => {
+                          setO2Stage('seasons')
+                          setO2Episodes([])
+                          setSelectedSeasonIdx(null)
+                          setSelectedEpisodeIdx(null)
+                          setVideoUrl('')
+                          setO2Error(null)
+                        }}
+                      >
+                        ← All seasons
+                      </button>
+                    </>
+                  )}
+                  {o2Stage === 'ready' && 'Episode ready to play'}
+                </p>
+              </div>
+            </div>
+
+            {o2Loading && (
+              <p className={styles.o2Status}>
+                {o2Stage === 'episodes' ? 'Loading episodes…' : 'Loading seasons…'}
+              </p>
+            )}
+
+            {o2Error && !o2Loading && (
               <div className={styles.nkiriError}>
-                <p>{nkiriError}</p>
+                <p>{o2Error}</p>
                 <button
                   type="button"
                   className={styles.retryButton}
                   onClick={() => {
-                    setNkiriEpisodes([])
-                    setNkiriError(null)
-                    // Re-trigger the fetch
-                    const event = new CustomEvent('nkiri-retry', { detail: presetVideoUrl })
-                    window.dispatchEvent(event)
+                    setO2Error(null)
+                    if (o2Stage === 'episodes' && o2SeasonNum) {
+                      loadO2Episodes(o2SeasonNum, selectedSeasonIdx)
+                    } else if (o2ShowSlug) {
+                      loadO2Seasons({ showSlug: o2ShowSlug, showName: o2ShowName, thumbnail: o2Thumbnail })
+                    }
                   }}
                 >
                   Retry
                 </button>
               </div>
-            ) : (
+            )}
+
+            {!o2Loading && o2Stage === 'seasons' && o2Seasons.length > 0 && (
               <div className={styles.episodeGrid}>
-                {nkiriEpisodes.map((ep, idx) => (
+                {o2Seasons.map((season, idx) => (
                   <button
-                    key={idx}
+                    key={season.seasonNum || season.url || idx}
                     type="button"
-                    className={`${styles.episodeCard} ${selectedEpisode === idx ? styles.episodeSelected : ''}`}
-                    onClick={() => {
-                      setSelectedEpisode(idx)
-                      setVideoUrl(ep.url)
-                      setTitle(ep.title || `Episode ${idx + 1}`)
-                    }}
+                    className={`${styles.episodeCard} ${selectedSeasonIdx === idx ? styles.episodeSelected : ''}`}
+                    onClick={() => loadO2Episodes(season.seasonNum || idx + 1, idx)}
                   >
-                    {ep.thumbnail && (
-                      <img src={ep.thumbnail} alt="" className={styles.episodeThumb} />
+                    {(season.thumbnail || o2Thumbnail) && (
+                      <img
+                        src={season.thumbnail || o2Thumbnail}
+                        alt=""
+                        className={styles.episodeThumb}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none'
+                        }}
+                      />
                     )}
-                    <span className={styles.episodeTitle}>{ep.title || `Episode ${idx + 1}`}</span>
+                    <span className={styles.episodeTitle}>
+                      {season.label || season.title || `Season ${season.seasonNum || idx + 1}`}
+                    </span>
                   </button>
                 ))}
+              </div>
+            )}
+
+            {!o2Loading && o2Stage === 'episodes' && o2Episodes.length > 0 && (
+              <div className={styles.episodeGrid}>
+                {o2Episodes.map((ep, idx) => (
+                  <button
+                    key={ep.episodeNum || ep.url || idx}
+                    type="button"
+                    className={`${styles.episodeCard} ${selectedEpisodeIdx === idx ? styles.episodeSelected : ''}`}
+                    disabled={resolvingEpisode}
+                    onClick={() => resolveO2Episode(ep, idx)}
+                  >
+                    {(ep.thumbnail || o2Thumbnail) && (
+                      <img
+                        src={ep.thumbnail || o2Thumbnail}
+                        alt=""
+                        className={styles.episodeThumb}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none'
+                        }}
+                      />
+                    )}
+                    <span className={styles.episodeTitle}>
+                      {ep.label || ep.title || `Episode ${ep.episodeNum || idx + 1}`}
+                    </span>
+                    {resolvingEpisode && selectedEpisodeIdx === idx && (
+                      <span className={styles.o2Resolving}>Resolving…</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {o2Stage === 'ready' && videoUrl && (
+              <div className={styles.o2Ready}>
+                <span className={styles.selectedText}>Episode resolved — ready to create room</span>
+                <button
+                  type="button"
+                  className={styles.o2BackLink}
+                  onClick={() => {
+                    setO2Stage('episodes')
+                    setVideoUrl('')
+                    setSelectedEpisodeIdx(null)
+                  }}
+                >
+                  Change episode
+                </button>
               </div>
             )}
           </div>
@@ -592,15 +926,14 @@ export default function CreateRoomPage() {
           ) : (
             <>
               <p className={styles.note}>
-                Search TV shows (O2TV) or paste a direct .mp4 / .m3u8 link.
+                Search TV shows (O2TV) or paste a direct .mp4 / .m3u8 link. Pick a season, then an episode.
               </p>
               <div className={styles.row}>
                 <Input
                   placeholder="Paste direct URL or search keywords (Silo, House of the Dragon...)"
-                  value={nkiriDisplayName || url || searchQuery}
+                  value={url || searchQuery}
                   onChange={(e) => {
                     const val = e.target.value
-                    setNkiriDisplayName('') // Clear friendly name when user types
                     onUrlChange(val)
                     setSearchQuery(val)
                   }}
@@ -624,16 +957,17 @@ export default function CreateRoomPage() {
                   (item.source === 'youtube' && item.id) ||
                   item.isDirect ||
                   isDirectVideoUrl(item.link || item.url)
+                const thumb = safeThumb(item.thumbnail || item.image)
                 return (
                   <button
-                    key={item.id || item.link || idx}
+                    key={item.id || item.link || item.url || idx}
                     type="button"
                     className={`${styles.result} ${!playable ? styles.resultMuted : ''}`}
                     onClick={() => selectVideo(item)}
                   >
-                    {(item.thumbnail || item.image) && (
+                    {thumb && (
                       <img
-                        src={item.thumbnail || item.image}
+                        src={thumb}
                         alt=""
                         className={styles.resultThumb}
                         onError={(e) => {
@@ -643,7 +977,11 @@ export default function CreateRoomPage() {
                     )}
                     <p className={styles.resultTitle}>{item.title}</p>
                     <span className={styles.resultSource}>
-                      {playable ? 'Ready to play' : 'Select to continue'}
+                      {item.o2tvKind === 'show' || item.source === 'o2tv'
+                        ? 'TV show — open seasons'
+                        : playable
+                          ? 'Ready to play'
+                          : 'Select to continue'}
                     </span>
                   </button>
                 )
@@ -655,6 +993,16 @@ export default function CreateRoomPage() {
             <div className={styles.selected}>
               {videoType === 'youtube' && videoId && (
                 <img src={getThumbnail(videoId)} alt="" className={styles.selectedThumb} />
+              )}
+              {videoType !== 'youtube' && o2Thumbnail && (
+                <img
+                  src={o2Thumbnail}
+                  alt=""
+                  className={styles.selectedThumb}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none'
+                  }}
+                />
               )}
               <span className={styles.selectedText}>
                 {videoType === 'youtube' ? `YouTube: ${videoId}` : 'Direct video link selected'}
@@ -685,7 +1033,7 @@ export default function CreateRoomPage() {
             </label>
           </div>
 
-          <Button type="submit" loading={creating} fullWidth disabled={!videoId && !videoUrl} variant="cta">
+          <Button type="submit" loading={creating} fullWidth disabled={!canCreate || resolvingEpisode} variant="cta">
             Create Room
           </Button>
         </form>
@@ -698,7 +1046,6 @@ export default function CreateRoomPage() {
             type="button"
             className={styles.cancelLink}
             onClick={() => {
-              // Prefer explicit return path (from /media or /search), else browser history, else /media
               const from = location.state?.from
               if (from) navigate(from)
               else if (window.history.length > 1) navigate(-1)

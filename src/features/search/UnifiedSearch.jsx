@@ -280,14 +280,26 @@ export default function UnifiedSearch() {
 
     const sourceKey = String(result.source || result.provider || '').toLowerCase()
 
-    // O2TV / tvshows4mobile: hand off to Create Room for episode pick / play
-    if (sourceKey === 'o2tv' || sourceKey === 'tvshows4mobile' || /tvshows4mobile|o2tv/i.test(resultUrl)) {
+    // O2TV / tvshows4mobile: hand off to Create Room for seasons → episodes → resolve
+    if (
+      sourceKey === 'o2tv'
+      || sourceKey === 'tvshows4mobile'
+      || result.o2tvKind === 'show'
+      || result.o2tvKind === 'season'
+      || result.o2tvKind === 'episode'
+      || /tvshows4mobile|o2tv/i.test(resultUrl)
+    ) {
       const params = new URLSearchParams({
-        videoUrl: resultUrl,
+        videoUrl: resultUrl || '',
         title: finalTitle,
         type: 'direct',
         thumbnail: finalThumb || '',
       })
+      if (result.showSlug) params.set('showSlug', result.showSlug)
+      if (result.showName) params.set('showName', result.showName)
+      else if (finalTitle) params.set('showName', finalTitle)
+      if (result.seasonNum != null) params.set('seasonNum', String(result.seasonNum))
+      if (result.episodeNum != null) params.set('episodeNum', String(result.episodeNum))
       navigate(`/create?${params.toString()}`, { state: { from: `${location.pathname}${location.search || ''}` } })
       return
     }
