@@ -478,9 +478,9 @@ export default function RoomPage() {
             <Button type="button" size="sm" variant="ghost" onClick={() => setEditingTitle(false)}>Cancel</Button>
           </form>
         ) : (
-          <h1 className={styles.titleText}>{room.title}</h1>
+          <h1 className={styles.titleText}>{room?.title || 'Room'}</h1>
         )}
-        {room.locked && (
+        {room?.locked && (
           <Badge variant="warning" icon={Lock}>Locked</Badge>
         )}
         {isDirectVideo && (
@@ -498,14 +498,14 @@ export default function RoomPage() {
         <IconButton onClick={() => { setShowChat(true); setSidebarTab('chat') }} active={showChat && sidebarTab === 'chat'} aria-label="Toggle chat" title="Chat">
           <MessageSquare size={18} />
         </IconButton>
-        {isHost ? (
+        {room && isHost ? (
           <Button variant="danger" size="sm" onClick={() => setEndConfirmOpen(true)}>End Room</Button>
-        ) : (
+        ) : room ? (
           <Button variant="danger" size="sm" onClick={requestLeave}>
             <LogOut size={14} />
             Leave
           </Button>
-        )}
+        ) : null}
       </div>
     </header>
   )

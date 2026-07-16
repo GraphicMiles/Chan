@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
-import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore'
+import { doc, setDoc, deleteDoc, serverTimestamp, collection } from 'firebase/firestore'
 import { db } from '../../../shared/lib/firebase.js'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
 import {
@@ -371,6 +371,10 @@ export default function CreateRoomPage() {
         if (presetIsLive || isLiveStream) roomData.isLive = true
       }
 
+      // Seed participantCount=1 + heartbeat so opportunistic cleanup never treats
+      // this brand-new room as empty while the host is still joining.
+      roomData.participantCount = 1
+
       await setDoc(doc(db, 'rooms', roomId), roomData)
 
       const playerState = {
@@ -385,24 +389,53 @@ export default function CreateRoomPage() {
       await setDoc(doc(db, 'rooms', roomId, 'playerState', 'current'), playerState)
 
       const joinToken = await user.getIdToken()
-      const joinRes = await fetch('/api/room', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${joinToken}`,
-        },
-        body: JSON.stringify({
-          action: 'join',
-          roomId,
-          uid: user.uid,
-          displayName: user.displayName || 'Host',
-          inviteCode: inviteCode || undefined,
-        }),
-      })
-      const joinData = await parseJsonResponse(joinRes)
-      if (!joinRes.ok) throw new Error(joinData.error || 'Could not add host to room')
+      let joinOk = false
+      let lastJoinError = null
+      // Retry join a few times — cold starts / transient auth can fail once.
+      for (let attempt = 0; attempt < 3 && !joinOk; attempt += 1) {
+        try {
+          const joinRes = await fetch('/api/room', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${joinToken}`,
+            },
+            body: JSON.stringify({
+              action: 'join',
+              roomId,
+              uid: user.uid,
+              displayName: user.displayName || 'Host',
+              inviteCode: inviteCode || undefined,
+            }),
+          })
+          const joinData = await parseJsonResponse(joinRes)
+          if (!joinRes.ok) {
+            lastJoinError = new Error(joinData.error || 'Could not add host to room')
+            // Brief backoff before retry
+            await new Promise((r) => setTimeout(r, 400 * (attempt + 1)))
+            continue
+          }
+          joinOk = true
+        } catch (err) {
+          lastJoinError = err
+          await new Promise((r) => setTimeout(r, 400 * (attempt + 1)))
+        }
+      }
+      if (!joinOk) {
+        // Don't leave an orphan room doc that cleanup will eventually wipe —
+        // delete the half-created room, then surface the error.
+        try {
+          await deleteDoc(doc(db, 'rooms', roomId, 'playerState', 'current')).catch(() => {})
+          await deleteDoc(doc(db, 'rooms', roomId)).catch(() => {})
+        } catch {
+          /* best-effort cleanup */
+        }
+        throw lastJoinError || new Error('Could not add host to room')
+      }
 
       toast('Room created', { variant: 'success' })
+      // Keep creating=true until navigation unmounts — prevents double-submit
+      // if the user mashes Create while the router is transitioning.
       navigate(`/room/${roomId}${inviteCode ? `?invite=${inviteCode}` : ''}`)
     } catch (err) {
       console.error('Create room error:', err)
