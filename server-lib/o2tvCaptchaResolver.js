@@ -139,7 +139,7 @@ export async function resolveO2TvCaptcha(fileId) {
   }, 8000)
 
   // Collect cookies
-  const setCookies = dlRes.headers.raw()?.['set-cookie'] || []
+  const setCookies = dlRes.headers.getSetCookie?.() || []
   cookies = setCookies.map(c => c.split(';')[0]).join('; ')
 
   // Step 2: Follow to the captcha page
@@ -153,7 +153,7 @@ export async function resolveO2TvCaptcha(fileId) {
   }, 8000)
 
   // Collect more cookies
-  const moreCookies = captchaPageRes.headers.raw()?.['set-cookie'] || []
+  const moreCookies = captchaPageRes.headers.getSetCookie?.() || []
   cookies = [cookies, ...moreCookies.map(c => c.split(';')[0])].filter(Boolean).join('; ')
 
   // Step 3: Download the captcha image
@@ -206,7 +206,7 @@ export async function resolveO2TvCaptcha(fileId) {
 
   // Step 6: Follow redirects to get the final CDN URL
   let currentUrl = postRes.headers.get('location')
-  const postCookies = postRes.headers.raw()?.['set-cookie'] || []
+  const postCookies = postRes.headers.getSetCookie?.() || []
   cookies = [cookies, ...postCookies.map(c => c.split(';')[0])].filter(Boolean).join('; ')
 
   if (!currentUrl) {
@@ -248,7 +248,7 @@ export async function resolveO2TvCaptcha(fileId) {
         },
       }, 8000)
 
-      const moreRedirectCookies = redirRes.headers.raw()?.['set-cookie'] || []
+      const moreRedirectCookies = redirRes.headers.getSetCookie?.() || []
       cookies = [cookies, ...moreRedirectCookies.map(c => c.split(';')[0])].filter(Boolean).join('; ')
 
       const nextLocation = redirRes.headers.get('location')
