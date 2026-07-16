@@ -101,6 +101,43 @@ export default function RoomPage() {
 
   const { isHost, writePlayerState, canControl } = usePlayerSync(roomId, room, playerRef)
 
+  // If there's an error from useRoom, show it immediately
+  if (error) {
+    return (
+      <Layout header={<header className={styles.header}><Link to="/" className={styles.brand}>Chan</Link></header>} wide className={styles.layout}>
+        <div className={styles.error}>
+          <h3>Room Error</h3>
+          <p>{error}</p>
+          <Button as={Link} to="/" variant="secondary">Back to Home</Button>
+        </div>
+      </Layout>
+    )
+  }
+
+  if (!room) {
+    return (
+      <Layout header={<header className={styles.header}><Link to="/" className={styles.brand}>Chan</Link></header>} wide className={styles.layout}>
+        <div className={styles.loading}>
+          <p>Loading room...</p>
+          <p style={{ fontSize: '0.875rem', color: '#888', marginTop: '1rem' }}>
+            If this persists, the room may have been deleted.
+          </p>
+          <Button as={Link} to="/" variant="secondary" style={{ marginTop: '1rem' }}>Back to Home</Button>
+        </div>
+      </Layout>
+    )
+  }
+
+  if (!joined) {
+    return (
+      <Layout header={<header className={styles.header}><Link to="/" className={styles.brand}>Chan</Link></header>} wide className={styles.layout}>
+        <div className={styles.joining}>
+          <p>Joining room...</p>
+        </div>
+      </Layout>
+    )
+  }
+
   // Continuously report player position so leave/beforeunload can freeze the exact timestamp
   useEffect(() => {
     if (!reportPlayerPosition) return undefined
@@ -233,16 +270,6 @@ export default function RoomPage() {
       </div>
     )
   }
-  if (error) {
-    return (
-      <div className={styles.error}>
-        <p>{error}</p>
-        <Button as={Link} to="/" variant="secondary">Back home</Button>
-      </div>
-    )
-  }
-  if (!room) return <div className={styles.loading}>Loading room...</div>
-  if (!joined) return <div className={styles.joining}>Joining room...</div>
 
   const isDirectVideo = room?.videoType === 'direct' || room?.videoType === 'iptv' || room?.videoType === 'sports' || room?.videoType === 'nsfw'
   const isYoutube = !isDirectVideo && (activityType === 'youtube' || activityType === 'direct')
