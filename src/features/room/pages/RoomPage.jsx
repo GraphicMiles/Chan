@@ -262,6 +262,13 @@ export default function RoomPage() {
   const changeVideo = async (e) => {
     e.preventDefault()
     const trimmedUrl = newVideoUrl.trim()
+    
+    // Check if it's a Nkiri URL - needs episode selection first
+    if (/thenkiri\.com|nkiri\.com/i.test(trimmedUrl)) {
+      toast('Nkiri season URLs cannot be played directly. Please select a specific episode from the Create Room page.', { variant: 'info', duration: 5000 })
+      return
+    }
+    
     const id = extractVideoId(trimmedUrl)
     const isDirect = isDirectVideoUrl(trimmedUrl) || /\.(mp4|m3u8|mkv|avi|mov|webm|flv|ts)(\?|#|$)/i.test(trimmedUrl)
     const isM3u8 = /\.m3u8(\?|#|$)/i.test(trimmedUrl)

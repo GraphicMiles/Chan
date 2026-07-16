@@ -59,6 +59,7 @@ export default function CreateRoomPage() {
   const [nkiriLoading, setNkiriLoading] = useState(false)
   const [nkiriError, setNkiriError] = useState(null)
   const [selectedEpisode, setSelectedEpisode] = useState(null)
+  const [nkiriDisplayName, setNkiriDisplayName] = useState('')
 
   useEffect(() => {
     if (!presetVideoUrl || !user) return
@@ -73,6 +74,10 @@ export default function CreateRoomPage() {
 
     // Detect Nkiri URLs
     if (/thenkiri\.com|nkiri\.com/i.test(presetVideoUrl)) {
+      // Extract a friendly display name from the URL or title
+      const urlTitle = presetTitle || presetVideoUrl.split('/').filter(Boolean).pop()?.replace(/[-_]/g, ' ') || 'Nkiri Video'
+      setNkiriDisplayName(urlTitle)
+      setUrl('') // Clear the URL field to show friendly name instead
       setNkiriLoading(true)
       setNkiriError(null)
       user.getIdToken().then((token) => {
@@ -529,9 +534,10 @@ export default function CreateRoomPage() {
               <div className={styles.row}>
                 <Input
                   placeholder="Paste direct URL or search keywords (Silo, House of the Dragon...)"
-                  value={url || searchQuery}
+                  value={nkiriDisplayName || url || searchQuery}
                   onChange={(e) => {
                     const val = e.target.value
+                    setNkiriDisplayName('') // Clear friendly name when user types
                     onUrlChange(val)
                     setSearchQuery(val)
                   }}
