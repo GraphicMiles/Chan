@@ -101,43 +101,6 @@ export default function RoomPage() {
 
   const { isHost, writePlayerState, canControl } = usePlayerSync(roomId, room, playerRef)
 
-  // If there's an error from useRoom, show it immediately
-  if (error) {
-    return (
-      <Layout header={<header className={styles.header}><Link to="/" className={styles.brand}>Chan</Link></header>} wide className={styles.layout}>
-        <div className={styles.error}>
-          <h3>Room Error</h3>
-          <p>{error}</p>
-          <Button as={Link} to="/" variant="secondary">Back to Home</Button>
-        </div>
-      </Layout>
-    )
-  }
-
-  if (!room) {
-    return (
-      <Layout header={<header className={styles.header}><Link to="/" className={styles.brand}>Chan</Link></header>} wide className={styles.layout}>
-        <div className={styles.loading}>
-          <p>Loading room...</p>
-          <p style={{ fontSize: '0.875rem', color: '#888', marginTop: '1rem' }}>
-            If this persists, the room may have been deleted.
-          </p>
-          <Button as={Link} to="/" variant="secondary" style={{ marginTop: '1rem' }}>Back to Home</Button>
-        </div>
-      </Layout>
-    )
-  }
-
-  if (!joined) {
-    return (
-      <Layout header={<header className={styles.header}><Link to="/" className={styles.brand}>Chan</Link></header>} wide className={styles.layout}>
-        <div className={styles.joining}>
-          <p>Joining room...</p>
-        </div>
-      </Layout>
-    )
-  }
-
   // Continuously report player position so leave/beforeunload can freeze the exact timestamp
   useEffect(() => {
     if (!reportPlayerPosition) return undefined
@@ -546,6 +509,43 @@ export default function RoomPage() {
       </div>
     </header>
   )
+
+  // Error/loading/joining checks - MUST be after all hooks but before main render
+  if (error) {
+    return (
+      <Layout header={header} wide className={styles.layout}>
+        <div className={styles.error}>
+          <h3>Room Error</h3>
+          <p>{error}</p>
+          <Button as={Link} to="/" variant="secondary">Back to Home</Button>
+        </div>
+      </Layout>
+    )
+  }
+
+  if (!room) {
+    return (
+      <Layout header={header} wide className={styles.layout}>
+        <div className={styles.loading}>
+          <p>Loading room...</p>
+          <p style={{ fontSize: '0.875rem', color: '#888', marginTop: '1rem' }}>
+            If this persists, the room may have been deleted.
+          </p>
+          <Button as={Link} to="/" variant="secondary" style={{ marginTop: '1rem' }}>Back to Home</Button>
+        </div>
+      </Layout>
+    )
+  }
+
+  if (!joined) {
+    return (
+      <Layout header={header} wide className={styles.layout}>
+        <div className={styles.joining}>
+          <p>Joining room...</p>
+        </div>
+      </Layout>
+    )
+  }
 
   return (
     <Layout header={header} wide className={styles.layout}>
