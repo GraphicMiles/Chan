@@ -572,3 +572,82 @@
 @media (prefers-reduced-motion: reduce) {
   .sidebar { transition: none; }
 }
+
+/* Video Change Section */
+.videoChangeSection {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--bg-secondary, #1a1a1a);
+  border-radius: var(--radius, 8px);
+}
+
+.searchRow {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.searchResults {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.resultsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #888);
+}
+
+.clearBtn {
+  background: none;
+  border: none;
+  color: var(--accent, #6366f1);
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.resultItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: var(--bg-tertiary, #252525);
+  border-radius: var(--radius, 8px);
+  margin-bottom: 0.5rem;
+}
+
+.resultInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.resultInfo strong {
+  font-size: 0.875rem;
+  color: var(--text-primary, #fff);
+}
+
+.source {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+}
+
+.episodesList {
+  margin-top: 0.5rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--accent, #6366f1);
+}
+
+.episodeItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--bg-tertiary, #252525);
+  border-radius: var(--radius, 8px);
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+}
