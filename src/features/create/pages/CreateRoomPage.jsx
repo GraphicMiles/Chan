@@ -298,9 +298,10 @@ export default function CreateRoomPage() {
         throw new Error('Pick a valid YouTube video')
       }
       
-      // Resolve Nkiri/downloadwella URLs via Puppeteer
+      // Resolve Nkiri page → episodes, or DownloadWella landing → direct/proxy URL.
+      // Server uses form-walk (no Puppeteer required on Vercel Hobby).
       let resolvedUrl = videoUrl || url || ''
-      if (/downloadwella\.com/i.test(resolvedUrl)) {
+      if (/downloadwella\.com|thenkiri\.com|nkiri\.com|fsmc/i.test(resolvedUrl) && !/\/api\/proxy\?/i.test(resolvedUrl)) {
         try {
           const token = await user.getIdToken()
           const res = await fetch('/api/media', {
@@ -309,14 +310,48 @@ export default function CreateRoomPage() {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({ action: 'scrape', url: resolvedUrl }),
+            body: JSON.stringify({ action: 'scrape', url: resolvedUrl, options: { resolve: true } }),
           })
           const data = await res.json()
-          if (data.results && data.results.length > 0 && data.results[0].url) {
-            resolvedUrl = data.results[0].url
+          const list = Array.isArray(data.results) ? data.results : []
+          // Prefer already-playable proxy/direct results; then MP4 over MKV
+          const ranked = [...list].sort((a, b) => {
+            const score = (it) => {
+              let s = 0
+              if (it.isDirect || it.playableInRoom) s += 20
+              if (/\/api\/proxy\?/i.test(it.url || it.link || '')) s += 15
+              if (it.container === 'mp4' || /\.mp4/i.test(it.url || '') || /\bmp4\b/i.test(it.title || '')) s += 10
+              if (it.container === 'mkv' || /\.mkv/i.test(it.url || '') || /\bmkv\b/i.test(it.title || '')) s -= 5
+              if (it.requiresUserAction) s -= 20
+              return s
+            }
+            return score(b) - score(a)
+          })
+          const best = ranked[0]
+          if (best?.url && (best.isDirect || best.playableInRoom || /\/api\/proxy\?/i.test(best.url))) {
+            resolvedUrl = best.url
+          } else if (best?.url && /downloadwella\.com/i.test(best.url) && !/downloadwella\.com/i.test(resolvedUrl)) {
+            // Nkiri page returned episode list — resolve the best DownloadWella link now
+            const epRes = await fetch('/api/media', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ action: 'scrape', url: best.url }),
+            })
+            const epData = await epRes.json()
+            const playable = (epData.results || []).find((r) => r.isDirect || r.playableInRoom || /\/api\/proxy\?/i.test(r.url || ''))
+            if (playable?.url) resolvedUrl = playable.url
+            else if (data.expired || epData.expired) {
+              throw new Error(epData.results?.[0]?.meta || data.results?.[0]?.meta || 'Download link expired — pick the episode again from Nkiri for a fresh token')
+            }
+          } else if (data.expired || best?.requiresUserAction) {
+            throw new Error(best?.meta || data.results?.[0]?.meta || 'Could not resolve DownloadWella link — try another quality (prefer MP4) or re-open Nkiri')
           }
         } catch (err) {
-          console.error('Downloadwella resolution failed:', err)
+          console.error('Nkiri/Downloadwella resolution failed:', err)
+          if (err.message && /expired|resolve|MP4|Nkiri/i.test(err.message)) throw err
         }
       }
       
