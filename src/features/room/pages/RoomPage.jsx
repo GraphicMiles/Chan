@@ -57,6 +57,10 @@ export default function RoomPage() {
   const [showChat, setShowChat] = useState(() => (typeof window !== 'undefined' ? window.innerWidth > 768 : true))
   const [newVideoUrl, setNewVideoUrl] = useState('')
   const [showVideoInput, setShowVideoInput] = useState(false)
+  const [videoSearchQuery, setVideoSearchQuery] = useState('')
+  const [videoSearchResults, setVideoSearchResults] = useState([])
+  const [expandedSeasons, setExpandedSeasons] = useState({})
+  const [loadingEpisodes, setLoadingEpisodes] = useState({})
   const [shareOpen, setShareOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [endConfirmOpen, setEndConfirmOpen] = useState(false)
@@ -259,14 +263,78 @@ export default function RoomPage() {
     }
   }
 
-  const changeVideo = async (e) => {
-    e.preventDefault()
-    const trimmedUrl = newVideoUrl.trim()
-    
-    // Check if it's a Nkiri URL - needs episode selection first
-    if (/thenkiri\.com|nkiri\.com/i.test(trimmedUrl)) {
-      toast('Nkiri season URLs cannot be played directly. Please select a specific episode from the Create Room page.', { variant: 'info', duration: 5000 })
+  const searchVideos = useCallback(async () => {
+    if (!videoSearchQuery.trim()) return
+    setBusy(true)
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch('/api/media', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'search',
+          layer: 'direct',
+          query: videoSearchQuery.trim(),
+          options: { limit: 20 },
+        }),
+      })
+      const data = await res.json()
+      setVideoSearchResults(data.results || [])
+    } catch (err) {
+      console.error('Search failed:', err)
+      toast('Search failed', { variant: 'error' })
+    } finally {
+      setBusy(false)
+    }
+  }, [videoSearchQuery, user, toast])
+
+  const fetchEpisodesForChange = useCallback(async (seasonUrl) => {
+    if (expandedSeasons[seasonUrl]) {
+      setExpandedSeasons(prev => {
+        const next = { ...prev }
+        delete next[seasonUrl]
+        return next
+      })
       return
+    }
+
+    setLoadingEpisodes(prev => ({ ...prev, [seasonUrl]: true }))
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch('/api/media', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: 'scrape', url: seasonUrl }),
+      })
+      const data = await res.json()
+      if (data.results && data.results.length > 0) {
+        setExpandedSeasons(prev => ({ ...prev, [seasonUrl]: data.results }))
+      } else {
+        toast('No episodes found', { variant: 'error' })
+      }
+    } catch (err) {
+      console.error('Failed to fetch episodes:', err)
+      toast('Failed to load episodes', { variant: 'error' })
+    } finally {
+      setLoadingEpisodes(prev => ({ ...prev, [seasonUrl]: false }))
+    }
+  }, [expandedSeasons, user, toast])
+
+  const changeVideo = async (e, episode = null) => {
+    e?.preventDefault()
+    let trimmedUrl = newVideoUrl.trim()
+    let itemTitle = episode?.title || ''
+    
+    // If episode provided, use episode data
+    if (episode) {
+      trimmedUrl = episode.url
+      itemTitle = episode.title
     }
     
     const id = extractVideoId(trimmedUrl)
@@ -284,6 +352,7 @@ export default function RoomPage() {
           videoType: 'youtube',
           activityType: 'youtube',
           isLive: false,
+          title: itemTitle || room.title,
         })
         await writePlayerState({ videoId: id, videoUrl: null, isPlaying: false, currentTime: 0 })
       } else if (isDirect || trimmedUrl) {
@@ -294,6 +363,7 @@ export default function RoomPage() {
           videoType: nextType,
           activityType: nextType,
           isLive: isM3u8,
+          title: itemTitle || room.title,
         })
         await writePlayerState({ videoId: null, videoUrl: playbackUrl, isPlaying: false, currentTime: 0 })
       } else {
@@ -562,14 +632,71 @@ export default function RoomPage() {
                 </div>
               )}
               {showVideoInput && (
-                <form onSubmit={changeVideo} className={styles.videoForm}>
-                  <Input
-                    placeholder="Paste YouTube URL or direct video link (.mp4, .mkv)"
-                    value={newVideoUrl}
-                    onChange={(e) => setNewVideoUrl(e.target.value)}
-                  />
-                  <Button type="submit" loading={busy}>Update</Button>
-                </form>
+                <div className={styles.videoChangeSection}>
+                  <div className={styles.searchRow}>
+                    <Input
+                      placeholder="Search for movies/shows (e.g. Silo) or paste URL"
+                      value={videoSearchQuery}
+                      onChange={(e) => setVideoSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && searchVideos()}
+                    />
+                    <Button onClick={searchVideos} loading={busy}>Search</Button>
+                  </div>
+                  
+                  {videoSearchResults.length > 0 && (
+                    <div className={styles.searchResults}>
+                      <div className={styles.resultsHeader}>
+                        <span>Found {videoSearchResults.length} result(s)</span>
+                        <button onClick={() => setVideoSearchResults([])} className={styles.clearBtn}>Clear</button>
+                      </div>
+                      {videoSearchResults.map((item, idx) => {
+                        const isNkiri = /thenkiri\.com|nkiri\.com/i.test(item.url || '')
+                        const isExpanded = expandedSeasons[item.url]
+                        const isLoading = loadingEpisodes[item.url]
+                        const episodes = isExpanded || []
+                        
+                        return (
+                          <div key={idx} className={styles.resultItem}>
+                            <div className={styles.resultInfo}>
+                              <strong>{item.title}</strong>
+                              <span className={styles.source}>{item.source}</span>
+                            </div>
+                            {isNkiri ? (
+                              <Button 
+                                size="sm" 
+                                onClick={() => fetchEpisodesForChange(item.url)}
+                                loading={isLoading}
+                              >
+                                {isExpanded ? 'Hide' : 'Episodes'}
+                              </Button>
+                            ) : (
+                              <Button 
+                                size="sm" 
+                                onClick={() => changeVideo(null, item)}
+                              >
+                                Play
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* Expanded Episodes */}
+                  {Object.entries(expandedSeasons).map(([seasonUrl, episodes]) => (
+                    <div key={seasonUrl} className={styles.episodesList}>
+                      {episodes.map((ep, epIdx) => (
+                        <div key={epIdx} className={styles.episodeItem}>
+                          <span>{ep.title}</span>
+                          <Button size="sm" onClick={() => changeVideo(null, ep)}>
+                            Play
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               )}
             </Card>
           )}
