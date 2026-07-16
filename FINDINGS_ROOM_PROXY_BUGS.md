@@ -71,10 +71,25 @@ Several paths could zero out a brand-new room and then delete it:
 
 ---
 
+## Hobby 10s + chunking (follow-up)
+
+Vercel **Hobby hard-kills functions at ~10s**. Config and proxy behavior:
+
+| Setting | Value |
+|---------|--------|
+| `vercel.json` `api/proxy.js` `maxDuration` | **10** |
+| Small file (`Content-Length` ≤ 8 MiB) | Full progressive stream in one invocation |
+| Large / unknown size | **1 MiB** `206` chunks (`Accept-Ranges: bytes`) — browser requests next range |
+| MKV remux | **Only** if size ≤ ~6 MiB and no Range; large MKV = chunked passthrough |
+| Upstream connect budget | ~3.5s |
+| Hard stream deadline | ~9s (exit cleanly before platform kill) |
+
+Response headers for debugging: `X-Chan-Proxy-Mode: full|chunked|probe|remux-small`, `X-Chan-Proxy-Chunk-Bytes`.
+
 ## What is still a platform limit (not fully solvable in code)
 
-- **Vercel serverless cannot be a full video CDN.** Even at 60s, large MKV remux will eventually cut off. Browser may recover via Range on non-remux sources; remux is progressive-only.
-- If your plan hard-caps below 60s, raise the plan or put heavy media behind a real media proxy / R2 / Cloudflare Stream / direct CDN play where CORS allows.
+- **Vercel serverless cannot be a full video CDN.** Chunking fixes 504s for progressive MP4/WebM; seeking still works via Range.
+- **Large MKV remux is not viable on Hobby** — browsers often cannot play raw MKV; prefer MP4 sources or upgrade plan / external media edge.
 - Set `PROXY_ALLOWED_DOMAINS` in production (currently open if unset).
 
 ---
