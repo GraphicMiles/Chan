@@ -46,7 +46,7 @@ export default function CreateRoomPage() {
   const [searchMode, setSearchMode] = useState(
     presetType === 'direct' || presetVideoUrl ? 'scraper' : 'youtube'
   )
-  const [scraperSite, setScraperSite] = useState('netnaija')
+  const [scraperSite, setScraperSite] = useState('o2tv')
   const [videoId, setVideoId] = useState(presetVideo)
   const [videoUrl, setVideoUrl] = useState(presetVideoUrl ? normalizePlaybackUrl(presetVideoUrl) : '')
   const [videoType, setVideoType] = useState(presetIsStream || presetVideoUrl ? 'direct' : 'youtube')
@@ -73,12 +73,10 @@ export default function CreateRoomPage() {
       return
     }
 
-    // Detect Nkiri URLs
-    if (/thenkiri\.com|nkiri\.com/i.test(presetVideoUrl)) {
-      // Extract a friendly display name from the URL or title
-      const urlTitle = presetTitle || presetVideoUrl.split('/').filter(Boolean).pop()?.replace(/[-_]/g, ' ') || 'Nkiri Video'
-      setNkiriDisplayName(urlTitle)
-      setUrl('') // Clear the URL field to show friendly name instead
+    // O2TV / tvshows4mobile: load seasons/episodes via server scrape
+    if (/tvshows4mobile\.org|o2tvseries|o2tv\.org/i.test(presetVideoUrl)) {
+      setNkiriDisplayName(presetTitle || 'TV Show')
+      setUrl('')
       setNkiriLoading(true)
       setNkiriError(null)
       user.getIdToken().then((token) => {
@@ -97,23 +95,19 @@ export default function CreateRoomPage() {
         })
         .then((data) => {
           if (data.results && data.results.length > 0) {
-            // Check if it's the "no episodes" message
-            if (data.results[0].meta === 'This page has no downloadable episodes.') {
-              setNkiriError('No episodes found on this page. It may be a movie page or the content structure changed.')
-            } else {
-              setNkiriEpisodes(data.results)
-            }
+            setNkiriEpisodes(data.results)
           } else {
-            setNkiriError('No content found. The page may not exist or may have invalid structure.')
+            setNkiriError('No episodes found. Try another show or paste a direct .mp4 link.')
           }
         })
         .catch((err) => {
-          console.error('Nkiri fetch failed:', err)
-          setNkiriError(`Failed to load content: ${err.message}. The URL may be invalid or the site may be temporarily unavailable.`)
+          console.error('O2TV fetch failed:', err)
+          setNkiriError(`Failed to load episodes: ${err.message}`)
         })
         .finally(() => setNkiriLoading(false))
       return
     }
+
 
     if (presetIsStream || isDirectVideoUrl(presetVideoUrl) || presetVideoUrl) {
       const normalized = normalizePlaybackUrl(presetVideoUrl)
@@ -302,7 +296,7 @@ export default function CreateRoomPage() {
       // Resolve Nkiri page → episodes, or DownloadWella landing → direct/proxy URL.
       // Server uses form-walk (no Puppeteer required on Vercel Hobby).
       let resolvedUrl = videoUrl || url || ''
-      if (/downloadwella\.com|thenkiri\.com|nkiri\.com|fsmc/i.test(resolvedUrl) && !/\/api\/proxy\?/i.test(resolvedUrl)) {
+      if (/tvshows4mobile\.org|o2tvseries|o2tv\.org|downloadwella\.com|fsmc/i.test(resolvedUrl) && !/\/api\/proxy\?/i.test(resolvedUrl)) {
         try {
           const token = await user.getIdToken()
           const res = await fetch('/api/media', {
@@ -488,14 +482,14 @@ export default function CreateRoomPage() {
       <Card className={styles.card}>
         <h1 className={styles.title}>Start a Room</h1>
         <p className={styles.subtitle}>
-          Pick an embeddable YouTube video, or a direct video file URL (.mp4 / .m3u8).
+          Pick YouTube, search TV shows (O2TV / progressive MP4), or paste a direct .mp4 / .m3u8 link.
         </p>
 
 
         {/* Nkiri Episode Grid */}
         {(nkiriEpisodes.length > 0 || nkiriError) && (
           <div className={styles.nkiriSection}>
-            <h2 className={styles.nkiriTitle}>{presetTitle || 'Select Episode'}</h2>
+            <h2 className={styles.nkiriTitle}>{presetTitle || 'Select episode'}</h2>
             {nkiriLoading ? (
               <p>Loading episodes...</p>
             ) : nkiriError ? (
@@ -567,7 +561,7 @@ export default function CreateRoomPage() {
                 setYtResults([])
               }}
             >
-              Direct / Scraper
+              TV Shows / Direct
             </button>
           </div>
 
@@ -598,7 +592,7 @@ export default function CreateRoomPage() {
           ) : (
             <>
               <p className={styles.note}>
-                Paste a direct .mp4/.m3u8 link, or type a movie/show title (e.g. Silo) to search.
+                Search TV shows (O2TV) or paste a direct .mp4 / .m3u8 link.
               </p>
               <div className={styles.row}>
                 <Input

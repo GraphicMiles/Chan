@@ -15,7 +15,7 @@ import { Modal, Button } from '../../shared/ui/index.js'
 const SEARCH_LAYERS = [
   { id: 'all', label: 'All Media', icon: Compass, placeholder: 'Search movies, live TV, YouTube, sports, anime...', description: 'Search movies, shows, live TV, YouTube, sports, and more' },
   { id: 'youtube', label: 'YouTube', icon: PlayCircle, placeholder: 'Search YouTube videos...', description: 'Search millions of YouTube videos with instant playback' },
-  { id: 'direct', label: 'Direct Links', icon: Link2, placeholder: 'Search movies/shows or paste direct URL (.mp4/.m3u8)...', description: 'Find movies and shows ready to watch together' },
+  { id: 'direct', label: 'Direct Links', icon: Link2, placeholder: 'Search TV shows (e.g. X-Men 97) or paste .mp4 URL...', description: 'TV shows via O2TV (progressive MP4) or paste a direct .mp4 link' },
   { id: 'iptv', label: 'Live TV', icon: Tv, placeholder: 'Search channels (CNN, ESPN, HBO)...', description: 'Watch live TV channels and 24/7 streaming networks' },
   { id: 'sports', label: 'Sports', icon: Trophy, placeholder: 'Search team, league, or match...', description: 'Find live sports matches, scores, and streaming fixtures' },
   { id: 'nsfw', label: 'NSFW', icon: ShieldAlert, placeholder: 'Search adult content (18+ only)...', description: 'Adult content - legal age verification required', adult: true },
@@ -280,9 +280,8 @@ export default function UnifiedSearch() {
 
     const sourceKey = String(result.source || result.provider || '').toLowerCase()
 
-    // Nkiri: navigate directly to Create Room with the Nkiri page URL
-    // Create Room will scrape for episodes and show the episode grid
-    if (sourceKey === 'nkiri' || sourceKey === 'thenkiri') {
+    // O2TV / tvshows4mobile: hand off to Create Room for episode pick / play
+    if (sourceKey === 'o2tv' || sourceKey === 'tvshows4mobile' || /tvshows4mobile|o2tv/i.test(resultUrl)) {
       const params = new URLSearchParams({
         videoUrl: resultUrl,
         title: finalTitle,
@@ -334,7 +333,7 @@ export default function UnifiedSearch() {
     // Known multi-hop providers: allow navigation even if isDirect flag is missing
     // after a partial resolve (CreateRoom / player will re-normalize).
     const knownProviders = [
-      'nkiri', 'thenkiri', 'downloadwella', 'maxcinema', 'archive.org',
+      'o2tv', 'tvshows4mobile', 'o2tv.org', 'downloadwella', 'archive.org',
       'archiveorg',
     ]
     const isKnownProvider = knownProviders.some((p) =>
@@ -732,9 +731,9 @@ export default function UnifiedSearch() {
           
           {activeLayer === 'direct' && (
             <div className={styles.multiLayerAlert}>
-              <h4>Multi Layer Direct Search Completed</h4>
+              <h4>TV Show Search Completed</h4>
               <p>
-                We searched Nkiri using multiple query formats and found 0 direct links for &quot;{query}&quot;.
+                No TV show results for &quot;{query}&quot;. Try a shorter title or paste a direct .mp4 link.
               </p>
               <div className={styles.alertTips}>
                 <span>• Try simplifying your keywords (e.g. search &quot;Silo&quot; instead of exact episode name)</span>
