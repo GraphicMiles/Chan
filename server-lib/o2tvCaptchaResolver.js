@@ -410,6 +410,7 @@ export async function resolveO2TvEpisodeViaCaptcha(showSlug, seasonNum, epNum) {
   if (!options.length) return []
 
   const showName = showSlug
+    .replace(/^download-/i, '')
     .replace(/-otv[a-z0-9]+$/i, '')
     .replace(/-/g, ' ')
     .trim()
