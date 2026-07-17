@@ -226,33 +226,10 @@ export default function RoomPage() {
     }, 5000)
   }, [canControl, queueItems, onPlayNextQueueItem, roomId])
 
-  if (!user) {
-    return (
-      <div className={styles.loading}>
-        <Link to="/auth">Sign in to join</Link>
-      </div>
-    )
-  }
-
-  const isDirectVideo = room?.videoType === 'direct' || room?.videoType === 'iptv' || room?.videoType === 'sports' || room?.videoType === 'nsfw'
-  const isYoutube = !isDirectVideo && (activityType === 'youtube' || activityType === 'direct')
-  const canShareScreen = isDisplayMediaSupported()
-
-  const switchActivity = async (type) => {
-    if (type === 'screenshare' && !canShareScreen) {
-      toast('Screen share needs a desktop browser. On mobile, only watching is supported.', { variant: 'warning' })
-      return
-    }
-    try {
-      setBusy(true)
-      await updateRoom({ activityType: type })
-    } catch (err) {
-      toast(err.message || 'Could not switch mode', { variant: 'error' })
-    } finally {
-      setBusy(false)
-    }
-  }
-
+  // Hooks must run unconditionally on every render. These two useCallbacks
+  // previously lived AFTER the `if (!user)` early return, which made them
+  // conditional hooks (rules-of-hooks violation). They are declared here, with
+  // all other hooks, so call order is stable across renders.
   const searchVideos = useCallback(async () => {
     if (!videoSearchQuery.trim()) return
     setBusy(true)
@@ -315,6 +292,33 @@ export default function RoomPage() {
       setLoadingEpisodes(prev => ({ ...prev, [seasonUrl]: false }))
     }
   }, [expandedSeasons, user, toast])
+
+  if (!user) {
+    return (
+      <div className={styles.loading}>
+        <Link to="/auth">Sign in to join</Link>
+      </div>
+    )
+  }
+
+  const isDirectVideo = room?.videoType === 'direct' || room?.videoType === 'iptv' || room?.videoType === 'sports' || room?.videoType === 'nsfw'
+  const isYoutube = !isDirectVideo && (activityType === 'youtube' || activityType === 'direct')
+  const canShareScreen = isDisplayMediaSupported()
+
+  const switchActivity = async (type) => {
+    if (type === 'screenshare' && !canShareScreen) {
+      toast('Screen share needs a desktop browser. On mobile, only watching is supported.', { variant: 'warning' })
+      return
+    }
+    try {
+      setBusy(true)
+      await updateRoom({ activityType: type })
+    } catch (err) {
+      toast(err.message || 'Could not switch mode', { variant: 'error' })
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const changeVideo = async (e, episode = null) => {
     e?.preventDefault()
