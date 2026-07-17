@@ -216,6 +216,70 @@ export default function CreateRoomPage() {
     }
   }, [mediaPost, o2ShowSlug, o2ShowName, o2Thumbnail])
 
+  const resolveNkiriEpisode = useCallback(async (ep, idx) => {
+    if (!ep?.url) return
+    const reqId = ++o2AbortRef.current
+    setResolvingEpisode(true)
+    setO2Error(null)
+    setSelectedEpisodeIdx(idx)
+    try {
+      // Resolve the downloadwella episode URL via the worker
+      const data = await mediaPost({ action: 'scrape', url: ep.url })
+      const list = data.results || []
+      const best = list.find((r) => r.isDirect || r.playableInRoom || /\/api\/proxy\?/i.test(r.url || ''))
+        || list[0]
+      if (!best?.url) {
+        throw new Error('Could not resolve this episode. Try another quality.')
+      }
+      const playUrl = normalizePlaybackUrl(best.url)
+      setVideoUrl(playUrl)
+      setVideoType('direct')
+      setVideoId('')
+      setO2Stage('ready')
+      const epTitle = best.title || ep.title || `${o2ShowName} Episode`
+      setTitle((t) => t || epTitle)
+      toast('Episode ready — create the room when you are set', { variant: 'success' })
+    } catch (err) {
+      if (reqId !== o2AbortRef.current) return
+      setO2Error(err.message || 'Failed to resolve episode')
+      setVideoUrl('')
+      toast(err.message || 'Failed to resolve episode', { variant: 'error' })
+    } finally {
+      if (reqId === o2AbortRef.current) setResolvingEpisode(false)
+    }
+  }, [mediaPost, o2ShowName, toast])
+
+  const loadNkiriEpisodes = useCallback(async (showUrl, showName) => {
+    const reqId = ++o2AbortRef.current
+    setO2Loading(true)
+    setO2Error(null)
+    setO2Stage('episodes')
+    setO2Episodes([])
+    setSelectedEpisodeIdx(null)
+    setVideoUrl('')
+    if (showName) setO2ShowName(showName)
+    try {
+      const data = await mediaPost({ action: 'scrape', url: showUrl })
+      if (reqId !== o2AbortRef.current) return
+      const list = (data.results || []).filter((r) => r.url)
+      setO2Episodes(list.map((r, i) => ({
+        episodeNum: i + 1,
+        title: r.title || `Episode ${i + 1}`,
+        label: r.title || `Episode ${i + 1}`,
+        url: r.url,
+        thumbnail: r.thumbnail || null,
+      })))
+      if (!list.length) {
+        setO2Error('No episodes found. Try another show.')
+      }
+    } catch (err) {
+      if (reqId !== o2AbortRef.current) return
+      setO2Error(err.message || 'Failed to load episodes')
+    } finally {
+      if (reqId === o2AbortRef.current) setO2Loading(false)
+    }
+  }, [mediaPost])
+
   const resolveO2Episode = useCallback(async (ep, idx) => {
     if (!ep) return
     const seasonNum = ep.seasonNum || o2SeasonNum || 1
@@ -467,7 +531,7 @@ export default function CreateRoomPage() {
     })
   }
 
-  const selectVideo = (item) => {
+  const selectVideo = async (item) => {
     setError(null)
     setEmbedWarning(null)
 
@@ -532,6 +596,51 @@ export default function CreateRoomPage() {
         loadO2Seasons({ showSlug: slug, showName: name, thumbnail: thumb })
         return
       }
+    }
+
+    // Nkiri show page → load episodes directly (no seasons — Nkiri lists episodes flat)
+    const isNkiriShow =
+      item.source === 'nkiri'
+      || /thenkiri\.com|nkiri\.com/i.test(candidateStr)
+
+    if (isNkiriShow && !item.isDirect && !isDirectVideoUrl(candidateStr)) {
+      const name = itemTitle || 'TV Show'
+      setO2ShowName(name)
+      if (item.thumbnail || item.image) setO2Thumbnail(safeThumb(item.thumbnail || item.image))
+      if (itemTitle) setTitle((t) => t || name)
+      clear()
+      loadNkiriEpisodes(candidateStr, name)
+      return
+    }
+
+    // Downloadwella episode link from Nkiri → resolve to playable URL
+    if (
+      /downloadwella\.com|fsmc/i.test(candidateStr)
+      && !/\/api\/proxy\?/i.test(candidateStr)
+      && !isDirectVideoUrl(candidateStr)
+    ) {
+      try {
+        setResolvingEpisode(true)
+        setO2Error(null)
+        const data = await mediaPost({ action: 'scrape', url: candidateStr })
+        const list = data.results || []
+        const best = list.find((r) => r.isDirect || r.playableInRoom || /\/api\/proxy\?/i.test(r.url || '')) || list[0]
+        if (best?.url) {
+          const playUrl = normalizePlaybackUrl(best.url)
+          setVideoUrl(playUrl)
+          setVideoId('')
+          setVideoType('direct')
+          if (itemTitle) setTitle((t) => t || itemTitle)
+          toast('Episode resolved — ready to create room', { variant: 'success' })
+          return
+        }
+        toast('Could not resolve this episode link', { variant: 'error' })
+      } catch (err) {
+        toast(err.message || 'Failed to resolve episode', { variant: 'error' })
+      } finally {
+        setResolvingEpisode(false)
+      }
+      return
     }
 
     if (item.requiresUserAction && candidateStr && !item.isDirect && !isDirectVideoUrl(candidateStr)) {
@@ -882,7 +991,13 @@ export default function CreateRoomPage() {
                     type="button"
                     className={`${styles.episodeCard} ${selectedEpisodeIdx === idx ? styles.episodeSelected : ''}`}
                     disabled={resolvingEpisode}
-                    onClick={() => resolveO2Episode(ep, idx)}
+                    onClick={() => {
+                      if (/downloadwella\.com|fsmc|thenkiri/i.test(ep.url || '')) {
+                        resolveNkiriEpisode(ep, idx)
+                      } else {
+                        resolveO2Episode(ep, idx)
+                      }
+                    }}
                   >
                     {(ep.thumbnail || o2Thumbnail) && (
                       <img
