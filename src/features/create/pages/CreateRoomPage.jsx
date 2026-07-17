@@ -218,36 +218,19 @@ export default function CreateRoomPage() {
 
   const resolveNkiriEpisode = useCallback(async (ep, idx) => {
     if (!ep?.url) return
-    const reqId = ++o2AbortRef.current
-    setResolvingEpisode(true)
-    setO2Error(null)
     setSelectedEpisodeIdx(idx)
-    try {
-      // Resolve the downloadwella episode URL via the worker
-      const data = await mediaPost({ action: 'scrape', url: ep.url })
-      const list = data.results || []
-      const best = list.find((r) => r.isDirect || r.playableInRoom || /\/api\/proxy\?/i.test(r.url || ''))
-        || list[0]
-      if (!best?.url) {
-        throw new Error('Could not resolve this episode. Try another quality.')
-      }
-      const playUrl = normalizePlaybackUrl(best.url)
-      setVideoUrl(playUrl)
-      setVideoType('direct')
-      setVideoId('')
-      setO2Stage('ready')
-      const epTitle = best.title || ep.title || `${o2ShowName} Episode`
-      setTitle((t) => t || epTitle)
-      toast('Episode ready — create the room when you are set', { variant: 'success' })
-    } catch (err) {
-      if (reqId !== o2AbortRef.current) return
-      setO2Error(err.message || 'Failed to resolve episode')
-      setVideoUrl('')
-      toast(err.message || 'Failed to resolve episode', { variant: 'error' })
-    } finally {
-      if (reqId === o2AbortRef.current) setResolvingEpisode(false)
-    }
-  }, [mediaPost, o2ShowName, toast])
+    setO2Error(null)
+    // Store the downloadwella page URL — it will be resolved FRESH when Create
+    // Room is clicked (the create() function has a downloadwella re-resolve block).
+    // Resolving now would produce a time-limited CDN URL that expires before playback.
+    setVideoUrl(ep.url)
+    setVideoType('direct')
+    setVideoId('')
+    setO2Stage('ready')
+    const epTitle = ep.title || ep.label || `${o2ShowName} Episode`
+    setTitle((t) => t || epTitle)
+    toast('Episode selected — click Create Room to start watching', { variant: 'success' })
+  }, [o2ShowName, toast])
 
   const loadNkiriEpisodes = useCallback(async (showUrl, showName) => {
     const reqId = ++o2AbortRef.current
