@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import {
@@ -44,7 +44,7 @@ export default function UnifiedSearch() {
   const [filters, setFilters] = useState({ hdOnly: false, liveOnly: false })
   const [categoryFilter, setCategoryFilter] = useState('all')
   
-  const { results, loading, error, search, clear, hasMore, loadMore, searchMeta } = useUnifiedSearch()
+  const { results, loading, error, search, clear, hasMore, loadMore } = useUnifiedSearch()
   
   const currentLayer = useMemo(() => SEARCH_LAYERS.find(l => l.id === activeLayer), [activeLayer])
   const CurrentLayerIcon = currentLayer?.icon || Film

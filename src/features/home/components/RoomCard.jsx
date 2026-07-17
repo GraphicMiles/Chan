@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Users, Monitor, Play, Radio } from 'lucide-react'
+import { Users, Monitor, Play } from 'lucide-react'
 import { getThumbnail } from '../../../shared/lib/youtube.js'
 import styles from './RoomCard.module.css'
 

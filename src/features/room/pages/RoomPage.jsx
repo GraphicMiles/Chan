@@ -690,8 +690,7 @@ export default function RoomPage() {
                         const isNkiri = /thenkiri\.com|nkiri\.com/i.test(item.url || '')
                         const isExpanded = expandedSeasons[item.url]
                         const isLoading = loadingEpisodes[item.url]
-                        const episodes = isExpanded || []
-                        
+
                         return (
                           <div key={idx} className={styles.resultItem}>
                             <div className={styles.resultInfo}>

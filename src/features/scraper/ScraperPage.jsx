@@ -1,24 +1,15 @@
-import React, { useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import styles from './ScraperPage.module.css'
 import { useUnifiedSearch } from '../../hooks/useUnifiedSearch.js'
 import { isDirectVideoUrl, normalizePlaybackUrl } from '../../shared/lib/youtube.js'
 
-const SITES = [
-  { key: 'nkiri', label: 'Nkiri' },
-  { key: 'netnaija', label: 'NetNaija' },
-  { key: 'fzmovies', label: 'FZMovies' },
-  { key: 'o2tv', label: 'O2TV Series' },
-  { key: 'custom', label: 'Custom URL' },
-]
-
 export default function ScraperPage() {
   const navigate = useNavigate()
   const { results, loading, error, clear, search } = useUnifiedSearch()
   const [url, setUrl] = useState('')
   const [query, setQuery] = useState('')
-  const [site, setSite] = useState('custom')
   const [showDirectOnly, setShowDirectOnly] = useState(false)
 
   const handleUrlChange = useCallback((e) => {
