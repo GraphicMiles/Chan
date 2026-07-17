@@ -6,17 +6,24 @@
  * 2. Solving the captcha using Groq vision API
  * 3. Following the redirect to the actual CDN URL
  *
- * The CDN URLs have random per-file suffixes (otv-XXXXX) that can only be
- * discovered through the download page, which is protected by a simple
- * text captcha. This module automates the full resolution chain.
+ * IMPORTANT (2026): tvshows4mobile serves an interstitial AD on the first
+ * captcha solve per session; the SECOND solve (same validated session) yields
+ * the real CDN URL with the per-file suffix (otv-XXXXX). The suffixes are not
+ * guessable, so the captcha path is the only working MP4 resolution route.
  */
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const VISION_MODEL = 'llama-3.2-11b-vision-preview'
+// Groq has decommissioned earlier vision models (llama-3.2-*-vision-preview).
+// Try these multimodal models in order; the first that accepts image input wins.
+const VISION_MODELS = [
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'meta-llama/llama-4-maverick-17b-128e-instruct',
+  'llama-3.2-90b-vision-preview',
+  'llama-3.2-11b-vision-preview',
+]
 
 // ─── Suffix cache shared with o2tvResolver.js ───
-// We export the cache so both modules can share it
 export const suffixCache = new Map()
 const CACHE_TTL = 4 * 60 * 60 * 1000 // 4 hours
 
@@ -37,7 +44,40 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
   }
 }
 
-// ─── HEAD-probe a CDN URL ───
+// ─── Proper cookie jar ───
+// Naive "join('; ')" concatenation creates DUPLICATE PHPSESSID entries after the
+// POST re-sets the session — the server then reads the stale (unverified) value
+// and re-triggers the captcha. We store by name so re-sets replace cleanly.
+class CookieJar {
+  constructor() { this.store = new Map() }
+  capture(res) {
+    for (const sc of (res.headers.getSetCookie?.() || [])) {
+      const pair = sc.split(';')[0]
+      const eq = pair.indexOf('=')
+      if (eq > 0) this.store.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim())
+    }
+  }
+  header() { return [...this.store.entries()].map(([k, v]) => `${k}=${v}`).join('; ') }
+}
+
+// Encode a raw Location header (may contain literal spaces) into a valid URL.
+// The URL constructor already percent-encodes spaces in the pathname, so we just
+// re-serialize — do NOT call encodeURI on an already-encoded pathname (that
+// double-encodes %20 → %2520).
+function normalizeMediaUrl(rawUrl) {
+  if (!rawUrl) return rawUrl
+  try {
+    return new URL(rawUrl).toString()
+  } catch {
+    return String(rawUrl).replace(/ /g, '%20')
+  }
+}
+
+function isInterstitialAd(url) {
+  return /obqj|aliexpress|s\.click|rtmark|partitial|propeller/i.test(url || '')
+}
+
+// ─── HEAD-probe a CDN URL (kept for legacy callers) ───
 async function probeUrl(url) {
   try {
     const res = await fetchWithTimeout(url, {
@@ -49,7 +89,7 @@ async function probeUrl(url) {
   } catch { return false }
 }
 
-// ─── Build a CDN URL ───
+// ─── Build a CDN URL (kept for legacy callers) ───
 function buildCdnUrl(cdnHost, showName, seasonNum, epNum, suffix) {
   const encoded = encodeURIComponent(showName)
   const s = String(seasonNum).padStart(2, '0')
@@ -61,9 +101,9 @@ function buildCdnUrl(cdnHost, showName, seasonNum, epNum, suffix) {
 }
 
 /**
- * Solve a captcha image using Groq vision API
- * @param {Buffer} imageBuffer - PNG image data
- * @returns {Promise<string>} - The captcha text
+ * Solve a captcha image using Groq vision API.
+ * Tries each model in VISION_MODELS until one accepts image input and returns
+ * a plausible answer — resilient to Groq deprecating individual models.
  */
 async function solveCaptchaWithGroq(imageBuffer) {
   if (!GROQ_API_KEY) {
@@ -73,204 +113,197 @@ async function solveCaptchaWithGroq(imageBuffer) {
   const base64 = imageBuffer.toString('base64')
   const dataUrl = `data:image/png;base64,${base64}`
 
-  const res = await fetchWithTimeout(GROQ_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: VISION_MODEL,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: 'Read the text in this captcha image. Reply with ONLY the exact text characters shown, no explanation, no quotes, no extra words. Just the text.',
-          },
-          {
-            type: 'image_url',
-            image_url: { url: dataUrl },
-          },
-        ],
-      }],
-      max_tokens: 20,
-      temperature: 0.1,
-    }),
-  }, 15000)
+  let lastError = null
+  for (const model of VISION_MODELS) {
+    try {
+      const res = await fetchWithTimeout(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Read the text in this captcha image. Reply with ONLY the exact text characters shown, no explanation, no quotes, no extra words. Just the text.',
+              },
+              {
+                type: 'image_url',
+                image_url: { url: dataUrl },
+              },
+            ],
+          }],
+          max_tokens: 20,
+          temperature: 0.1,
+        }),
+      }, 15000)
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.error?.message || `Groq API returned HTTP ${res.status}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        lastError = new Error(err.error?.message || `Groq API returned HTTP ${res.status}`)
+        // 404 / decommissioned → try the next model
+        if (res.status === 404 || /decommission|not found|no longer supported/i.test(lastError.message)) {
+          continue
+        }
+        continue
+      }
+
+      const data = await res.json()
+      const text = data.choices?.[0]?.message?.content?.trim() || ''
+      const cleaned = text.replace(/[^a-zA-Z0-9]/g, '').trim()
+      if (cleaned.length >= 3) {
+        return cleaned
+      }
+      lastError = new Error('Empty/short captcha answer from ' + model)
+    } catch (err) {
+      lastError = err
+    }
   }
-
-  const data = await res.json()
-  const text = data.choices?.[0]?.message?.content?.trim() || ''
-  // Clean up the response — remove any non-alphanumeric chars the model might add
-  return text.replace(/[^a-zA-Z0-9]/g, '').trim()
+  throw lastError || new Error('All Groq vision models failed')
 }
 
 /**
- * Resolve an o2tv download ID through the captcha
- *
- * Full flow:
- * 1. GET /download/{id} → 302 to /areyouhuman.php?fid={id}
- * 2. GET /areyouhuman.php → page with captcha image
- * 3. GET /simplecaptcha1/simple-php-captcha.php → captcha image
- * 4. Solve captcha with Groq vision
- * 5. POST captchainput={answer}&submit=Continue+Download
- * 6. Follow redirects → CDN URL
- *
- * @param {number} fileId - The download file ID from the episode page
- * @param {object} sessionCookies - Cookie string from previous requests
- * @returns {Promise<string|null>} - The CDN URL, or null if failed
+ * Perform ONE captcha solve + POST within a cookie jar.
+ * Returns the raw POST Location header value (ad interstitial, media URL, or '').
+ * Advances the session cookies inside `jar`.
  */
-export async function resolveO2TvCaptcha(fileId) {
+async function solveAndPost(jar, fileId) {
   const BASE = 'https://tvshows4mobile.org'
-  let cookies = ''
 
-  // Step 1: Get a session by visiting the download page
+  // download → captcha flow (captures ci_session / PHPSESSID)
   const dlRes = await fetchWithTimeout(`${BASE}/download/${fileId}`, {
     redirect: 'manual',
-    headers: {
-      'User-Agent': USER_AGENT,
-      'Accept': 'text/html',
-    },
+    headers: { 'User-Agent': USER_AGENT, Cookie: jar.header(), Accept: 'text/html' },
   }, 8000)
+  jar.capture(dlRes)
 
-  // Collect cookies
-  const setCookies = dlRes.headers.getSetCookie?.() || []
-  cookies = setCookies.map(c => c.split(';')[0]).join('; ')
-
-  // Step 2: Follow to the captcha page
-  const captchaPageUrl = `${BASE}/areyouhuman.php?fid=${fileId}`
-  const captchaPageRes = await fetchWithTimeout(captchaPageUrl, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      'Cookie': cookies,
-      'Referer': `${BASE}/download/${fileId}`,
-    },
+  const captchaPageUrl = dlRes.headers.get('location') || `${BASE}/areyouhuman.php?fid=${fileId}`
+  const capRes = await fetchWithTimeout(captchaPageUrl, {
+    headers: { 'User-Agent': USER_AGENT, Cookie: jar.header(), Referer: `${BASE}/download/${fileId}` },
   }, 8000)
+  jar.capture(capRes)
+  await capRes.text() // advance session state
 
-  // Collect more cookies
-  const moreCookies = captchaPageRes.headers.getSetCookie?.() || []
-  cookies = [cookies, ...moreCookies.map(c => c.split(';')[0])].filter(Boolean).join('; ')
-
-  // Step 3: Download the captcha image
-  const captchaImgUrl = `${BASE}/simplecaptcha1/simple-php-captcha.php?_CAPTCHA&t=${Date.now()}`
-  const imgRes = await fetchWithTimeout(captchaImgUrl, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      'Cookie': cookies,
-      'Referer': captchaPageUrl,
-    },
+  // Fresh captcha image (answer is bound to this session)
+  const imgRes = await fetchWithTimeout(`${BASE}/simplecaptcha1/simple-php-captcha.php?_CAPTCHA&t=${Date.now()}`, {
+    headers: { 'User-Agent': USER_AGENT, Cookie: jar.header(), Referer: captchaPageUrl },
   }, 8000)
-
+  jar.capture(imgRes)
   const contentType = imgRes.headers.get('content-type') || ''
   if (!contentType.includes('image')) {
     throw new Error('Captcha image not received — got ' + contentType)
   }
-
   const imgBuffer = Buffer.from(await imgRes.arrayBuffer())
 
-  // Step 4: Solve the captcha with Groq vision
+  // Solve (retry up to 4× for transient vision-model errors)
   let captchaAnswer = ''
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 4 && !(captchaAnswer && captchaAnswer.length >= 3); attempt++) {
     try {
       captchaAnswer = await solveCaptchaWithGroq(imgBuffer)
-      if (captchaAnswer && captchaAnswer.length >= 3) break
     } catch (err) {
       console.error(`Captcha solve attempt ${attempt + 1} failed:`, err.message)
     }
   }
-
   if (!captchaAnswer || captchaAnswer.length < 3) {
-    throw new Error('Failed to solve captcha after 3 attempts')
+    throw new Error('Failed to solve captcha after multiple attempts')
   }
 
-  console.log(`Captcha solved: "${captchaAnswer}" for file ID ${fileId}`)
-
-  // Step 5: POST the captcha answer
   const postRes = await fetchWithTimeout(captchaPageUrl, {
     method: 'POST',
     headers: {
       'User-Agent': USER_AGENT,
-      'Cookie': cookies,
+      Cookie: jar.header(),
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Referer': captchaPageUrl,
-      'Origin': BASE,
+      Referer: captchaPageUrl,
+      Origin: BASE,
     },
     body: `captchainput=${encodeURIComponent(captchaAnswer)}&submit=Continue+Download`,
     redirect: 'manual',
   }, 8000)
+  jar.capture(postRes)
 
-  // Step 6: Follow redirects to get the final CDN URL
-  let currentUrl = postRes.headers.get('location')
-  const postCookies = postRes.headers.getSetCookie?.() || []
-  cookies = [cookies, ...postCookies.map(c => c.split(';')[0])].filter(Boolean).join('; ')
-
-  if (!currentUrl) {
-    // Maybe the captcha was wrong — check response
+  const location = postRes.headers.get('location') || ''
+  if (!location) {
+    // Wrong answer typically returns a 200 body with an error
     const body = await postRes.text().catch(() => '')
-    if (body.includes('Does Not Match') || body.includes('incorrect')) {
+    if (/does not match|incorrect|invalid captcha/i.test(body)) {
       throw new Error('Captcha answer was incorrect')
     }
-    throw new Error('No redirect after captcha submission')
+  }
+  return location
+}
+
+/**
+ * Resolve an o2tv download ID to the real CDN MP4 URL.
+ *
+ * tvshows4mobile serves an interstitial ad on the FIRST captcha solve per
+ * session; the SECOND solve (same validated session) yields the real CDN URL
+ * with the per-file suffix (otv-XXXXX). So when the first POST redirects to an
+ * ad, we immediately solve again — the "go back and try again" behaviour.
+ *
+ * @param {number} fileId - The download file ID from the episode page
+ * @returns {Promise<string|null>} - The CDN URL, or null if failed
+ */
+export async function resolveO2TvCaptcha(fileId) {
+  const jar = new CookieJar()
+
+  // Solve #1
+  let location = await solveAndPost(jar, fileId).catch((err) => {
+    console.error(`solveAndPost #1 failed for ${fileId}:`, err.message)
+    return ''
+  })
+
+  // If the first solve hit the interstitial ad, solve AGAIN in the same session.
+  // The validated session now skips the ad and returns the real media URL.
+  if (isInterstitialAd(location) || !location) {
+    location = await solveAndPost(jar, fileId).catch((err) => {
+      console.error(`solveAndPost #2 failed for ${fileId}:`, err.message)
+      return ''
+    })
   }
 
-  // Follow up to 5 redirects
-  for (let i = 0; i < 5; i++) {
-    if (!currentUrl) break
+  if (!location) return null
 
-    // If it's a relative URL, make it absolute
-    if (currentUrl.startsWith('/')) {
-      currentUrl = `${BASE}${currentUrl}`
+  // Already a direct media URL / CDN host
+  if (/\.(mp4|mkv|m3u8|webm)(\?|#|$)/i.test(location) || /o2tv\.org/i.test(location)) {
+    return normalizeMediaUrl(location)
+  }
+
+  // Still an ad after two solves — give up on this fileId
+  if (isInterstitialAd(location)) return null
+
+  // Otherwise follow the remaining redirect chain on tvshows4mobile itself
+  let currentUrl = location
+  for (let i = 0; i < 5 && currentUrl; i++) {
+    if (currentUrl.startsWith('/')) currentUrl = `https://tvshows4mobile.org${currentUrl}`
+    if (/\.(mp4|mkv|m3u8|webm)(\?|#|$)/i.test(currentUrl) || /o2tv\.org/i.test(currentUrl)) {
+      return normalizeMediaUrl(currentUrl)
     }
-
-    // Check if we've reached a direct media URL
-    if (/\.(mp4|mkv|m3u8|webm)(\?|#|$)/i.test(currentUrl)) {
-      return currentUrl
-    }
-
-    // Check if it's a CDN URL we recognize
-    if (currentUrl.includes('o2tv.org')) {
-      return currentUrl
-    }
-
-    // Follow the redirect
     try {
       const redirRes = await fetchWithTimeout(currentUrl, {
         redirect: 'manual',
-        headers: {
-          'User-Agent': USER_AGENT,
-          'Cookie': cookies,
-          'Referer': BASE,
-        },
+        headers: { 'User-Agent': USER_AGENT, Cookie: jar.header(), Referer: 'https://tvshows4mobile.org/' },
       }, 8000)
-
-      const moreRedirectCookies = redirRes.headers.getSetCookie?.() || []
-      cookies = [cookies, ...moreRedirectCookies.map(c => c.split(';')[0])].filter(Boolean).join('; ')
-
-      const nextLocation = redirRes.headers.get('location')
-      if (!nextLocation) {
-        // We've reached the final page — check for direct URLs in the response
+      jar.capture(redirRes)
+      const next = redirRes.headers.get('location')
+      if (!next) {
         if (redirRes.ok) {
           const body = await redirRes.text().catch(() => '')
-          // Extract any .mp4/.mkv URLs from the page
-          const mediaMatch = body.match(/https?:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*/i)
-          if (mediaMatch) return mediaMatch[0]
-          const mkvMatch = body.match(/https?:\/\/[^\s"'<>]+\.mkv[^\s"'<>]*/i)
-          if (mkvMatch) return mkvMatch[0]
+          const mediaMatch = body.match(/https?:\/\/[^\s"'<>]+\.(mp4|mkv|m3u8|webm)([^\s"'<>]*)?/i)
+          if (mediaMatch) return normalizeMediaUrl(mediaMatch[0])
         }
         break
       }
-      currentUrl = nextLocation
+      currentUrl = next
     } catch {
       break
     }
   }
-
-  return currentUrl || null
+  return null
 }
 
 /**
@@ -278,10 +311,10 @@ export async function resolveO2TvCaptcha(fileId) {
  * Prefer basic progressive MP4 — HD is too large for proxy/Hobby, 3gp is too low.
  *
  * Rank (lower = try first):
- *   0 = basic Mp4 ("Basic Quality, Small Size")  ← preferred
+ *   0 = basic Mp4 (\"Basic Quality, Small Size\")  ← preferred
  *   1 = other/unknown mp4-like
- *   2 = HD Mp4 ("Highest Quality, Largest Size") ← fallback only
- *   3 = 3gp / low ("Lowest Quality")             ← last resort
+ *   2 = HD Mp4 (\"Highest Quality, Largest Size\") ← fallback only
+ *   3 = 3gp / low (\"Lowest Quality\")             ← last resort
  */
 function classifyO2TvDownload(label, context = '') {
   const text = `${label || ''} ${context || ''}`.toLowerCase()
@@ -291,13 +324,11 @@ function classifyO2TvDownload(label, context = '') {
   if (/\bhd\b/.test(text) || /highest quality|largest size/.test(text)) {
     return { tier: 'hd', rank: 2, quality: 'HD' }
   }
-  // Explicit basic / standard mp4
   if (
     /\bmp4\b/.test(text)
     || /basic quality|small size/.test(text)
     || /in mp4 format/.test(text)
   ) {
-    // "in Mp4 Format" without HD/3gp nearby → basic
     if (!/\bhd\b/.test(text) && !/\b3gp\b/.test(text)) {
       return { tier: 'basic', rank: 0, quality: 'MP4' }
     }
@@ -312,7 +343,6 @@ function parseO2TvDownloadOptions(epHtml) {
   const options = []
   const seen = new Set()
 
-  // Anchor text is the best signal: "… in Mp4 Format" / "… in HD Mp4 Format" / "… in 3gp Format"
   const anchorRe = /href=["'](?:https?:\/\/(?:www\.)?tvshows4mobile\.org)?\/download\/(\d+)["'][^>]*>([\s\S]*?)<\/a>/gi
   let m
   while ((m = anchorRe.exec(epHtml)) !== null) {
@@ -329,7 +359,6 @@ function parseO2TvDownloadOptions(epHtml) {
     })
   }
 
-  // Fallback: bare /download/IDs without parseable anchors
   if (!options.length) {
     const idRe = /\/download\/(\d+)/g
     let im
@@ -347,7 +376,6 @@ function parseO2TvDownloadOptions(epHtml) {
     }
   }
 
-  // Prefer basic MP4 → unknown → HD → 3gp
   options.sort((a, b) => a.rank - b.rank || a.fileId - b.fileId)
   return options
 }
@@ -359,7 +387,7 @@ function parseO2TvDownloadOptions(epHtml) {
  * 3. Solving captcha for the best option, falling back down the list
  * 4. Following redirects to get the CDN URL
  *
- * @param {string} showSlug - e.g., "House-of-the-Dragon-otviao8f"
+ * @param {string} showSlug - e.g., \"House-of-the-Dragon-otviao8f\"
  * @param {number} seasonNum - Season number (1-based)
  * @param {number} epNum - Episode number (1-based)
  * @returns {Promise<Array<{title, url, source, isDirect, playableInRoom, quality}>>}
@@ -370,7 +398,6 @@ export async function resolveO2TvEpisodeViaCaptcha(showSlug, seasonNum, epNum) {
   const episodePath = `Episode-${String(epNum).padStart(2, '0')}`
   const episodeUrl = `${BASE}/${showSlug}/${seasonPath}/${episodePath}/`
 
-  // Step 1: Fetch the episode page
   const epRes = await fetchWithTimeout(episodeUrl, {
     headers: { 'User-Agent': USER_AGENT },
   }, 8000)
@@ -379,11 +406,9 @@ export async function resolveO2TvEpisodeViaCaptcha(showSlug, seasonNum, epNum) {
 
   const epHtml = await epRes.text()
 
-  // Step 2: Ranked download options — basic Mp4 first, never prefer HD/3gp
   const options = parseO2TvDownloadOptions(epHtml)
   if (!options.length) return []
 
-  // Derive the show name from slug for the title
   const showName = showSlug
     .replace(/-otv[a-z0-9]+$/i, '')
     .replace(/-/g, ' ')
@@ -398,7 +423,6 @@ export async function resolveO2TvEpisodeViaCaptcha(showSlug, seasonNum, epNum) {
     options.map((o) => `${o.fileId}:${o.tier}`).join(' → '),
   )
 
-  // Step 3: Try best quality first (basic), then fallbacks
   for (const opt of options) {
     try {
       const cdnUrl = await resolveO2TvCaptcha(opt.fileId)
