@@ -221,6 +221,7 @@ export default function UnifiedSearch() {
   }, [user])
 
   const handleResultSelect = useCallback(async (result) => {
+    try {
     if ((result.type || activeLayer) === 'youtube' && result.id) {
       const params = new URLSearchParams({
         video: result.id,
@@ -374,6 +375,10 @@ export default function UnifiedSearch() {
     if (result.isLive) params.set('isLive', 'true')
 
     navigate(`/create?${params.toString()}`, { state: { from: `${location.pathname}${location.search || ''}` } })
+    } catch (err) {
+      console.error('handleResultSelect error:', err)
+      toast.error(err.message || 'Could not open this result')
+    }
   }, [navigate, location.pathname, location.search, activeLayer, resolveMediaUrl, user])
 
   const handleDirectUrlSubmit = useCallback(() => {
@@ -708,6 +713,7 @@ export default function UnifiedSearch() {
                       type="button"
                       className={`${styles.watchBtn} ${result.isLive ? styles.liveBtn : ''}`}
                       disabled={result.channelAvailable === false}
+                      onClick={(e) => { e.stopPropagation(); handleResultSelect(result) }}
                     >
                       {result.isLive ? 'Watch Live' : 'Watch in Room'}
                     </button>
