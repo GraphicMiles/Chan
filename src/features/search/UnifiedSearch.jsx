@@ -1,39 +1,42 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { toast } from 'react-toastify'
 import {
   PlayCircle, Link2, Tv, Trophy, ShieldAlert, Search, X, Play,
   ArrowUpRight, SlidersHorizontal, Clock, Eye, Radio, Film,
-  AlertCircle, Loader2, Compass
+  AlertCircle, Loader2, Compass, ChevronRight, Volume2, VolumeX,
+  Maximize, Settings, MessageSquare, SkipBack, SkipForward, Pause
 } from 'lucide-react'
 import styles from './UnifiedSearch.module.scss'
 import { useUnifiedSearch } from '../../hooks/useUnifiedSearch'
 import { useAuth } from '../../shared/auth/hooks/useAuth.jsx'
 import { isDirectVideoUrl, normalizePlaybackUrl } from '../../shared/lib/youtube.js'
-import { Modal, Button } from '../../shared/ui/index.js'
+import { Modal, Button, useToast } from '../../shared/ui/index.js'
+import { parseJsonResponse } from '../../shared/lib/api.js'
+import { EpisodesModal } from './EpisodesModal.jsx'
 
 const SEARCH_LAYERS = [
-  { id: 'all', label: 'All Media', icon: Compass, placeholder: 'Search movies, live TV, YouTube, sports, anime...', description: 'Search movies, shows, live TV, YouTube, sports, and more' },
-  { id: 'youtube', label: 'YouTube', icon: PlayCircle, placeholder: 'Search YouTube videos...', description: 'Search millions of YouTube videos with instant playback' },
-  { id: 'direct', label: 'Direct Links', icon: Link2, placeholder: 'Search TV shows (e.g. X-Men 97) or paste .mp4 URL...', description: 'TV shows via O2TV (progressive MP4) or paste a direct .mp4 link' },
-  { id: 'iptv', label: 'Live TV', icon: Tv, placeholder: 'Search channels (CNN, ESPN, HBO)...', description: 'Watch live TV channels and 24/7 streaming networks' },
-  { id: 'sports', label: 'Sports', icon: Trophy, placeholder: 'Search team, league, or match...', description: 'Find live sports matches, scores, and streaming fixtures' },
-  { id: 'nsfw', label: 'NSFW', icon: ShieldAlert, placeholder: 'Search adult content (18+ only)...', description: 'Adult content - legal age verification required', adult: true },
+  { id: 'all', label: 'All Media', icon: Compass, description: 'Search across all sources' },
+  { id: 'youtube', label: 'YouTube', icon: PlayCircle, description: 'Search millions of YouTube videos' },
+  { id: 'direct', label: 'Direct Links', icon: Link2, description: 'TV shows via O2TV & Nkiri' },
+  { id: 'iptv', label: 'Live TV', icon: Tv, description: 'Watch live TV channels' },
+  { id: 'sports', label: 'Sports', icon: Trophy, description: 'Live sports events & fixtures' },
+  { id: 'nsfw', label: 'NSFW', icon: ShieldAlert, description: 'Adult content — 18+ only', adult: true },
 ]
 
 const TRENDING_SUGGESTIONS = {
-  all: ['Top 10 Movies 2026', 'House of the Dragon', 'Silo Season 3', 'Premier League Highlights', 'CNN News Live', 'Anime Hits', 'Alan Walker Stay'],
-  youtube: ['Top 10 Movies 2026', 'House of the Dragon', 'Alan Walker Stay', 'Afrobeats Hits', 'Burn', 'Silo Season 3', 'Burna Boy Live', 'Gaming Highlights'],
-  direct: ['House of the Dragon', 'Silo Season 2', 'Squid Game Season 2', 'The Last of Us', 'Stranger Things', 'Deadpool & Wolverine', 'Gladiator 2', 'Dune Part Two'],
-  iptv: ['CNN News Live', 'ESPN Sports 24/7', 'HBO HD Channel', 'BBC World News', 'Sky Sports Live', 'Discovery Channel', 'Al Jazeera Live News'],
-  sports: ['Premier League Highlights', 'Real Madrid vs Barcelona', 'Arsenal vs Chelsea', 'Champions League Goals', 'NBA Finals Live', 'Formula 1 Grand Prix'],
-  nsfw: ['Trending Scenes', 'College Action 2026', 'Yoga Studio Scene', 'After Class Party', 'Summer Vacation', 'Weekend Party HD'],
+  all: ['Silo', 'House of the Dragon', 'Premier League', 'Alan Walker'],
+  youtube: ['Alan Walker Live', 'Top 10 Movies 2026', 'Gaming Highlights'],
+  direct: ['Silo', 'House of the Dragon', 'Squid Game', 'The Last of Us', 'Stranger Things'],
+  iptv: ['CNN News Live', 'ESPN Sports', 'BBC World News', 'Sky Sports'],
+  sports: ['Premier League', 'Champions League', 'NBA Finals'],
+  nsfw: ['Trending', 'Popular Scenes'],
 }
 
 export default function UnifiedSearch() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, loading: authLoading } = useAuth()
+  const { toast } = useToast()
   const isMediaRoute = location.pathname === '/media'
   const [activeLayer, setActiveLayer] = useState(isMediaRoute ? 'direct' : 'all')
   const [query, setQuery] = useState('')
@@ -43,343 +46,247 @@ export default function UnifiedSearch() {
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({ hdOnly: false, liveOnly: false })
   const [categoryFilter, setCategoryFilter] = useState('all')
-  
+
+  // Direct Links hierarchical state
+  const [directResults, setDirectResults] = useState(null) // { title, seasons: [...] }
+  const [directLoading, setDirectLoading] = useState(false)
+  const [episodesModal, setEpisodesModal] = useState(null) // { seasonNum, episodes: [...] }
+
   const { results, loading, error, search, clear, hasMore, loadMore } = useUnifiedSearch()
-  
+
   const currentLayer = useMemo(() => SEARCH_LAYERS.find(l => l.id === activeLayer), [activeLayer])
   const CurrentLayerIcon = currentLayer?.icon || Film
 
-  const runSearchWithVerification = useCallback(async (verifiedState, targetQuery = query.trim()) => {
+  // Redirect if NSFW not verified
+  if (activeLayer === 'nsfw' && !adultVerified && !showNsfwModal) {
+    // Show modal on next render
+  }
+
+  const runSearch = useCallback(async (targetQuery = query.trim()) => {
     if (!targetQuery) {
-      toast.error('Please enter a search query')
+      toast('Please enter a search query', { variant: 'warning' })
       return
     }
-    await search({ 
-      layer: activeLayer, 
+
+    if (activeLayer === 'nsfw' && !adultVerified) {
+      setPendingNsfwAction({ type: 'search', query: targetQuery })
+      setShowNsfwModal(true)
+      return
+    }
+
+    // Direct Links: hierarchical search
+    if (activeLayer === 'direct') {
+      await searchDirect(targetQuery)
+      return
+    }
+
+    // Other layers: standard search
+    await search({
+      layer: activeLayer,
       query: targetQuery,
-      options: { 
-        adultVerified: verifiedState,
+      options: {
+        adultVerified,
         filters: showFilters ? filters : undefined,
-        resolve: activeLayer === 'direct' || activeLayer === 'nsfw'
-      }
+        resolve: activeLayer === 'nsfw',
+      },
     })
-  }, [activeLayer, query, filters, showFilters, search])
+  }, [activeLayer, query, filters, showFilters, search, adultVerified, toast])
 
-  const handleSearch = useCallback(async (e) => {
-    e?.preventDefault()
-    if (!query.trim()) {
-      toast.error('Please enter a search query')
+  const searchDirect = useCallback(async (targetQuery) => {
+    if (!user) {
+      toast('Sign in to search', { variant: 'warning' })
       return
     }
-    
-    if (activeLayer === 'nsfw' && !adultVerified) {
-      setPendingNsfwAction({ type: 'search' })
-      setShowNsfwModal(true)
-      return
-    }
-    
-    await runSearchWithVerification(adultVerified, query.trim())
-  }, [activeLayer, query, adultVerified, runSearchWithVerification])
+    setDirectLoading(true)
+    setDirectResults(null)
+    setEpisodesModal(null)
 
-  const handleTrendingClick = useCallback((item) => {
-    setQuery(item)
-    if (activeLayer === 'nsfw' && !adultVerified) {
-      setPendingNsfwAction({ type: 'trending', query: item })
-      setShowNsfwModal(true)
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch('/api/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'search', layer: 'direct', query: targetQuery, options: { limit: 20 } }),
+      })
+      const data = await parseJsonResponse(res)
+      const items = data.results || []
+
+      if (items.length === 0) {
+        toast('No results found. Try a different query.', { variant: 'warning' })
+        setDirectLoading(false)
+        return
+      }
+
+      // Group by show (O2TV results have showName/showSlug)
+      const shows = new Map()
+      for (const item of items) {
+        if (item.o2tvKind === 'show' || item.showSlug) {
+          const key = item.showSlug || item.title
+          if (!shows.has(key)) {
+            shows.set(key, {
+              title: item.showName || item.title,
+              showSlug: item.showSlug || '',
+              url: item.url || item.link || '',
+              thumbnail: item.thumbnail || item.image || null,
+              seasons: [],
+            })
+          }
+        }
+      }
+
+      if (shows.size > 0) {
+        // Fetch seasons for the first show
+        const firstShow = Array.from(shows.values())[0]
+        const seasons = await fetchSeasons(firstShow.showSlug, firstShow.showName)
+        setDirectResults({
+          title: firstShow.title,
+          showSlug: firstShow.showSlug,
+          url: firstShow.url,
+          thumbnail: firstShow.thumbnail,
+          seasons,
+        })
+      } else {
+        // Fallback: show as flat results
+        setDirectResults({
+          title: targetQuery,
+          showSlug: '',
+          url: '',
+          thumbnail: null,
+          seasons: [],
+          flatResults: items,
+        })
+      }
+    } catch (err) {
+      toast(err.message || 'Search failed', { variant: 'error' })
+    } finally {
+      setDirectLoading(false)
+    }
+  }, [user, toast])
+
+  const fetchSeasons = useCallback(async (showSlug, showName) => {
+    if (!showSlug || !user) return []
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch('/api/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'o2tvSeasons', showSlug, showName }),
+      })
+      const data = await parseJsonResponse(res)
+      return (data.results || []).map(s => ({
+        number: s.seasonNum,
+        label: s.label || `Season ${s.seasonNum}`,
+        url: s.url,
+      }))
+    } catch {
+      return []
+    }
+  }, [user])
+
+  const fetchEpisodes = useCallback(async (seasonUrl, seasonNum, showSlug, showName) => {
+    if (!user) return
+    setEpisodesModal({ seasonNum, episodes: [], loading: true })
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch('/api/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'o2tvEpisodes', showSlug, showName, seasonNum }),
+      })
+      const data = await parseJsonResponse(res)
+      const episodes = (data.results || []).map(ep => ({
+        number: ep.episodeNum,
+        title: ep.label || ep.title || `Episode ${ep.episodeNum}`,
+        url: ep.url,
+      }))
+      setEpisodesModal({ seasonNum, episodes, loading: false })
+    } catch (err) {
+      toast(err.message || 'Failed to load episodes', { variant: 'error' })
+      setEpisodesModal(null)
+    }
+  }, [user, toast])
+
+  const handleEpisodeClick = useCallback(async (episode) => {
+    if (!user) {
+      toast('Sign in to watch', { variant: 'warning' })
       return
     }
-    runSearchWithVerification(adultVerified, item)
-  }, [activeLayer, adultVerified, runSearchWithVerification])
+    if (!episode.url) {
+      toast('No playable URL for this episode', { variant: 'error' })
+      return
+    }
+
+    setEpisodesModal(null)
+    toast(`Resolving ${episode.title}...`, { variant: 'info' })
+
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch('/api/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'scrape', url: episode.url, options: { resolve: true } }),
+      })
+      const data = await parseJsonResponse(res)
+      const directItem = data.results?.find(r => r.isDirect || r.playableInRoom) || data.results?.[0]
+
+      if (directItem?.url) {
+        const playbackUrl = normalizePlaybackUrl(directItem.url)
+        const params = new URLSearchParams({
+          videoUrl: playbackUrl,
+          title: directItem.title || episode.title,
+          type: 'direct',
+        })
+        navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
+      } else {
+        // Fallback: navigate with the episode URL for CreateRoom to resolve
+        const params = new URLSearchParams({
+          videoUrl: episode.url,
+          title: episode.title,
+          type: 'direct',
+          showSlug: directResults?.showSlug || '',
+          showName: directResults?.title || '',
+          seasonNum: String(episodesModal?.seasonNum || ''),
+          episodeNum: String(episode.number || ''),
+        })
+        navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
+      }
+    } catch (err) {
+      toast(err.message || 'Could not resolve episode', { variant: 'error' })
+    }
+  }, [user, toast, navigate, location.pathname, directResults, episodesModal])
 
   const handleLayerClick = useCallback((layerId) => {
     if (layerId === 'nsfw' && !adultVerified) {
-      setPendingNsfwAction({ type: 'tab' })
+      setPendingNsfwAction({ type: 'switch', layer: layerId })
       setShowNsfwModal(true)
       return
     }
     setActiveLayer(layerId)
-    setCategoryFilter('all')
     clear()
-    setQuery('')
+    setDirectResults(null)
+    setEpisodesModal(null)
   }, [adultVerified, clear])
+
+  const handleTrendingClick = useCallback((item) => {
+    setQuery(item)
+    setTimeout(() => runSearch(item), 50)
+  }, [runSearch])
 
   const handleNsfwConfirm = useCallback(() => {
     setAdultVerified(true)
     setShowNsfwModal(false)
-    if (pendingNsfwAction?.type === 'tab') {
-      setActiveLayer('nsfw')
-      clear()
-      setQuery('')
+    if (pendingNsfwAction?.type === 'switch') {
+      setActiveLayer(pendingNsfwAction.layer)
     } else if (pendingNsfwAction?.type === 'search') {
-      runSearchWithVerification(true, query.trim())
-    } else if (pendingNsfwAction?.type === 'trending' && pendingNsfwAction.query) {
-      runSearchWithVerification(true, pendingNsfwAction.query)
+      setTimeout(() => runSearch(pendingNsfwAction.query), 50)
     }
     setPendingNsfwAction(null)
-  }, [pendingNsfwAction, query, clear, runSearchWithVerification])
+  }, [pendingNsfwAction, runSearch])
 
   const handleNsfwCancel = useCallback(() => {
     setShowNsfwModal(false)
     setPendingNsfwAction(null)
-    if (activeLayer === 'nsfw' && !adultVerified) {
-      setActiveLayer('youtube')
-      clear()
-      setQuery('')
-    }
-  }, [activeLayer, adultVerified, clear])
-
-  const handleLoadMore = useCallback(() => {
-    if (hasMore && !loading) {
-      loadMore()
-    }
-  }, [hasMore, loading, loadMore])
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'k') {
-        e.preventDefault()
-        document.getElementById('unified-search-input')?.focus()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
-
-  const resolveMediaUrl = useCallback(async (resultUrl, site, label, isNsfw = false) => {
-    if (!resultUrl) return null
-    toast.info('Resolving stream...')
-    
-    const attemptResolve = async () => {
-      const token = user ? await user.getIdToken() : ''
-      const res = await fetch('/api/media', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          action: 'scrape',
-          url: resultUrl,
-          site: site || 'custom',
-          options: { resolve: true },
-        }),
-      })
-      // Vercel sometimes returns HTML error pages (504/500) — never crash on JSON parse
-      const text = await res.text()
-      let data = null
-      try {
-        data = JSON.parse(text)
-      } catch {
-        const isTimeout = res.status === 504 || /timeout|504/i.test(text)
-        throw new Error(
-          isTimeout
-            ? 'Resolution timed out — try again or pick another result.'
-            : `Resolution failed (HTTP ${res.status}). Try another result.`
-        )
-      }
-      if (!res.ok || data?.success === false) {
-        throw new Error(data?.error || `Resolution failed (HTTP ${res.status})`)
-      }
-      return data
-    }
-
-    try {
-      let data = await attemptResolve()
-      let results = data?.results || []
-      let directItem = results.find((it) => it.isDirect || isDirectVideoUrl(it.url || it.link))
-        || results.find((it) => it.playableInRoom)
-        || null
-
-      // For NSFW sources, retry once if first attempt didn't find a direct URL
-      // (some providers are flaky — PornHub especially)
-      if (!directItem && isNsfw) {
-        try {
-          data = await attemptResolve()
-          results = data?.results || []
-          directItem = results.find((it) => it.isDirect || isDirectVideoUrl(it.url || it.link))
-            || results.find((it) => it.playableInRoom)
-            || null
-        } catch {
-          // retry failed, use original result
-        }
-      }
-
-      if (directItem) {
-        return {
-          url: directItem.url || directItem.link,
-          title: directItem.title,
-          thumbnail: directItem.thumbnail || directItem.image || null,
-          isDirect: true,
-          source: directItem.source || site,
-        }
-      }
-      return null
-    } catch (err) {
-      toast.error(err.message || 'Could not resolve this link')
-      return null
-    }
-  }, [user])
-
-  const handleResultSelect = useCallback(async (result) => {
-    try {
-    if ((result.type || activeLayer) === 'youtube' && result.id) {
-      const params = new URLSearchParams({
-        video: result.id,
-        title: result.title || 'Untitled',
-        type: 'youtube',
-      })
-      navigate(`/create?${params.toString()}`, { state: { from: `${location.pathname}${location.search || ''}` } })
-      return
-    }
-
-    // IPTV / live streams are already m3u8/mp4 URLs — always normalize through proxy
-    // so mixed-content http:// streams and CORS-hostile CDNs work in the browser.
-    if ((result.type === 'iptv' || result.isLive) && (result.url || result.link)) {
-      // Prefer raw upstream URL for health probe; playable URL may already be proxied
-      const liveUrl = result.rawUrl || result.url || result.link
-      if (result.type === 'iptv' && user) {
-        try {
-          const token = await user.getIdToken()
-          const probeRes = await fetch('/api/media', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ action: 'probeIptv', url: liveUrl }),
-            signal: AbortSignal.timeout(4500),
-          })
-          const probeData = await probeRes.json().catch(() => null)
-          if (probeData && probeData.healthy === false) {
-            toast.warning(`"${result.title}" may be offline (${probeData.error || 'unreachable'}). Creating room anyway — try another channel if it doesn't play.`)
-          }
-        } catch {
-          // Probe failed — proceed; player will surface errors
-        }
-      }
-      // If server already wrapped /api/proxy, keep it; else force proxy for http/CORS
-      const playback = /\/api\/proxy\?/i.test(String(result.url || ''))
-        ? String(result.url)
-        : normalizePlaybackUrl(liveUrl, { forceProxy: true })
-      const params = new URLSearchParams({
-        videoUrl: playback,
-        title: result.title || 'Live Stream',
-        type: result.type === 'sports' ? 'sports' : 'iptv',
-        thumbnail: result.thumbnail || result.image || '',
-        isLive: 'true',
-      })
-      if (result.matchInfo) params.set('matchInfo', JSON.stringify(result.matchInfo))
-      navigate(`/create?${params.toString()}`, { state: { from: `${location.pathname}${location.search || ''}` } })
-      return
-    }
-
-    const resultUrl = result.url || result.link
-    if (!resultUrl) {
-      toast.error('This result has no playable URL')
-      return
-    }
-
-    let playable = result.isDirect === true || result.playableInRoom === true || isDirectVideoUrl(resultUrl)
-    let finalUrl = resultUrl
-    let finalThumb = result.thumbnail || result.image || ''
-    let finalTitle = result.title || 'Untitled'
-
-    const sourceKey = String(result.source || result.provider || '').toLowerCase()
-
-    // O2TV / tvshows4mobile: hand off to Create Room for seasons → episodes → resolve
-    if (
-      sourceKey === 'o2tv'
-      || sourceKey === 'tvshows4mobile'
-      || result.o2tvKind === 'show'
-      || result.o2tvKind === 'season'
-      || result.o2tvKind === 'episode'
-      || /tvshows4mobile|o2tv/i.test(resultUrl)
-    ) {
-      const params = new URLSearchParams({
-        videoUrl: resultUrl || '',
-        title: finalTitle,
-        type: 'direct',
-        thumbnail: finalThumb || '',
-      })
-      if (result.showSlug) params.set('showSlug', result.showSlug)
-      if (result.showName) params.set('showName', result.showName)
-      else if (finalTitle) params.set('showName', finalTitle)
-      if (result.seasonNum != null) params.set('seasonNum', String(result.seasonNum))
-      if (result.episodeNum != null) params.set('episodeNum', String(result.episodeNum))
-      navigate(`/create?${params.toString()}`, { state: { from: `${location.pathname}${location.search || ''}` } })
-      return
-    }
-
-    // Always attempt server-side resolution for non-direct page links across ALL media types
-    // (direct, nsfw, netnaija, naijaprey, maxcinema, o2tv, archive, doodstream, etc.)
-    const needsResolve = !playable
-      || result.requiresUserAction === true
-      || result.requiresResolve === true
-      || ['downloadwella', 'maxcinema'].includes(sourceKey)
-
-    if (needsResolve) {
-      const isNsfwResult = result.type === 'nsfw' || result.isNSFW === true
-      const resolved = await resolveMediaUrl(
-        resultUrl,
-        result.source || result.provider || (isNsfwResult ? 'nsfw' : 'custom'),
-        result.source || result.type || 'provider',
-        isNsfwResult
-      )
-      if (resolved?.url) {
-        playable = true
-        finalUrl = resolved.url
-        if (resolved.thumbnail) finalThumb = resolved.thumbnail
-        if (resolved.title && resolved.title !== 'Untitled') finalTitle = resolved.title
-      } else if (result.requiresUserAction && result.type !== 'nsfw' && result.type !== 'direct' && sourceKey !== 'naijaprey') {
-        // Genuine download-gate providers: open externally as last resort
-        window.open(resultUrl, '_blank', 'noopener,noreferrer')
-        toast.info('Could not auto-extract a stream. Open the link, finish any download step, then paste the final HTTPS video URL into Chan.')
-        return
-      } else if (!playable) {
-        toast.error('Could not resolve a playable stream. Try another result or episode.')
-        return
-      }
-    }
-
-    // NSFW fallback: if resolution failed, don't create a room with a page URL
-    // (it won't play). Instead, offer to open the page externally or try another result.
-    if (result.type === 'nsfw' && !playable && finalUrl) {
-      toast.error('Could not extract a playable stream from this result. Try another one.')
-      return
-    }
-
-    // Known multi-hop providers: allow navigation even if isDirect flag is missing
-    // after a partial resolve (CreateRoom / player will re-normalize).
-    const knownProviders = [
-      'o2tv', 'tvshows4mobile', 'o2tv.org', 'downloadwella', 'archive.org',
-      'archiveorg',
-    ]
-    const isKnownProvider = knownProviders.some((p) =>
-      String(resultUrl).toLowerCase().includes(p) || String(result.source || '').toLowerCase().includes(p)
-    )
-
-    if (!finalUrl || (!playable && !isKnownProvider)) {
-      toast.error('Could not extract direct media from this link. Try another option.')
-      return
-    }
-
-    const playbackUrl = normalizePlaybackUrl(finalUrl)
-    const params = new URLSearchParams({
-      videoUrl: playbackUrl,
-      title: finalTitle,
-      type: ['iptv', 'sports', 'nsfw'].includes(result.type) ? result.type : 'direct',
-      thumbnail: finalThumb,
-    })
-
-    if (result.matchInfo) params.set('matchInfo', JSON.stringify(result.matchInfo))
-    if (result.isLive) params.set('isLive', 'true')
-
-    navigate(`/create?${params.toString()}`, { state: { from: `${location.pathname}${location.search || ''}` } })
-    } catch (err) {
-      console.error('handleResultSelect error:', err)
-      toast.error(err.message || 'Could not open this result')
-    }
-  }, [navigate, location.pathname, location.search, activeLayer, resolveMediaUrl, user])
 
   const handleDirectUrlSubmit = useCallback(() => {
     if (isDirectVideoUrl(query)) {
@@ -392,50 +299,24 @@ export default function UnifiedSearch() {
   const clearSearch = useCallback(() => {
     setQuery('')
     clear()
-    document.getElementById('unified-search-input')?.focus()
+    setDirectResults(null)
+    setEpisodesModal(null)
   }, [clear])
 
-  const filteredResults = useMemo(() => {
-    let list = results
-    if (categoryFilter !== 'all') {
-      list = list.filter((r) => {
-        const t = r.type || r.source || activeLayer
-        if (categoryFilter === 'direct') return t === 'direct' || t === 'omdb' || t === 'movie'
-        if (categoryFilter === 'anime') return t === 'anime' || r.source === 'animedrive'
-        if (categoryFilter === 'youtube') return t === 'youtube'
-        if (categoryFilter === 'iptv') return t === 'iptv' || r.isLive
-        if (categoryFilter === 'sports') return t === 'sports'
-        if (categoryFilter === 'nsfw') return t === 'nsfw' || r.isNSFW
-        return true
-      })
-    }
-
-    if (!showFilters) return list
-    
-    return list.filter(r => {
-      if (filters.hdOnly && !['720p', '1080p', '4K', 'HD'].some(q => (r.quality || '').includes(q))) {
-        return false
-      }
-      if (filters.liveOnly && !r.isLive) {
-        return false
-      }
-      return true
-    })
-  }, [results, categoryFilter, filters, showFilters, activeLayer])
-
-  if (authLoading) return <div className={styles.loading}>Loading...</div>
-  if (!user) return <Navigate to="/auth" replace />
+  const trending = TRENDING_SUGGESTIONS[activeLayer] || TRENDING_SUGGESTIONS.all
 
   return (
     <div className={styles.unifiedSearch}>
+      {/* Header */}
       <div className={styles.header}>
-        <h1>Find Something to Watch</h1>
-        <p className={styles.subtitle}>Search across YouTube, movie sites, live TV, sports, and more</p>
+        <h1>Media Browser</h1>
+        <p className={styles.subtitle}>Search movies, shows, live TV, and sports — watch together in sync</p>
       </div>
-      
+
+      {/* Layer Tabs */}
       <div className={styles.layerTabs}>
         {SEARCH_LAYERS.map(layer => {
-          const LayerIcon = layer.icon
+          const Icon = layer.icon
           return (
             <button
               key={layer.id}
@@ -443,378 +324,323 @@ export default function UnifiedSearch() {
               className={`${styles.tab} ${activeLayer === layer.id ? styles.active : ''} ${layer.adult ? styles.adult : ''}`}
               onClick={() => handleLayerClick(layer.id)}
             >
-              <LayerIcon size={16} />
+              <Icon size={14} />
               <span className={styles.label}>{layer.label}</span>
-              {layer.adult && <span className={styles.adultBadge}>18+</span>}
             </button>
           )
         })}
       </div>
 
+      {/* Layer Description */}
       <div className={styles.layerInfo}>
         <CurrentLayerIcon size={16} className={styles.layerIcon} />
-        <p>{currentLayer?.description}</p>
+        <p>{currentLayer?.description || ''}</p>
       </div>
 
-      <form onSubmit={handleSearch} className={styles.searchForm}>
-        <div className={styles.searchBarWrapper}>
+      {/* Search Form */}
+      <div className={styles.searchForm}>
+        <form onSubmit={(e) => { e.preventDefault(); runSearch() }} className={styles.searchBarWrapper}>
           <div className={styles.inputInner}>
-            <Search size={18} className={styles.searchIcon} />
+            <Search size={16} className={styles.searchIcon} />
             <input
               id="unified-search-input"
               type="text"
+              className={styles.searchInput}
+              placeholder={currentLayer?.placeholder || 'Search...'}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={currentLayer?.placeholder || 'Search...'}
-              className={styles.searchInput}
-              disabled={loading}
+              autoFocus
             />
-            {query && (
-              <button type="button" className={styles.clearBtn} onClick={clearSearch} title="Clear search">
-                <X size={16} />
-              </button>
-            )}
           </div>
-          
           <div className={styles.searchButtonsRow}>
-            <button 
-              type="submit" 
-              disabled={loading || !query.trim()}
-              className={styles.searchBtn}
-            >
-              <Search size={16} />
-              <span>Search</span>
-            </button>
-            
-            {isDirectVideoUrl(query) && (
-              <button 
-                type="button" 
-                onClick={handleDirectUrlSubmit}
-                className={styles.directBtn}
-              >
-                <Play size={14} />
-                <span>Play Direct</span>
+            {query && (
+              <button type="button" onClick={clearSearch} className={styles.clearBtn} title="Clear">
+                <X size={14} />
               </button>
             )}
+            <button type="submit" className={styles.searchBtn} disabled={loading || directLoading}>
+              {loading || directLoading ? <Loader2 size={14} className={styles.spin} /> : <Search size={14} />}
+              Search
+            </button>
           </div>
-        </div>
+        </form>
 
-        {!query && (
+        {/* Trending */}
+        {trending.length > 0 && (
           <div className={styles.trendingContainer}>
-            <span className={styles.trendingHeader}>Trending</span>
+            <div className={styles.trendingHeader}>Trending</div>
             <div className={styles.trendingPills}>
-              {(TRENDING_SUGGESTIONS[activeLayer] || TRENDING_SUGGESTIONS.youtube).map((item, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  className={styles.trendingPill}
-                  onClick={() => handleTrendingClick(item)}
-                >
+              {trending.map((item, i) => (
+                <button key={i} type="button" className={styles.trendingPill} onClick={() => handleTrendingClick(item)}>
                   {item}
                 </button>
               ))}
             </div>
           </div>
         )}
-        
-        <div className={styles.filterToggle}>
-          <button type="button" onClick={() => setShowFilters(!showFilters)}>
-            <SlidersHorizontal size={14} />
-            <span>{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
-          </button>
-        </div>
-        
-        {showFilters && (
-          <div className={styles.filters}>
-            <label>
-              <input 
-                type="checkbox" 
-                checked={filters.hdOnly} 
-                onChange={(e) => setFilters(f => ({ ...f, hdOnly: e.target.checked }))}
-              />
-              HD Only (720p+)
-            </label>
-            <label>
-              <input 
-                type="checkbox" 
-                checked={filters.liveOnly} 
-                onChange={(e) => setFilters(f => ({ ...f, liveOnly: e.target.checked }))}
-              />
-              Live Only
-            </label>
-          </div>
-        )}
-      </form>
+      </div>
 
+      {/* Error */}
       {error && (
         <div className={styles.error}>
           <AlertCircle size={16} />
           <span>{error}</span>
-          <button type="button" onClick={() => search({ layer: activeLayer, query, options: { adultVerified } })}>
-            Retry
-          </button>
+          <button type="button" onClick={clearSearch}>Dismiss</button>
         </div>
       )}
 
-      {loading && results.length === 0 && (
+      {/* ─── Direct Links: Hierarchical Seasons/Episodes ─── */}
+      {activeLayer === 'direct' && directLoading && (
         <div className={styles.loading}>
           <Loader2 size={32} className={styles.spinnerLarge} />
-          <p>Searching {currentLayer?.label}...</p>
+          <p>Resolving from O2TV & Nkiri...</p>
         </div>
       )}
 
-      {filteredResults.length > 0 && (
-        <div className={styles.results}>
-          <div className={styles.resultsHeader}>
-            <h2>
-              {filteredResults.length} result{filteredResults.length !== 1 ? 's' : ''} 
-              {results.length !== filteredResults.length && ` (filtered from ${results.length})`}
-            </h2>
-            <div className={styles.resultActions}>
-              <button type="button" onClick={clear} className={styles.clearAll}>Clear All</button>
+      {activeLayer === 'direct' && directResults && !directLoading && (
+        <div className={styles.directResults}>
+          <div className={styles.directHeader}>
+            <div className={styles.directHeaderLeft}>
+              <h2 className={styles.directTitle}>{directResults.title}</h2>
+              <span className={styles.badgeLime}>O2TV</span>
+              {directResults.seasons.length > 0 && (
+                <span className={styles.badgeFaint}>{directResults.seasons.length} seasons found</span>
+              )}
             </div>
           </div>
 
-          <div className={styles.categoryFilterRow}>
-            {[
-              { id: 'all', label: 'All Results' },
-              { id: 'direct', label: 'Movies & Shows' },
-              { id: 'anime', label: 'Anime' },
-              { id: 'youtube', label: 'YouTube' },
-              { id: 'iptv', label: 'Live TV' },
-              { id: 'sports', label: 'Sports' },
-              { id: 'nsfw', label: 'NSFW 18+' },
-            ].map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                className={`${styles.categoryPill} ${categoryFilter === cat.id ? styles.categoryPillActive : ''}`}
-                onClick={() => setCategoryFilter(cat.id)}
-              >
-                {cat.label}
-              </button>
-            ))}
+          {directResults.seasons.length > 0 ? (
+            <div className={styles.seasonsGrid}>
+              {directResults.seasons.map(season => (
+                <div
+                  key={season.number}
+                  className={styles.seasonCard}
+                  onClick={() => fetchEpisodes(season.url, season.number, directResults.showSlug, directResults.title)}
+                >
+                  <div className={styles.seasonPoster}>
+                    S{season.number}
+                  </div>
+                  <div className={styles.seasonInfo}>
+                    <div className={styles.seasonTitle}>{season.label}</div>
+                    <div className={styles.seasonMeta}>O2TV · HD</div>
+                  </div>
+                  <ChevronRight size={16} className={styles.seasonChevron} />
+                </div>
+              ))}
+            </div>
+          ) : directResults.flatResults?.length > 0 ? (
+            // Fallback: show flat results
+            <div className={styles.resultsGrid}>
+              {directResults.flatResults.map((result, idx) => (
+                <div
+                  key={result.url || idx}
+                  className={styles.resultCard}
+                  onClick={() => {
+                    const params = new URLSearchParams({
+                      videoUrl: normalizePlaybackUrl(result.url || result.link || ''),
+                      title: result.title || 'Video',
+                      type: 'direct',
+                    })
+                    navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
+                  }}
+                >
+                  <div className={styles.info}>
+                    <h3 className={styles.title}>{result.title}</h3>
+                    <div className={styles.meta}>
+                      <span className={styles.source}>{result.source}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.empty}>
+              <p>No seasons found. The show may not be available on O2TV.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── Other Layers: Standard Results Grid ─── */}
+      {activeLayer !== 'direct' && results.length > 0 && (
+        <>
+          <div className={styles.resultsHeader}>
+            <h2>{results.length} result{results.length !== 1 ? 's' : ''}</h2>
+            <button type="button" onClick={clearSearch} className={styles.clearAll}>Clear All</button>
           </div>
 
           <div className={styles.resultsGrid}>
-            {filteredResults.map((result, idx) => {
-              const thumb = result.thumbnail || result.image || null
-              return (
-                <div 
-                  key={`${result.id || result.url || idx}`}
-                  className={`${styles.resultCard} ${styles[result.type || activeLayer]} ${result.isLive ? styles.live : ''}`}
-                  onClick={() => handleResultSelect(result)}
-                >
-                  <div className={styles.thumbnail}>
-                    {thumb ? (
-                      <>
-                        <div
-                          className={styles.thumbnailBg}
-                          style={{ backgroundImage: `url(${thumb})` }}
-                        />
-                        <img
-                          src={thumb}
-                          alt={result.title}
-                          loading="lazy"
-                          className={styles.thumbnailImg}
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none'
-                            if (e.currentTarget.previousSibling) e.currentTarget.previousSibling.style.display = 'none'
-                            if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'flex'
-                          }}
-                        />
-                      </>
-                    ) : null}
-                    <div className={styles.noThumbnail} style={{ display: thumb ? 'none' : 'flex' }}>
-                      <CurrentLayerIcon size={32} />
-                    </div>
-                    
-                    {result.duration && (
-                      <span className={styles.duration}>
-                        <Clock size={10} />
-                        {result.duration}
-                      </span>
-                    )}
-                    {result.isLive && (
-                      <span className={styles.liveBadge}>
-                        <Radio size={10} />
-                        LIVE
-                      </span>
-                    )}
-                    {result.quality && (
-                      <span className={styles.qualityBadge}>{result.quality}</span>
-                    )}
-                    {result.isNSFW && (
-                      <span className={styles.nsfwBadge}>18+</span>
-                    )}
-                  </div>
-                  
-                  <div className={styles.info}>
-                    <h3 className={styles.title} title={result.title}>
-                      {result.title}
-                    </h3>
-                    
-                    <div className={styles.meta}>
-                      {result.views && (
-                        <span className={styles.views}>
-                          <Eye size={10} />
-                          {parseInt(result.views).toLocaleString()}
-                        </span>
-                      )}
-                      {result.year && (
-                        <span className={styles.year}>{result.year}</span>
-                      )}
-                      {result.isLive && (
-                        <span className={styles.liveBadge}>
-                          <Radio size={10} /> LIVE
-                        </span>
-                      )}
-                    </div>
-
-                    {result.description && (
-                      <p className={styles.description}>{result.description.slice(0, 120)}...</p>
-                    )}
-
-                    {activeLayer === 'sports' && result.matchInfo && (
-                      <div className={styles.matchInfo}>
-                        <div className={styles.teams}>{result.matchInfo.teams}</div>
-                        <div className={styles.matchDetails}>
-                          <span className={styles.time}>{result.matchInfo.time}</span>
-                          <span className={styles.competition}>{result.matchInfo.competition}</span>
-                          {result.isLive && <span className={styles.liveIndicator}>LIVE NOW</span>}
-                        </div>
-                        {result.channelCandidates?.length > 0 && (
-                          <div className={styles.candidates}>
-                            Candidate channels: {result.channelCandidates.join(', ')}
-                          </div>
-                        )}
-                        {result.channelAvailable === false && (
-                          <div className={styles.noChannel}>No mapped IPTV channel for this fixture</div>
-                        )}
-                      </div>
-                    )}
-
-                    {activeLayer === 'iptv' && result.program && (
-                      <div className={styles.program}>
-                        <div className={styles.nowPlaying}>
-                          <span className={styles.progLabel}>Now:</span> {result.program.now}
-                        </div>
-                        {result.program.next && (
-                          <div className={styles.next}>
-                            <span className={styles.progLabel}>Next:</span> {result.program.next}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className={styles.actions}>
-                    <button 
-                      type="button"
-                      className={`${styles.watchBtn} ${result.isLive ? styles.liveBtn : ''}`}
-                      disabled={result.channelAvailable === false}
-                      onClick={(e) => { e.stopPropagation(); handleResultSelect(result) }}
-                    >
-                      {result.isLive ? 'Watch Live' : 'Watch in Room'}
-                    </button>
-                    {(result.url || result.link) && (
-                      <a 
-                        href={result.url || result.link} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className={styles.externalLink}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ArrowUpRight size={16} />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+            {results.map((result, idx) => (
+              <ResultCard key={result.id || result.url || idx} result={result} layer={activeLayer} />
+            ))}
           </div>
 
           {hasMore && (
             <div className={styles.loadMore}>
-              <button type="button" onClick={handleLoadMore} disabled={loading}>
+              <button type="button" onClick={loadMore} disabled={loading}>
+                {loading ? <Loader2 size={14} className={styles.spin} /> : null}
                 {loading ? 'Loading...' : 'Load More'}
               </button>
             </div>
           )}
-        </div>
+        </>
       )}
 
-      {!loading && filteredResults.length === 0 && query && (
-        <div className={styles.empty}>
-          <div className={styles.emptyIcon}>
-            <Search size={32} />
-          </div>
-          <h3>No results found</h3>
-          <p>No {currentLayer?.label} results for &quot;{query}&quot;</p>
-          
-          {activeLayer === 'direct' && (
-            <div className={styles.multiLayerAlert}>
-              <h4>TV Show Search Completed</h4>
-              <p>
-                No TV show results for &quot;{query}&quot;. Try a shorter title or paste a direct .mp4 link.
-              </p>
-              <div className={styles.alertTips}>
-                <span>• Try simplifying your keywords (e.g. search &quot;Silo&quot; instead of exact episode name)</span>
-                <span>• Or paste a direct .mp4 / .m3u8 video URL directly into the search bar to play immediately!</span>
-              </div>
-            </div>
-          )}
-
-          {activeLayer === 'nsfw' && !adultVerified && (
-            <p className={styles.verifyPrompt}>Age verification required for NSFW content</p>
-          )}
-          <button type="button" onClick={() => { setQuery(''); document.getElementById('unified-search-input')?.focus(); }}>
-            Clear Search
-          </button>
-        </div>
-      )}
-
-      {!query && !loading && results.length === 0 && (
+      {/* Empty / Initial State */}
+      {!loading && !directLoading && results.length === 0 && !directResults && !error && (
         <div className={styles.initial}>
           <div className={styles.initialIcon}>
-            <CurrentLayerIcon size={32} />
+            <CurrentLayerIcon size={28} />
           </div>
-          <h3>Start Searching</h3>
-          <p>Enter a query above or choose a trending topic to search {currentLayer?.label}</p>
-          <div className={styles.tips}>
-            <p>Tips:</p>
-            <ul>
-              <li>Click any trending pill above to search instantly</li>
-              <li>For direct links, you can paste a full URL (.mp4/.m3u8)</li>
-              <li>Press Ctrl+K to quickly focus the search box</li>
-            </ul>
-          </div>
+          <h3>Search for something</h3>
+          <p>Enter a query above to find {currentLayer?.label?.toLowerCase() || 'content'}</p>
         </div>
       )}
 
-      <Modal
-        open={showNsfwModal}
-        title="Adult Content Verification (18+)"
-        icon={ShieldAlert}
-        onClose={handleNsfwCancel}
-      >
+      {/* Episodes Modal (Direct Links) */}
+      {episodesModal && (
+        <EpisodesModal
+          open={Boolean(episodesModal)}
+          showTitle={directResults?.title || 'Show'}
+          seasonNum={episodesModal.seasonNum}
+          episodes={episodesModal.episodes}
+          loading={episodesModal.loading}
+          onClose={() => setEpisodesModal(null)}
+          onEpisodeClick={handleEpisodeClick}
+        />
+      )}
+
+      {/* NSFW Verification Modal */}
+      <Modal open={showNsfwModal} title="Age Verification Required" icon={ShieldAlert} onClose={handleNsfwCancel}>
         <div className={styles.nsfwModalBody}>
-          <p className={styles.nsfwModalText}>
-            This section contains sexually explicit material restricted to adults aged 18 years and older (or the age of legal majority in your jurisdiction).
-          </p>
-          <p className={styles.nsfwModalSubtext}>
-            By continuing, you confirm that you are at least 18 years old, that accessing adult content is permitted by the laws where you reside, and that you wish to view such material.
-          </p>
+          <p className={styles.nsfwModalText}>You must be 18 or older to access adult content.</p>
+          <p className={styles.nsfwModalSubtext}>By continuing, you confirm you are of legal age in your jurisdiction.</p>
           <div className={styles.nsfwModalActions}>
-            <Button variant="secondary" onClick={handleNsfwCancel}>
-              Cancel / Leave
-            </Button>
-            <Button variant="danger" onClick={handleNsfwConfirm}>
-              I Am 18+ — Continue
-            </Button>
+            <Button variant="secondary" onClick={handleNsfwCancel}>Cancel</Button>
+            <Button variant="danger" onClick={handleNsfwConfirm}>I am 18+</Button>
           </div>
         </div>
       </Modal>
+    </div>
+  )
+}
+
+// ─── Result Card Component ───
+function ResultCard({ result, layer }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const thumb = result.thumbnail || result.image || null
+
+  const handleClick = useCallback(async () => {
+    // YouTube
+    if ((result.type || layer) === 'youtube' && result.id) {
+      navigate(`/create?video=${result.id}&title=${encodeURIComponent(result.title || 'Untitled')}&type=youtube`, { state: { from: location.pathname } })
+      return
+    }
+
+    // IPTV / Live
+    if (result.type === 'iptv' || result.isLive) {
+      const liveUrl = result.rawUrl || result.url || result.link
+      const playback = /\/api\/proxy\?/i.test(String(result.url || ''))
+        ? String(result.url)
+        : normalizePlaybackUrl(liveUrl, { forceProxy: true })
+      const params = new URLSearchParams({
+        videoUrl: playback,
+        title: result.title || 'Live Stream',
+        type: result.type === 'sports' ? 'sports' : 'iptv',
+        isLive: 'true',
+      })
+      navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
+      return
+    }
+
+    // O2TV show → seasons
+    const sourceKey = String(result.source || '').toLowerCase()
+    if (sourceKey === 'o2tv' || result.o2tvKind === 'show' || /tvshows4mobile|o2tv/i.test(result.url || '')) {
+      const params = new URLSearchParams({
+        videoUrl: result.url || '',
+        title: result.title || 'Untitled',
+        type: 'direct',
+      })
+      if (result.showSlug) params.set('showSlug', result.showSlug)
+      if (result.showName) params.set('showName', result.showName)
+      navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
+      return
+    }
+
+    // Direct playable
+    if (result.isDirect || result.playableInRoom || isDirectVideoUrl(result.url || '')) {
+      const params = new URLSearchParams({
+        videoUrl: normalizePlaybackUrl(result.url || result.link || ''),
+        title: result.title || 'Video',
+        type: ['iptv', 'sports', 'nsfw'].includes(result.type) ? result.type : 'direct',
+      })
+      navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
+      return
+    }
+
+    // Needs resolve
+    if (user) {
+      try {
+        const token = await user.getIdToken()
+        const res = await fetch('/api/media', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ action: 'scrape', url: result.url || result.link, options: { resolve: true } }),
+        })
+        const data = await parseJsonResponse(res)
+        const directItem = data.results?.find(r => r.isDirect || r.playableInRoom)
+        if (directItem?.url) {
+          const params = new URLSearchParams({
+            videoUrl: normalizePlaybackUrl(directItem.url),
+            title: directItem.title || result.title || 'Video',
+            type: 'direct',
+          })
+          navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
+          return
+        }
+      } catch { /* fallback below */ }
+    }
+
+    toast('Could not resolve this result. Try another option.', { variant: 'error' })
+  }, [result, layer, navigate, location.pathname, user, toast])
+
+  return (
+    <div className={styles.resultCard} onClick={handleClick}>
+      <div className={styles.thumbnail}>
+        {thumb ? (
+          <>
+            <div className={styles.thumbnailBg} style={{ backgroundImage: `url(${thumb})` }} />
+            <img src={thumb} alt={result.title} loading="lazy" className={styles.thumbnailImg} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+          </>
+        ) : null}
+        <div className={styles.noThumbnail} style={{ display: thumb ? 'none' : 'flex' }}>
+          <Film size={28} />
+        </div>
+        {result.duration && (
+          <span className={styles.duration}><Clock size={10} /> {result.duration}</span>
+        )}
+        {result.isLive && (
+          <span className={styles.liveBadge}><Radio size={10} /> LIVE</span>
+        )}
+        {result.quality && (
+          <span className={styles.qualityBadge}>{result.quality}</span>
+        )}
+      </div>
+      <div className={styles.info}>
+        <h3 className={styles.title}>{result.title}</h3>
+        <div className={styles.meta}>
+          {result.views && <span className={styles.views}><Eye size={10} />{parseInt(result.views).toLocaleString()}</span>}
+          {result.source && <span className={styles.source}>{result.source}</span>}
+        </div>
+      </div>
+      <div className={styles.actions}>
+        <button type="button" className={`${styles.watchBtn} ${result.isLive ? styles.liveBtn : ''}`} onClick={(e) => { e.stopPropagation(); handleClick() }}>
+          {result.isLive ? 'Watch Live' : 'Watch in Room'}
+        </button>
+      </div>
     </div>
   )
 }

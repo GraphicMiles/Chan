@@ -951,4 +951,168 @@
     padding: 8px 12px;
     font-size: 13px;
   }
+
+  /* Direct Links responsive */
+  .directHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-2);
+  }
+
+  .seasonsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .seasonCard {
+    padding: var(--s-3);
+  }
+
+  .seasonPoster {
+    width: 40px;
+    height: 56px;
+    font-size: 13px;
+  }
+}
+
+/* ─── Direct Links: Hierarchical Browse ─── */
+
+.directResults {
+  margin-top: var(--s-4);
+  animation: fadeIn 0.3s ease;
+}
+
+.directHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s-5);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--border-hairline);
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.directHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.directTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  margin: 0;
+  color: var(--text-black);
+}
+
+.badgeLime {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: rgba(198, 255, 51, 0.10);
+  color: #8FB800;
+  border: 1px solid rgba(198, 255, 51, 0.3);
+  display: inline-flex;
+  align-items: center;
+}
+
+.badgeFaint {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--surface-light);
+  color: var(--text-muted-grey);
+  border: 1px solid var(--border-hairline);
+  display: inline-flex;
+  align-items: center;
+}
+
+.seasonsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.seasonCard {
+  background: var(--surface-white);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-card);
+  padding: var(--s-4) var(--s-4);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--shadow-card);
+}
+
+.seasonCard:hover {
+  border-color: var(--accent-orange);
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 3px rgba(255, 106, 43, 0.12), var(--shadow-card-hover);
+}
+
+.seasonPoster {
+  width: 52px;
+  height: 72px;
+  background: var(--surface-light);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--accent-orange);
+  flex-shrink: 0;
+  border: 1px solid var(--border-hairline);
+}
+
+.seasonInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.seasonTitle {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+  color: var(--text-black);
+}
+
+.seasonMeta {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10px;
+  color: var(--text-muted-grey);
+}
+
+.seasonChevron {
+  color: var(--text-muted-grey);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.seasonCard:hover .seasonChevron {
+  transform: translateX(3px);
+  color: var(--accent-orange);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
