@@ -1,19 +1,23 @@
 {
-    "functions": {
-        "api/media.js": {
-            "memory": 1024,
-            "maxDuration": 10
-        },
-        "api/proxy.js": {
-            "memory": 1024,
-            "maxDuration": 10
-        },
-        "api/room.js": {
-            "memory": 256,
-            "maxDuration": 10
-        }
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "framework": "vite",
+  "functions": {
+    "api/media.js": {
+      "memory": 1024,
+      "maxDuration": 10
     },
-    "headers": [
+    "api/proxy.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/room.js": {
+      "memory": 256,
+      "maxDuration": 10
+    }
+  },
+  "headers": [
     {
       "source": "/(.*)",
       "headers": [
