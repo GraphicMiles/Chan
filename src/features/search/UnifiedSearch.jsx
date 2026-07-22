@@ -1,10 +1,8 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useState, useCallback, useMemo } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  PlayCircle, Link2, Tv, Trophy, ShieldAlert, Search, X, Play,
-  ArrowUpRight, SlidersHorizontal, Clock, Eye, Radio, Film,
-  AlertCircle, Loader2, Compass, ChevronRight, Volume2, VolumeX,
-  Maximize, Settings, MessageSquare, SkipBack, SkipForward, Pause
+  Compass, PlayCircle, Link2, Tv, Trophy, ShieldAlert,
+  Search, X, Loader2, ChevronRight, Film
 } from 'lucide-react'
 import styles from './UnifiedSearch.module.scss'
 import { useUnifiedSearch } from '../../hooks/useUnifiedSearch'
@@ -16,81 +14,66 @@ import { EpisodesModal } from './EpisodesModal.jsx'
 
 const SEARCH_LAYERS = [
   { id: 'all', label: 'All Media', icon: Compass, description: 'Search across all sources' },
-  { id: 'youtube', label: 'YouTube', icon: PlayCircle, description: 'Search millions of YouTube videos' },
-  { id: 'direct', label: 'Direct Links', icon: Link2, description: 'TV shows via O2TV & Nkiri' },
-  { id: 'iptv', label: 'Live TV', icon: Tv, description: 'Watch live TV channels' },
-  { id: 'sports', label: 'Sports', icon: Trophy, description: 'Live sports events & fixtures' },
+  { id: 'youtube', label: 'YouTube', icon: PlayCircle, description: 'Search YouTube videos' },
+  { id: 'direct', label: 'Direct Links', icon: Link2, description: 'TV shows via O2TV' },
+  { id: 'iptv', label: 'IPTV', icon: Tv, description: 'Live TV channels' },
+  { id: 'sports', label: 'Sports', icon: Trophy, description: 'Live sports events' },
   { id: 'nsfw', label: 'NSFW', icon: ShieldAlert, description: 'Adult content — 18+ only', adult: true },
 ]
 
-const TRENDING_SUGGESTIONS = {
-  all: ['Silo', 'House of the Dragon', 'Premier League', 'Alan Walker'],
-  youtube: ['Alan Walker Live', 'Top 10 Movies 2026', 'Gaming Highlights'],
-  direct: ['Silo', 'House of the Dragon', 'Squid Game', 'The Last of Us', 'Stranger Things'],
-  iptv: ['CNN News Live', 'ESPN Sports', 'BBC World News', 'Sky Sports'],
-  sports: ['Premier League', 'Champions League', 'NBA Finals'],
-  nsfw: ['Trending', 'Popular Scenes'],
+const TRENDING = {
+  all: ['Silo', 'House of the Dragon', 'Premier League'],
+  youtube: ['Alan Walker Live', 'Top Movies 2026'],
+  direct: ['Silo', 'House of the Dragon', 'Squid Game', 'The Last of Us'],
+  iptv: ['CNN News', 'ESPN Sports', 'BBC World'],
+  sports: ['Premier League', 'Champions League'],
+  nsfw: ['Trending', 'Popular'],
 }
 
 export default function UnifiedSearch() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, loading: authLoading } = useAuth()
+  const { user } = useAuth()
   const { toast } = useToast()
   const isMediaRoute = location.pathname === '/media'
+
   const [activeLayer, setActiveLayer] = useState(isMediaRoute ? 'direct' : 'all')
   const [query, setQuery] = useState('')
   const [adultVerified, setAdultVerified] = useState(false)
   const [showNsfwModal, setShowNsfwModal] = useState(false)
   const [pendingNsfwAction, setPendingNsfwAction] = useState(null)
-  const [showFilters, setShowFilters] = useState(false)
-  const [filters, setFilters] = useState({ hdOnly: false, liveOnly: false })
-  const [categoryFilter, setCategoryFilter] = useState('all')
 
   // Direct Links hierarchical state
-  const [directResults, setDirectResults] = useState(null) // { title, seasons: [...] }
+  const [directResults, setDirectResults] = useState(null)
   const [directLoading, setDirectLoading] = useState(false)
-  const [episodesModal, setEpisodesModal] = useState(null) // { seasonNum, episodes: [...] }
+  const [episodesModal, setEpisodesModal] = useState(null)
 
   const { results, loading, error, search, clear, hasMore, loadMore } = useUnifiedSearch()
 
   const currentLayer = useMemo(() => SEARCH_LAYERS.find(l => l.id === activeLayer), [activeLayer])
   const CurrentLayerIcon = currentLayer?.icon || Film
-
-  // Redirect if NSFW not verified
-  if (activeLayer === 'nsfw' && !adultVerified && !showNsfwModal) {
-    // Show modal on next render
-  }
+  const trending = TRENDING[activeLayer] || TRENDING.all
 
   const runSearch = useCallback(async (targetQuery = query.trim()) => {
     if (!targetQuery) {
       toast('Please enter a search query', { variant: 'warning' })
       return
     }
-
     if (activeLayer === 'nsfw' && !adultVerified) {
       setPendingNsfwAction({ type: 'search', query: targetQuery })
       setShowNsfwModal(true)
       return
     }
-
-    // Direct Links: hierarchical search
     if (activeLayer === 'direct') {
       await searchDirect(targetQuery)
       return
     }
-
-    // Other layers: standard search
     await search({
       layer: activeLayer,
       query: targetQuery,
-      options: {
-        adultVerified,
-        filters: showFilters ? filters : undefined,
-        resolve: activeLayer === 'nsfw',
-      },
+      options: { adultVerified, resolve: activeLayer === 'nsfw' },
     })
-  }, [activeLayer, query, filters, showFilters, search, adultVerified, toast])
+  }, [activeLayer, query, search, adultVerified, toast])
 
   const searchDirect = useCallback(async (targetQuery) => {
     if (!user) {
@@ -117,7 +100,7 @@ export default function UnifiedSearch() {
         return
       }
 
-      // Group by show (O2TV results have showName/showSlug)
+      // Group by show
       const shows = new Map()
       for (const item of items) {
         if (item.o2tvKind === 'show' || item.showSlug) {
@@ -135,7 +118,6 @@ export default function UnifiedSearch() {
       }
 
       if (shows.size > 0) {
-        // Fetch seasons for the first show
         const firstShow = Array.from(shows.values())[0]
         const seasons = await fetchSeasons(firstShow.showSlug, firstShow.showName)
         setDirectResults({
@@ -146,7 +128,6 @@ export default function UnifiedSearch() {
           seasons,
         })
       } else {
-        // Fallback: show as flat results
         setDirectResults({
           title: targetQuery,
           showSlug: '',
@@ -238,7 +219,6 @@ export default function UnifiedSearch() {
         })
         navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
       } else {
-        // Fallback: navigate with the episode URL for CreateRoom to resolve
         const params = new URLSearchParams({
           videoUrl: episode.url,
           title: episode.title,
@@ -283,27 +263,12 @@ export default function UnifiedSearch() {
     setPendingNsfwAction(null)
   }, [pendingNsfwAction, runSearch])
 
-  const handleNsfwCancel = useCallback(() => {
-    setShowNsfwModal(false)
-    setPendingNsfwAction(null)
-  }, [])
-
-  const handleDirectUrlSubmit = useCallback(() => {
-    if (isDirectVideoUrl(query)) {
-      const normalized = normalizePlaybackUrl(query.trim())
-      const title = normalized.split('/').pop()?.replace(/\.(mp4|m3u8|mkv|avi|mov|webm|ogg|flv|ts)$/i, '') || 'Direct Video'
-      navigate(`/create?videoUrl=${encodeURIComponent(normalized)}&title=${encodeURIComponent(title)}&type=direct`, { state: { from: `${location.pathname}${location.search || ''}` } })
-    }
-  }, [query, navigate, location.pathname, location.search])
-
   const clearSearch = useCallback(() => {
     setQuery('')
     clear()
     setDirectResults(null)
     setEpisodesModal(null)
   }, [clear])
-
-  const trending = TRENDING_SUGGESTIONS[activeLayer] || TRENDING_SUGGESTIONS.all
 
   return (
     <div className={styles.unifiedSearch}>
@@ -388,14 +353,15 @@ export default function UnifiedSearch() {
         </div>
       )}
 
-      {/* ─── Direct Links: Hierarchical Seasons/Episodes ─── */}
+      {/* Direct Links: Loading */}
       {activeLayer === 'direct' && directLoading && (
         <div className={styles.loading}>
           <Loader2 size={32} className={styles.spinnerLarge} />
-          <p>Resolving from O2TV & Nkiri...</p>
+          <p>Resolving from O2TV...</p>
         </div>
       )}
 
+      {/* Direct Links: Results */}
       {activeLayer === 'direct' && directResults && !directLoading && (
         <div className={styles.directResults}>
           <div className={styles.directHeader}>
@@ -416,9 +382,7 @@ export default function UnifiedSearch() {
                   className={styles.seasonCard}
                   onClick={() => fetchEpisodes(season.url, season.number, directResults.showSlug, directResults.title)}
                 >
-                  <div className={styles.seasonPoster}>
-                    S{season.number}
-                  </div>
+                  <div className={styles.seasonPoster}>S{season.number}</div>
                   <div className={styles.seasonInfo}>
                     <div className={styles.seasonTitle}>{season.label}</div>
                     <div className={styles.seasonMeta}>O2TV · HD</div>
@@ -428,7 +392,6 @@ export default function UnifiedSearch() {
               ))}
             </div>
           ) : directResults.flatResults?.length > 0 ? (
-            // Fallback: show flat results
             <div className={styles.resultsGrid}>
               {directResults.flatResults.map((result, idx) => (
                 <div
@@ -460,7 +423,7 @@ export default function UnifiedSearch() {
         </div>
       )}
 
-      {/* ─── Other Layers: Standard Results Grid ─── */}
+      {/* Other Layers: Results */}
       {activeLayer !== 'direct' && results.length > 0 && (
         <>
           <div className={styles.resultsHeader}>
@@ -485,7 +448,7 @@ export default function UnifiedSearch() {
         </>
       )}
 
-      {/* Empty / Initial State */}
+      {/* Empty State */}
       {!loading && !directLoading && results.length === 0 && !directResults && !error && (
         <div className={styles.initial}>
           <div className={styles.initialIcon}>
@@ -501,7 +464,7 @@ export default function UnifiedSearch() {
         </div>
       )}
 
-      {/* Episodes Modal (Direct Links) */}
+      {/* Episodes Modal */}
       {episodesModal && (
         <EpisodesModal
           open={Boolean(episodesModal)}
@@ -514,13 +477,13 @@ export default function UnifiedSearch() {
         />
       )}
 
-      {/* NSFW Verification Modal */}
-      <Modal open={showNsfwModal} title="Age Verification Required" icon={ShieldAlert} onClose={handleNsfwCancel}>
+      {/* NSFW Modal */}
+      <Modal open={showNsfwModal} title="Age Verification Required" icon={ShieldAlert} onClose={() => setShowNsfwModal(false)}>
         <div className={styles.nsfwModalBody}>
           <p className={styles.nsfwModalText}>You must be 18 or older to access adult content.</p>
           <p className={styles.nsfwModalSubtext}>By continuing, you confirm you are of legal age in your jurisdiction.</p>
           <div className={styles.nsfwModalActions}>
-            <Button variant="secondary" onClick={handleNsfwCancel}>Cancel</Button>
+            <Button variant="secondary" onClick={() => setShowNsfwModal(false)}>Cancel</Button>
             <Button variant="danger" onClick={handleNsfwConfirm}>I am 18+</Button>
           </div>
         </div>
@@ -529,7 +492,7 @@ export default function UnifiedSearch() {
   )
 }
 
-// ─── Result Card Component ───
+// Result Card Component
 function ResultCard({ result, layer }) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -538,13 +501,10 @@ function ResultCard({ result, layer }) {
   const thumb = result.thumbnail || result.image || null
 
   const handleClick = useCallback(async () => {
-    // YouTube
     if ((result.type || layer) === 'youtube' && result.id) {
       navigate(`/create?video=${result.id}&title=${encodeURIComponent(result.title || 'Untitled')}&type=youtube`, { state: { from: location.pathname } })
       return
     }
-
-    // IPTV / Live
     if (result.type === 'iptv' || result.isLive) {
       const liveUrl = result.rawUrl || result.url || result.link
       const playback = /\/api\/proxy\?/i.test(String(result.url || ''))
@@ -559,8 +519,6 @@ function ResultCard({ result, layer }) {
       navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
       return
     }
-
-    // O2TV show → seasons
     const sourceKey = String(result.source || '').toLowerCase()
     if (sourceKey === 'o2tv' || result.o2tvKind === 'show' || /tvshows4mobile|o2tv/i.test(result.url || '')) {
       const params = new URLSearchParams({
@@ -573,8 +531,6 @@ function ResultCard({ result, layer }) {
       navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
       return
     }
-
-    // Direct playable
     if (result.isDirect || result.playableInRoom || isDirectVideoUrl(result.url || '')) {
       const params = new URLSearchParams({
         videoUrl: normalizePlaybackUrl(result.url || result.link || ''),
@@ -584,8 +540,6 @@ function ResultCard({ result, layer }) {
       navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
       return
     }
-
-    // Needs resolve
     if (user) {
       try {
         const token = await user.getIdToken()
@@ -605,9 +559,8 @@ function ResultCard({ result, layer }) {
           navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
           return
         }
-      } catch { /* fallback below */ }
+      } catch { /* fallback */ }
     }
-
     toast('Could not resolve this result. Try another option.', { variant: 'error' })
   }, [result, layer, navigate, location.pathname, user, toast])
 
@@ -623,20 +576,14 @@ function ResultCard({ result, layer }) {
         <div className={styles.noThumbnail} style={{ display: thumb ? 'none' : 'flex' }}>
           <Film size={28} />
         </div>
-        {result.duration && (
-          <span className={styles.duration}><Clock size={10} /> {result.duration}</span>
-        )}
-        {result.isLive && (
-          <span className={styles.liveBadge}><Radio size={10} /> LIVE</span>
-        )}
-        {result.quality && (
-          <span className={styles.qualityBadge}>{result.quality}</span>
-        )}
+        {result.duration && <span className={styles.duration}>{result.duration}</span>}
+        {result.isLive && <span className={styles.liveBadge}>LIVE</span>}
+        {result.quality && <span className={styles.qualityBadge}>{result.quality}</span>}
       </div>
       <div className={styles.info}>
         <h3 className={styles.title}>{result.title}</h3>
         <div className={styles.meta}>
-          {result.views && <span className={styles.views}><Eye size={10} />{parseInt(result.views).toLocaleString()}</span>}
+          {result.views && <span>{parseInt(result.views).toLocaleString()} views</span>}
           {result.source && <span className={styles.source}>{result.source}</span>}
         </div>
       </div>

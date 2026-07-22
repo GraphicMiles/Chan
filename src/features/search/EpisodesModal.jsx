@@ -12,50 +12,53 @@ const styles = {
     justifyContent: 'center',
     zIndex: 1000,
     padding: '16px',
-    animation: 'fadeIn 0.2s ease',
   },
   modal: {
     background: '#1D1B16',
     border: '1px solid #38352B',
-    borderRadius: '12px',
+    borderRadius: '10px',
     width: '100%',
-    maxWidth: '880px',
+    maxWidth: '860px',
     maxHeight: '85vh',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    boxShadow: '0 32px 64px rgba(0,0,0,0.6)',
-    animation: 'slideUp 0.25s ease',
+    boxShadow: '0 32px 64px rgba(0,0,0,0.5)',
   },
   header: {
-    padding: '18px 24px',
+    padding: '16px 20px',
     borderBottom: '1px solid #38352B',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     flexShrink: 0,
+    flexWrap: 'wrap',
+    gap: '10px',
   },
   titleWrap: {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
+    flexWrap: 'wrap',
   },
   title: {
     fontFamily: "'Space Grotesk', sans-serif",
     fontWeight: 700,
-    fontSize: '18px',
+    fontSize: '17px',
     color: '#F2EFE6',
     margin: 0,
+    letterSpacing: '-0.3px',
   },
-  countBadge: {
+  badge: {
     fontFamily: "'IBM Plex Mono', monospace",
     fontSize: '9px',
-    letterSpacing: '1px',
+    letterSpacing: '0.8px',
     textTransform: 'uppercase',
-    padding: '3px 9px',
+    padding: '3px 8px',
     borderRadius: '20px',
     display: 'inline-flex',
     alignItems: 'center',
+    fontWeight: 500,
     background: '#26231C',
     color: '#6E695C',
     border: '1px solid #38352B',
@@ -73,35 +76,42 @@ const styles = {
     justifyContent: 'center',
     transition: 'all 0.15s',
     padding: 0,
+    flexShrink: 0,
   },
   body: {
-    padding: '24px',
+    padding: '20px',
     overflowY: 'auto',
     flex: 1,
   },
   grid: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '12px',
+    gap: '10px',
   },
   loadingWrap: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '60px 20px',
+    padding: '48px 20px',
     gap: '12px',
   },
   loadingLabel: {
+    fontFamily: "'Space Grotesk', sans-serif",
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#F2EFE6',
+  },
+  loadingSub: {
     fontFamily: "'IBM Plex Mono', monospace",
-    fontSize: '11px',
+    fontSize: '10px',
     color: '#6E695C',
   },
 }
 
-const episodeCardStyle = {
-  width: 'calc(25% - 9px)',
-  minWidth: '150px',
+const episodeCardBase = {
+  width: 'calc(25% - 7.5px)',
+  minWidth: '140px',
   background: '#14130F',
   border: '1px solid #38352B',
   borderRadius: '8px',
@@ -116,13 +126,15 @@ export function EpisodesModal({ open, showTitle, seasonNum, episodes, loading, o
   return (
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
         <div style={styles.header}>
           <div style={styles.titleWrap}>
             <h3 style={styles.title}>{showTitle} — Season {seasonNum}</h3>
-            {!loading && (
-              <span style={styles.countBadge}>{episodes.length} episode{episodes.length !== 1 ? 's' : ''}</span>
+            {!loading && episodes.length > 0 && (
+              <span style={styles.badge}>{episodes.length} episodes</span>
             )}
+            <span style={{ ...styles.badge, background: 'rgba(31,122,92,0.1)', color: '#1F7A5C', borderColor: 'rgba(31,122,92,0.25)' }}>
+              O2TV
+            </span>
           </div>
           <button
             type="button"
@@ -135,12 +147,12 @@ export function EpisodesModal({ open, showTitle, seasonNum, episodes, loading, o
           </button>
         </div>
 
-        {/* Body */}
         <div style={styles.body}>
           {loading ? (
             <div style={styles.loadingWrap}>
-              <Loader2 size={24} style={{ color: '#C6FF33', animation: 'spin 0.8s linear infinite' }} />
+              <Loader2 size={28} style={{ color: '#C6FF33', animation: 'spin 0.7s linear infinite' }} />
               <div style={styles.loadingLabel}>Loading episodes...</div>
+              <div style={styles.loadingSub}>Fetching from O2TV</div>
             </div>
           ) : (
             <div style={styles.grid}>
@@ -148,7 +160,7 @@ export function EpisodesModal({ open, showTitle, seasonNum, episodes, loading, o
                 <EpisodeCard key={ep.number} episode={ep} onClick={() => onEpisodeClick(ep)} />
               ))}
               {episodes.length === 0 && (
-                <div style={{ width: '100%', textAlign: 'center', padding: '40px 20px', color: '#6E695C', fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px' }}>
+                <div style={{ width: '100%', textAlign: 'center', padding: '40px 20px', color: '#6E695C', fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px' }}>
                   No episodes found for this season
                 </div>
               )}
@@ -161,26 +173,26 @@ export function EpisodesModal({ open, showTitle, seasonNum, episodes, loading, o
 }
 
 function EpisodeCard({ episode, onClick }) {
+  const cardRef = { current: null }
+
   return (
     <div
-      style={episodeCardStyle}
+      ref={cardRef}
+      style={episodeCardBase}
       onClick={onClick}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = '#C6FF33'
-        e.currentTarget.style.transform = 'translateY(-3px)'
-        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.4)'
+        e.currentTarget.style.borderColor = '#6E695C'
+        e.currentTarget.style.transform = 'translateY(-2px)'
         const playIcon = e.currentTarget.querySelector('[data-play]')
-        if (playIcon) { playIcon.style.background = '#C6FF33'; playIcon.style.color = '#14130F' }
+        if (playIcon) { playIcon.style.background = 'rgba(198,255,51,0.15)'; playIcon.style.borderColor = 'rgba(198,255,51,0.3)'; playIcon.style.color = '#C6FF33' }
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = '#38352B'
         e.currentTarget.style.transform = 'none'
-        e.currentTarget.style.boxShadow = 'none'
         const playIcon = e.currentTarget.querySelector('[data-play]')
-        if (playIcon) { playIcon.style.background = 'rgba(198,255,51,0.15)'; playIcon.style.color = '#C6FF33' }
+        if (playIcon) { playIcon.style.background = 'rgba(242,239,230,0.06)'; playIcon.style.borderColor = 'rgba(242,239,230,0.12)'; playIcon.style.color = '#A8A296' }
       }}
     >
-      {/* Thumbnail */}
       <div style={{
         aspectRatio: '16/9',
         background: 'linear-gradient(135deg, #26231C, #2E2A20)',
@@ -195,26 +207,26 @@ function EpisodeCard({ episode, onClick }) {
           left: '8px',
           fontFamily: "'IBM Plex Mono', monospace",
           fontSize: '9px',
-          background: 'rgba(20,19,15,0.85)',
+          fontWeight: 500,
+          background: 'rgba(10,9,8,0.8)',
           padding: '2px 6px',
           borderRadius: '4px',
           color: '#A8A296',
-          letterSpacing: '1px',
         }}>
           E{String(episode.number).padStart(2, '0')}
         </span>
         <div
           data-play=""
           style={{
-            width: '36px',
-            height: '36px',
-            background: 'rgba(198,255,51,0.15)',
-            border: '1px solid rgba(198,255,51,0.4)',
+            width: '32px',
+            height: '32px',
+            background: 'rgba(242,239,230,0.06)',
+            border: '1px solid rgba(242,239,230,0.12)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#C6FF33',
+            color: '#A8A296',
             transition: 'all 0.15s',
           }}
         >
@@ -227,7 +239,8 @@ function EpisodeCard({ episode, onClick }) {
             right: '8px',
             fontFamily: "'IBM Plex Mono', monospace",
             fontSize: '9px',
-            background: 'rgba(20,19,15,0.85)',
+            fontWeight: 500,
+            background: 'rgba(10,9,8,0.8)',
             padding: '2px 6px',
             borderRadius: '4px',
             color: '#A8A296',
@@ -237,8 +250,7 @@ function EpisodeCard({ episode, onClick }) {
         )}
       </div>
 
-      {/* Info */}
-      <div style={{ padding: '12px' }}>
+      <div style={{ padding: '10px 12px' }}>
         <div style={{
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: 600,
