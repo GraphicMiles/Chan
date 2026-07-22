@@ -38,9 +38,9 @@ The Android workflow currently passes:
 GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 ```
 
-Because `android/app/build.gradle` defines a `BuildConfig` field from `System.getenv('GROQ_API_KEY')`, that secret would be compiled into the APK if the secret exists in GitHub Actions.
+The previous Android design compiled `GROQ_API_KEY` into Android `BuildConfig`, which would make the key recoverable from the APK.
 
-This is a high-risk mobile secret exposure. I prepared the fix locally, but the provided PAT cannot push workflow-file changes because GitHub rejected workflow updates without the `workflow` token scope. This specific workflow edit must be applied manually in GitHub or with a token that has `workflow` scope.
+I changed the design so native Android still performs the O2TV/captcha session work on-device, but sends only the captcha image to the server for OCR. The Groq key now stays server-side in `GROQ_API_KEY` and is never needed inside the APK.
 
 ### 2. Aligned Capacitor CLI major version
 
@@ -155,7 +155,7 @@ File:
 android/app/build.gradle
 ```
 
-Current code:
+Previous risky pattern:
 
 ```gradle
 buildConfigField "String", "GROQ_API_KEY", "\"${System.getenv('GROQ_API_KEY') ?: ''}\""
@@ -166,15 +166,17 @@ Risk:
 - Anything placed in Android `BuildConfig` is recoverable from the APK.
 - API keys such as Groq keys must not be shipped inside a mobile app.
 
-Required immediate mitigation:
+Mitigation implemented:
 
-- Remove `GROQ_API_KEY` from GitHub Actions build env.
-- Do not compile server/API secrets into Android `BuildConfig`.
+- Removed the Android `GROQ_API_KEY` `buildConfigField`.
+- Added server action `solveCaptchaImage` in `/api/media`.
+- Native Android now downloads the O2TV captcha image locally, sends only the image to `/api/media`, receives the solved text, and submits the captcha locally with the same on-device session/cookies.
 
-Recommended next step:
+Required deployment config:
 
-- Remove native Groq-solving from Android entirely, or proxy it through `/api/media`/server worker.
-- Then remove the `buildConfigField` completely.
+- Set `GROQ_API_KEY` on the server deployment platform, e.g. Vercel/Render.
+- Set `VITE_API_URL` for Android/Capacitor builds to the public API origin, e.g. `https://your-app.vercel.app`.
+- Do not put Groq keys in `VITE_` variables or Android Gradle `BuildConfig`.
 
 ### HIGH — Dependency audit still reports 20 vulnerabilities
 
