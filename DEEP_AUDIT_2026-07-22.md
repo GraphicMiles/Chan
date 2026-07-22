@@ -30,9 +30,9 @@ Notes:
 
 ## Immediate fixes applied
 
-### 1. Removed `GROQ_API_KEY` from Android APK build environment
+### 1. Identified `GROQ_API_KEY` Android APK leakage risk
 
-The Android workflow previously passed:
+The Android workflow currently passes:
 
 ```yaml
 GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -40,7 +40,7 @@ GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 
 Because `android/app/build.gradle` defines a `BuildConfig` field from `System.getenv('GROQ_API_KEY')`, that secret would be compiled into the APK if the secret exists in GitHub Actions.
 
-This is a high-risk mobile secret exposure. I removed the workflow env injection.
+This is a high-risk mobile secret exposure. I prepared the fix locally, but the provided PAT cannot push workflow-file changes because GitHub rejected workflow updates without the `workflow` token scope. This specific workflow edit must be applied manually in GitHub or with a token that has `workflow` scope.
 
 ### 2. Aligned Capacitor CLI major version
 
@@ -166,9 +166,10 @@ Risk:
 - Anything placed in Android `BuildConfig` is recoverable from the APK.
 - API keys such as Groq keys must not be shipped inside a mobile app.
 
-Mitigation applied:
+Required immediate mitigation:
 
-- Removed `GROQ_API_KEY` from GitHub Actions build env.
+- Remove `GROQ_API_KEY` from GitHub Actions build env.
+- Do not compile server/API secrets into Android `BuildConfig`.
 
 Recommended next step:
 
