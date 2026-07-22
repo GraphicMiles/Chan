@@ -278,6 +278,21 @@ export default function UnifiedSearch() {
         <p className={styles.subtitle}>Search movies, shows, live TV, and sports — watch together in sync</p>
       </div>
 
+      {/* VERSION MARKER */}
+      <div style={{
+        background: '#7D39EB',
+        color: '#fff',
+        padding: '10px 14px',
+        marginBottom: '20px',
+        borderRadius: '6px',
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        fontWeight: 'bold',
+        textAlign: 'center'
+      }}>
+        ⚡ MEDIA PAGE v3.0 — {new Date().toLocaleDateString()}
+      </div>
+
       {/* Layer Tabs */}
       <div className={styles.layerTabs}>
         {SEARCH_LAYERS.map(layer => {

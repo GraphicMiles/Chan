@@ -182,6 +182,22 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* VERSION MARKER - DO NOT REMOVE */}
+      <div style={{
+        background: '#C6FF33',
+        color: '#14130F',
+        padding: '12px 16px',
+        margin: '16px 0',
+        borderRadius: '8px',
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        fontWeight: 'bold',
+        textAlign: 'center',
+        border: '2px solid #14130F'
+      }}>
+        🚀 BUILD v3.0 — Updated {new Date().toLocaleString()} — Render Deploy
+      </div>
+
       {continueRoom && (
         <ErrorBoundary>
           <div className={styles.continue}>
