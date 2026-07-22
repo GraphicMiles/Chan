@@ -271,7 +271,20 @@ export default function UnifiedSearch() {
   }, [clear])
 
   return (
-    <div className={styles.unifiedSearch}>
+    <div className={styles.unifiedSearch} style={{
+      // Dark theme override
+      '--bg': '#14130F',
+      '--surface': '#1D1B16',
+      '--surface-2': '#26231C',
+      '--surface-3': '#2E2A20',
+      '--line': '#38352B',
+      '--text': '#F2EFE6',
+      '--text-dim': '#A8A296',
+      '--text-faint': '#6E695C',
+      background: '#0A0908',
+      color: '#F2EFE6',
+      minHeight: '100vh',
+    }}>
       {/* Header */}
       <div className={styles.header}>
         <h1>Media Browser</h1>
