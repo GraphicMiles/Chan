@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Compass, PlayCircle, Link2, Tv, Trophy, ShieldAlert,
-  Search, X, Loader2, ChevronRight, Film
+  Search, X, Loader2, ChevronRight, Film, AlertCircle
 } from 'lucide-react'
 import styles from './UnifiedSearch.module.scss'
 import { useUnifiedSearch } from '../../hooks/useUnifiedSearch'
