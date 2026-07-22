@@ -349,7 +349,6 @@ export default function UnifiedSearch() {
               placeholder={currentLayer?.placeholder || 'Search...'}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              autoFocus
             />
           </div>
           <div className={styles.searchButtonsRow}>
@@ -492,8 +491,13 @@ export default function UnifiedSearch() {
           <div className={styles.initialIcon}>
             <CurrentLayerIcon size={28} />
           </div>
-          <h3>Search for something</h3>
-          <p>Enter a query above to find {currentLayer?.label?.toLowerCase() || 'content'}</p>
+          <h3>{query ? 'Ready to search' : 'Search for something'}</h3>
+          <p>
+            {query
+              ? `Tap Search to find "${query}" in ${currentLayer?.label?.toLowerCase() || 'all sources'}`
+              : `Enter a query above to find ${currentLayer?.label?.toLowerCase() || 'content'}`
+            }
+          </p>
         </div>
       )}
 
