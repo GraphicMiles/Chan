@@ -434,7 +434,7 @@ export default function CreateRoomPage() {
         items = await searchYouTube(searchQuery.trim(), 12)
       } else {
         const token = await user.getIdToken()
-        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/media`, {
+        const res = await fetch(apiPath('/api/media'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -447,7 +447,7 @@ export default function CreateRoomPage() {
             options: { limit: 12 },
           }),
         })
-        const data = await res.json()
+        const data = await parseJsonResponse(res)
         if (!res.ok || !data.success) {
           throw new Error(data.error || `YouTube search failed (HTTP ${res.status})`)
         }
