@@ -4,7 +4,7 @@ import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/fire
 import { Plus, Search, LogOut, Film, Hash, Zap, Play } from 'lucide-react'
 import { db } from '../../../shared/lib/firebase.js'
 import { useAuth } from '../../../shared/auth/hooks/useAuth.jsx'
-import { parseJsonResponse } from '../../../shared/lib/api.js'
+import { apiPath, parseJsonResponse } from '../../../shared/lib/api.js'
 import { Button, Input, EmptyState, Skeleton, useToast } from '../../../shared/ui/index.js'
 import { Header, Layout } from '../../../shared/layout/index.js'
 import RoomCard from '../components/RoomCard.jsx'
@@ -124,7 +124,7 @@ export default function HomePage() {
     setJoining(true)
     try {
       const token = await user.getIdToken()
-      const res = await fetch('/api/room', {
+      const res = await fetch(apiPath('/api/room'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ action: 'join', inviteCode: code, uid: user.uid, displayName: user.displayName || 'Viewer' }),

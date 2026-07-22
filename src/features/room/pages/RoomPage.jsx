@@ -23,6 +23,7 @@ import { Button, Input, Card, IconButton, Modal, Badge, useToast } from '../../.
 import { Layout } from '../../../shared/layout/index.js'
 import ShareRoom from '../components/ShareRoom.jsx'
 import styles from './RoomPage.module.css'
+import { apiPath } from '../../../shared/lib/api.js'
 
 const SOUND_FX_URLS = {
   airhorn: 'https://cdn.freesound.org/previews/435/435255_8863641-lq.mp3',
@@ -235,7 +236,7 @@ export default function RoomPage() {
     setBusy(true)
     try {
       const token = await user.getIdToken()
-      const res = await fetch('/api/media', {
+      const res = await fetch(apiPath('/api/media'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -271,7 +272,7 @@ export default function RoomPage() {
     setLoadingEpisodes(prev => ({ ...prev, [seasonUrl]: true }))
     try {
       const token = await user.getIdToken()
-      const res = await fetch('/api/media', {
+      const res = await fetch(apiPath('/api/media'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

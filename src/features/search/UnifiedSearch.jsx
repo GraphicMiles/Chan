@@ -9,7 +9,7 @@ import { useUnifiedSearch } from '../../hooks/useUnifiedSearch'
 import { useAuth } from '../../shared/auth/hooks/useAuth.jsx'
 import { isDirectVideoUrl, normalizePlaybackUrl } from '../../shared/lib/youtube.js'
 import { Modal, Button, useToast } from '../../shared/ui/index.js'
-import { parseJsonResponse } from '../../shared/lib/api.js'
+import { apiPath, parseJsonResponse } from '../../shared/lib/api.js'
 import { EpisodesModal } from './EpisodesModal.jsx'
 
 const SEARCH_LAYERS = [
@@ -86,7 +86,7 @@ export default function UnifiedSearch() {
 
     try {
       const token = await user.getIdToken()
-      const res = await fetch('/api/media', {
+      const res = await fetch(apiPath('/api/media'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ action: 'search', layer: 'direct', query: targetQuery, options: { limit: 20 } }),
@@ -148,7 +148,7 @@ export default function UnifiedSearch() {
     if (!showSlug || !user) return []
     try {
       const token = await user.getIdToken()
-      const res = await fetch('/api/media', {
+      const res = await fetch(apiPath('/api/media'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ action: 'o2tvSeasons', showSlug, showName }),
@@ -169,7 +169,7 @@ export default function UnifiedSearch() {
     setEpisodesModal({ seasonNum, episodes: [], loading: true })
     try {
       const token = await user.getIdToken()
-      const res = await fetch('/api/media', {
+      const res = await fetch(apiPath('/api/media'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ action: 'o2tvEpisodes', showSlug, showName, seasonNum }),
@@ -202,7 +202,7 @@ export default function UnifiedSearch() {
 
     try {
       const token = await user.getIdToken()
-      const res = await fetch('/api/media', {
+      const res = await fetch(apiPath('/api/media'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ action: 'scrape', url: episode.url, options: { resolve: true } }),
@@ -564,7 +564,7 @@ function ResultCard({ result, layer }) {
     if (user) {
       try {
         const token = await user.getIdToken()
-        const res = await fetch('/api/media', {
+        const res = await fetch(apiPath('/api/media'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ action: 'scrape', url: result.url || result.link, options: { resolve: true } }),

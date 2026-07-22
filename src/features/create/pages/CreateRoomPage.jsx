@@ -13,7 +13,7 @@ import {
   hasYouTubeApiKey,
 } from '../../../shared/lib/youtube.js'
 import { useScraper } from '../../../hooks/useScraper.js'
-import { parseJsonResponse } from '../../../shared/lib/api.js'
+import { apiPath, parseJsonResponse } from '../../../shared/lib/api.js'
 import { isSuitableThumbnail } from '../../../shared/lib/mediaHelper.js'
 import { Button, Input, Card, useToast } from '../../../shared/ui/index.js'
 import styles from './CreateRoomPage.module.css'
@@ -115,7 +115,7 @@ export default function CreateRoomPage() {
   const mediaPost = useCallback(async (body) => {
     if (!user) throw new Error('Sign in required')
     const token = await user.getIdToken()
-    const res = await fetch('/api/media', {
+    const res = await fetch(apiPath('/api/media'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -810,7 +810,7 @@ export default function CreateRoomPage() {
       let lastJoinError = null
       for (let attempt = 0; attempt < 3 && !joinOk; attempt += 1) {
         try {
-          const joinRes = await fetch('/api/room', {
+          const joinRes = await fetch(apiPath('/api/room'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

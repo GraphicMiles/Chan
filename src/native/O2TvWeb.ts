@@ -1,9 +1,10 @@
 import { O2TvPlugin, SearchResponse, SeasonsResponse, EpisodesResponse, ResolveResponse } from './O2TvPlugin';
+import { apiPath } from '../shared/lib/api.js'
 
 export class O2TvWeb implements O2TvPlugin {
   async search(options: { query: string }): Promise<SearchResponse> {
     // Fallback to server-side API when running on web
-    const response = await fetch('/api/media', {
+    const response = await fetch(apiPath('/api/media'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -18,7 +19,7 @@ export class O2TvWeb implements O2TvPlugin {
   }
   
   async getSeasons(options: { showSlug: string }): Promise<SeasonsResponse> {
-    const response = await fetch('/api/media', {
+    const response = await fetch(apiPath('/api/media'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -32,7 +33,7 @@ export class O2TvWeb implements O2TvPlugin {
   }
   
   async getEpisodes(options: { showSlug: string; seasonNum: number }): Promise<EpisodesResponse> {
-    const response = await fetch('/api/media', {
+    const response = await fetch(apiPath('/api/media'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -52,7 +53,7 @@ export class O2TvWeb implements O2TvPlugin {
     seasonNum: number;
     epNum: number;
   }): Promise<ResolveResponse> {
-    const response = await fetch('/api/media', {
+    const response = await fetch(apiPath('/api/media'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
