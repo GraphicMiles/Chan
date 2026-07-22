@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Compass, PlayCircle, Link2, Tv, Trophy, ShieldAlert,
@@ -270,21 +270,14 @@ export default function UnifiedSearch() {
     setEpisodesModal(null)
   }, [clear])
 
+  // Apply dark theme when media page mounts
+  useEffect(() => {
+    document.body.classList.add('room-theme')
+    return () => document.body.classList.remove('room-theme')
+  }, [])
+
   return (
-    <div className={styles.unifiedSearch} style={{
-      // Dark theme override
-      '--bg': '#14130F',
-      '--surface': '#1D1B16',
-      '--surface-2': '#26231C',
-      '--surface-3': '#2E2A20',
-      '--line': '#38352B',
-      '--text': '#F2EFE6',
-      '--text-dim': '#A8A296',
-      '--text-faint': '#6E695C',
-      background: '#0A0908',
-      color: '#F2EFE6',
-      minHeight: '100vh',
-    }}>
+    <div className={styles.unifiedSearch}>
       {/* Header */}
       <div className={styles.header}>
         <h1>Media Browser</h1>
