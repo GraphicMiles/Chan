@@ -76,6 +76,9 @@ export default function UnifiedSearch() {
       query: targetQuery,
       options: { adultVerified, resolve: activeLayer === 'nsfw' },
     })
+  // searchDirect is declared below; keeping this dependency list stable avoids
+  // rebuilding the submit handler during in-flight searches.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLayer, query, search, adultVerified, toast])
 
   const searchDirect = useCallback(async (targetQuery) => {
@@ -178,6 +181,8 @@ export default function UnifiedSearch() {
     } finally {
       setDirectLoading(false)
     }
+  // fetchSeasons is declared below; keep searchDirect stable for active requests.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, toast, isNativeApp])
 
   const fetchSeasons = useCallback(async (showSlug, showName) => {
