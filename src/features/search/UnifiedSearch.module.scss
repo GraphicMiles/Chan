@@ -768,3 +768,196 @@
   margin-top: 8px;
   flex-wrap: wrap;
 }
+
+/* Production polish pass: monochrome, mobile-first, tactile controls */
+.unifiedSearch {
+  max-width: 1120px;
+  padding-top: max(32px, env(safe-area-inset-top));
+  background:
+    radial-gradient(circle at top left, rgba(255,255,255,0.055), transparent 34%),
+    #050505;
+}
+
+.header {
+  margin-bottom: 22px;
+}
+
+.header h1 {
+  font-size: clamp(28px, 6vw, 44px);
+  letter-spacing: -1.2px;
+}
+
+.subtitle {
+  font-size: clamp(15px, 3.4vw, 18px);
+  color: rgba(255,255,255,0.62);
+}
+
+.layerTabs {
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.tab,
+.searchBarWrapper,
+.layerInfo,
+.resultCard,
+.seasonCard,
+.error {
+  border-color: rgba(255,255,255,0.10);
+  background: linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.035));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 18px 45px rgba(0,0,0,0.28);
+}
+
+.tab {
+  border-radius: 14px;
+  min-height: 54px;
+  padding: 0 18px;
+  font-size: 15px;
+  font-weight: 650;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab.active {
+  background: #f4f1ea;
+  border-color: #f4f1ea;
+  color: #050505;
+  box-shadow: 0 10px 30px rgba(255,255,255,0.12);
+}
+
+.tab.adult:not(.active) {
+  color: #ff6257;
+}
+
+.layerInfo {
+  border-radius: 18px;
+  min-height: 58px;
+  padding: 0 18px;
+}
+
+.layerIcon {
+  color: #d7ff4f;
+}
+
+.layerInfo p {
+  font-size: 15px;
+  color: rgba(255,255,255,0.60);
+}
+
+.searchBarWrapper {
+  border-radius: 18px;
+  min-height: 64px;
+  padding: 7px 10px 7px 18px;
+}
+
+.searchBarWrapper:focus-within {
+  border-color: rgba(255,255,255,0.38);
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.08), 0 20px 50px rgba(0,0,0,0.32);
+}
+
+.inputInner {
+  height: 48px;
+}
+
+.searchInput {
+  font-size: 17px;
+  font-weight: 520;
+}
+
+.searchBtn {
+  height: 50px;
+  padding: 0 22px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 750;
+  background: #f4f1ea;
+  color: #050505;
+}
+
+.clearBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: rgba(255,255,255,0.06);
+}
+
+.trendingHeader {
+  font-size: 15px;
+}
+
+.trendingPill {
+  min-height: 38px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  background: rgba(255,255,255,0.07);
+}
+
+.error {
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 76, 64, 0.16), rgba(255, 76, 64, 0.08));
+  color: #ff7067;
+  font-size: 15px;
+  padding: 16px 18px;
+}
+
+.error button {
+  background: #ff5a4f;
+  border-radius: 999px;
+  padding: 10px 18px;
+  color: #fff;
+}
+
+.seasonCard,
+.resultCard {
+  border-radius: 20px;
+  transform: translateZ(0);
+}
+
+.seasonCard:active,
+.resultCard:active,
+.tab:active,
+.searchBtn:active,
+.trendingPill:active {
+  transform: scale(0.985);
+}
+
+.seasonPoster {
+  border-radius: 14px;
+  color: #f4f1ea;
+  background: linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0.035));
+}
+
+.watchBtn {
+  border-radius: 999px !important;
+  min-height: 42px;
+  font-weight: 750;
+}
+
+.initialIcon {
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 22px 70px rgba(255,255,255,0.08);
+}
+
+@media (max-width: 600px) {
+  .unifiedSearch {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .layerTabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tab {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .searchBarWrapper {
+    gap: 8px;
+  }
+
+  .searchBtn {
+    padding: 0 18px;
+  }
+}

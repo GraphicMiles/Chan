@@ -10,6 +10,8 @@ import { useAuth } from '../../shared/auth/hooks/useAuth.jsx'
 import { isDirectVideoUrl, normalizePlaybackUrl } from '../../shared/lib/youtube.js'
 import { Modal, Button, useToast } from '../../shared/ui/index.js'
 import { apiPath, parseJsonResponse } from '../../shared/lib/api.js'
+import { Capacitor } from '@capacitor/core'
+import { O2TvPlugin } from '../../native/O2TvPlugin'
 import { EpisodesModal } from './EpisodesModal.jsx'
 
 const SEARCH_LAYERS = [
@@ -49,6 +51,7 @@ export default function UnifiedSearch() {
   const [episodesModal, setEpisodesModal] = useState(null)
 
   const { results, loading, error, search, clear, hasMore, loadMore } = useUnifiedSearch()
+  const isNativeApp = Capacitor.isNativePlatform()
 
   const currentLayer = useMemo(() => SEARCH_LAYERS.find(l => l.id === activeLayer), [activeLayer])
   const CurrentLayerIcon = currentLayer?.icon || Film
@@ -85,6 +88,39 @@ export default function UnifiedSearch() {
     setEpisodesModal(null)
 
     try {
+      if (isNativeApp) {
+        const native = await O2TvPlugin.search({ query: targetQuery })
+        const shows = Array.isArray(native?.shows) ? native.shows : []
+        if (shows.length === 0) {
+          toast('No O2TV shows found. Try another title or use All Media.', { variant: 'warning' })
+          return
+        }
+        const firstShow = shows[0]
+        const showSlug = firstShow.showSlug || firstShow.slug || ''
+        const showName = firstShow.showName || firstShow.name || firstShow.title || targetQuery
+        let seasons = []
+        if (showSlug) {
+          const nativeSeasons = await O2TvPlugin.getSeasons({ showSlug })
+          seasons = (nativeSeasons?.seasons || []).map(s => ({
+            number: s.number,
+            label: s.label || `Season ${s.number}`,
+            url: s.url,
+          }))
+        }
+        setDirectResults({
+          title: showName,
+          showSlug,
+          url: firstShow.url || '',
+          thumbnail: null,
+          seasons,
+          nativeShows: shows,
+        })
+        if (!seasons.length) {
+          toast('Show found, but no seasons were detected. Try another result.', { variant: 'warning' })
+        }
+        return
+      }
+
       const token = await user.getIdToken()
       const res = await fetch(apiPath('/api/media'), {
         method: 'POST',
@@ -142,11 +178,20 @@ export default function UnifiedSearch() {
     } finally {
       setDirectLoading(false)
     }
-  }, [user, toast])
+  }, [user, toast, isNativeApp])
 
   const fetchSeasons = useCallback(async (showSlug, showName) => {
     if (!showSlug || !user) return []
     try {
+      if (isNativeApp) {
+        const nativeSeasons = await O2TvPlugin.getSeasons({ showSlug })
+        return (nativeSeasons?.seasons || []).map(s => ({
+          number: s.number,
+          label: s.label || `Season ${s.number}`,
+          url: s.url,
+        }))
+      }
+
       const token = await user.getIdToken()
       const res = await fetch(apiPath('/api/media'), {
         method: 'POST',
@@ -162,12 +207,27 @@ export default function UnifiedSearch() {
     } catch {
       return []
     }
-  }, [user])
+  }, [user, isNativeApp])
 
   const fetchEpisodes = useCallback(async (seasonUrl, seasonNum, showSlug, showName) => {
     if (!user) return
     setEpisodesModal({ seasonNum, episodes: [], loading: true })
     try {
+      if (isNativeApp) {
+        const nativeEpisodes = await O2TvPlugin.getEpisodes({ showSlug, seasonNum })
+        const episodes = (nativeEpisodes?.episodes || []).map(ep => ({
+          number: ep.number,
+          title: ep.title || `Episode ${ep.number}`,
+          url: ep.url,
+          native: true,
+          showSlug,
+          showName,
+          seasonNum,
+        }))
+        setEpisodesModal({ seasonNum, episodes, loading: false })
+        return
+      }
+
       const token = await user.getIdToken()
       const res = await fetch(apiPath('/api/media'), {
         method: 'POST',
@@ -185,7 +245,7 @@ export default function UnifiedSearch() {
       toast(err.message || 'Failed to load episodes', { variant: 'error' })
       setEpisodesModal(null)
     }
-  }, [user, toast])
+  }, [user, toast, isNativeApp])
 
   const handleEpisodeClick = useCallback(async (episode) => {
     if (!user) {
@@ -202,6 +262,31 @@ export default function UnifiedSearch() {
 
     try {
       const token = await user.getIdToken()
+      if (isNativeApp && (episode.native || directResults?.showSlug)) {
+        const showSlug = episode.showSlug || directResults?.showSlug || ''
+        const showName = episode.showName || directResults?.title || ''
+        const seasonNum = episode.seasonNum || episodesModal?.seasonNum || 1
+        const epNum = episode.number || episode.episodeNum || 1
+        const resolved = await O2TvPlugin.resolveEpisode({
+          showName,
+          showSlug,
+          seasonNum,
+          epNum,
+          captchaSolverEndpoint: apiPath('/api/media'),
+          authToken: token,
+        })
+        if (resolved?.url) {
+          const params = new URLSearchParams({
+            videoUrl: normalizePlaybackUrl(resolved.url),
+            title: episode.title || `${showName} S${seasonNum}E${epNum}`,
+            type: 'direct',
+          })
+          navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
+          return
+        }
+        throw new Error('Native resolver could not get a playable link. Try another episode.')
+      }
+
       const res = await fetch(apiPath('/api/media'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -233,7 +318,7 @@ export default function UnifiedSearch() {
     } catch (err) {
       toast(err.message || 'Could not resolve episode', { variant: 'error' })
     }
-  }, [user, toast, navigate, location.pathname, directResults, episodesModal])
+  }, [user, toast, navigate, location.pathname, directResults, episodesModal, isNativeApp])
 
   const handleLayerClick = useCallback((layerId) => {
     if (layerId === 'nsfw' && !adultVerified) {
@@ -282,21 +367,6 @@ export default function UnifiedSearch() {
       <div className={styles.header}>
         <h1>Media Browser</h1>
         <p className={styles.subtitle}>Search movies, shows, live TV, and sports — watch together in sync</p>
-      </div>
-
-      {/* VERSION MARKER */}
-      <div style={{
-        background: '#7D39EB',
-        color: '#fff',
-        padding: '10px 14px',
-        marginBottom: '20px',
-        borderRadius: '6px',
-        fontFamily: 'monospace',
-        fontSize: '13px',
-        fontWeight: 'bold',
-        textAlign: 'center'
-      }}>
-        ⚡ MEDIA PAGE v3.0 — {new Date().toLocaleDateString()}
       </div>
 
       {/* Layer Tabs */}
