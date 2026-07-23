@@ -17,7 +17,7 @@ import { EpisodesModal } from './EpisodesModal.jsx'
 const SEARCH_LAYERS = [
   { id: 'all', label: 'All Media', icon: Compass, description: 'Search across all sources' },
   { id: 'youtube', label: 'YouTube', icon: PlayCircle, description: 'Search YouTube videos' },
-  { id: 'direct', label: 'Direct Links', icon: Link2, description: 'TV shows via O2TV' },
+  { id: 'direct', label: 'Direct Links', icon: Link2, description: 'Nkiri shows via DownloadWella' },
   { id: 'iptv', label: 'IPTV', icon: Tv, description: 'Live TV channels' },
   { id: 'sports', label: 'Sports', icon: Trophy, description: 'Live sports events' },
   { id: 'nsfw', label: 'NSFW', icon: ShieldAlert, description: 'Adult content — 18+ only', adult: true },
@@ -52,6 +52,7 @@ export default function UnifiedSearch() {
 
   const { results, loading, error, search, clear, hasMore, loadMore } = useUnifiedSearch()
   const isNativeApp = Capacitor.isNativePlatform()
+  const useLegacyO2TvNative = isNativeApp && import.meta.env.VITE_DIRECT_PROVIDER === 'o2tv'
 
   const currentLayer = useMemo(() => SEARCH_LAYERS.find(l => l.id === activeLayer), [activeLayer])
   const CurrentLayerIcon = currentLayer?.icon || Film
@@ -91,7 +92,7 @@ export default function UnifiedSearch() {
     setEpisodesModal(null)
 
     try {
-      if (isNativeApp) {
+      if (useLegacyO2TvNative) {
         const native = await O2TvPlugin.search({ query: targetQuery })
         const shows = Array.isArray(native?.shows) ? native.shows : []
         if (shows.length === 0) {
@@ -134,8 +135,20 @@ export default function UnifiedSearch() {
       const items = data.results || []
 
       if (items.length === 0) {
-        toast('No results found. Try a different query.', { variant: 'warning' })
+        toast(data.error || 'No results found. Try a different query.', { variant: 'warning' })
         setDirectLoading(false)
+        return
+      }
+
+      if (items.some(item => item.source === 'nkiri' || item.provider === 'nkiri')) {
+        setDirectResults({
+          title: `${items.length} Nkiri result${items.length === 1 ? '' : 's'}`,
+          showSlug: '',
+          url: '',
+          thumbnail: null,
+          seasons: [],
+          flatResults: items,
+        })
         return
       }
 
@@ -183,7 +196,7 @@ export default function UnifiedSearch() {
     }
   // fetchSeasons is declared below; keep searchDirect stable for active requests.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, toast, isNativeApp])
+  }, [user, toast, isNativeApp, useLegacyO2TvNative])
 
   const fetchSeasons = useCallback(async (showSlug, showName) => {
     if (!showSlug || !user) return []
@@ -252,6 +265,36 @@ export default function UnifiedSearch() {
     }
   }, [user, toast, isNativeApp])
 
+
+  const fetchNkiriEpisodes = useCallback(async (showUrl, showTitle) => {
+    if (!user || !showUrl) return
+    setEpisodesModal({ seasonNum: 1, episodes: [], loading: true })
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch(apiPath('/api/media'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'nkiriEpisodes', url: showUrl, title: showTitle }),
+      })
+      const data = await parseJsonResponse(res)
+      if (!res.ok || data.success === false) throw new Error(data.error || 'Could not load episodes')
+      const episodes = (data.results || []).map(ep => ({
+        number: ep.episodeNum,
+        title: ep.title || ep.label || `Episode ${ep.episodeNum}`,
+        url: ep.url,
+        source: 'nkiri',
+        provider: 'downloadwella',
+        container: ep.container,
+      }))
+      setDirectResults(prev => prev ? { ...prev, title: showTitle || prev.title } : prev)
+      setEpisodesModal({ seasonNum: 1, episodes, loading: false })
+      if (!episodes.length) toast('No DownloadWella episode links found for this Nkiri result.', { variant: 'warning' })
+    } catch (err) {
+      toast(err.message || 'Could not load Nkiri episodes', { variant: 'error' })
+      setEpisodesModal(null)
+    }
+  }, [user, toast])
+
   const handleEpisodeClick = useCallback(async (episode) => {
     if (!user) {
       toast('Sign in to watch', { variant: 'warning' })
@@ -267,6 +310,27 @@ export default function UnifiedSearch() {
 
     try {
       const token = await user.getIdToken()
+      if (episode.source === 'nkiri' || episode.provider === 'downloadwella') {
+        const res = await fetch(apiPath('/api/media'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ action: 'nkiriResolve', url: episode.url, title: episode.title }),
+        })
+        const data = await parseJsonResponse(res)
+        if (!res.ok || data.success === false) throw new Error(data.error || 'Could not create direct link')
+        const directItem = data.results?.[0]
+        if (directItem?.url) {
+          const params = new URLSearchParams({
+            videoUrl: normalizePlaybackUrl(directItem.url),
+            title: directItem.title || episode.title || 'Nkiri Video',
+            type: 'direct',
+          })
+          navigate(`/create?${params.toString()}`, { state: { from: location.pathname } })
+          return
+        }
+        throw new Error('No playable stream returned')
+      }
+
       if (isNativeApp && (episode.native || directResults?.showSlug)) {
         const showSlug = episode.showSlug || directResults?.showSlug || ''
         const showName = episode.showName || directResults?.title || ''
@@ -453,7 +517,7 @@ export default function UnifiedSearch() {
       {activeLayer === 'direct' && directLoading && (
         <div className={styles.loading}>
           <Loader2 size={32} className={styles.spinnerLarge} />
-          <p>Resolving from O2TV...</p>
+          <p>Searching Nkiri...</p>
         </div>
       )}
 
@@ -463,7 +527,7 @@ export default function UnifiedSearch() {
           <div className={styles.directHeader}>
             <div className={styles.directHeaderLeft}>
               <h2 className={styles.directTitle}>{directResults.title}</h2>
-              <span className={styles.badgeLime}>O2TV</span>
+              <span className={styles.badgeLime}>NKIRI</span>
               {directResults.seasons.length > 0 && (
                 <span className={styles.badgeFaint}>{directResults.seasons.length} seasons found</span>
               )}
@@ -494,6 +558,10 @@ export default function UnifiedSearch() {
                   key={result.url || idx}
                   className={styles.resultCard}
                   onClick={() => {
+                    if (result.source === 'nkiri' || result.provider === 'nkiri' || result.requiresEpisodes) {
+                      fetchNkiriEpisodes(result.url || result.link, result.title)
+                      return
+                    }
                     const params = new URLSearchParams({
                       videoUrl: normalizePlaybackUrl(result.url || result.link || ''),
                       title: result.title || 'Video',
@@ -513,7 +581,7 @@ export default function UnifiedSearch() {
             </div>
           ) : (
             <div className={styles.empty}>
-              <p>No seasons found. The show may not be available on O2TV.</p>
+              <p>No episodes found. Try another Nkiri result.</p>
             </div>
           )}
         </div>
